@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Nexus Identity',
+        name: '[context] - Nexus',
         short_name: 'Nexus',
         description: 'Secure Hybrid Social Matrix',
         theme_color: '#0a0a0c',

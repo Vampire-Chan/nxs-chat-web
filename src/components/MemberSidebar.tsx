@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { IUser } from '../services/api';
 import { api } from '../services/api';
-import { UserPlus, UserMinus, MessageSquare } from 'lucide-react';
+
 import { ProfileMiniCard } from './ProfileMiniCard';
 
 interface Props {

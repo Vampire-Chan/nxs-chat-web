@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import type { INotification } from '../services/api';
-import { Heart, MessageCircle, UserPlus, ShieldAlert, CheckCircle2, Activity } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, ShieldAlert, CheckCircle2, Activity, X } from 'lucide-react';
 
-export const NotificationsPage = () => {
+export const NotificationsPage = ({ onClose }: { onClose?: () => void }) => {
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,9 +38,12 @@ export const NotificationsPage = () => {
     <div className="flex-1 bg-discord-dark overflow-y-auto custom-scrollbar p-10">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-12">
-           <div>
-              <h2 className="text-4xl font-black text-white uppercase tracking-tight">System Logs</h2>
-              <p className="text-gray-500 font-mono text-[10px] tracking-[0.3em] mt-2 uppercase">Full Pulse History established</p>
+           <div className="flex items-center space-x-6">
+              {onClose && <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-white/5"><X size={20} /></button>}
+              <div>
+                 <h2 className="text-4xl font-black text-white uppercase tracking-tight">System Logs</h2>
+                 <p className="text-gray-500 font-mono text-[10px] tracking-[0.3em] mt-2 uppercase">Full Pulse History established</p>
+              </div>
            </div>
            <button 
              onClick={handleClear}

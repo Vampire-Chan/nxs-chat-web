@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { LogOut, CheckCircle2, UserCircle, ShieldX } from 'lucide-react';
+
 
 interface MenuItem {
   label: string;

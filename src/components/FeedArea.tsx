@@ -9,14 +9,18 @@ interface Props {
   posts: IPost[];
   onOpenCreateModal: () => void;
   currentUser: IUser;
+  channelId?: string;
 }
 
-export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser }: Props) => {
+export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, channelId }: Props) => {
   const [posts, setPosts] = useState(initialPosts);
   const [showHeart, setShowHeart] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
 
   if (initialPosts.length !== posts.length) setPosts(initialPosts);
+
+  const isGlobal = channelId === 'global' || !channelId;
+  const canPost = !isGlobal || !currentUser.isPrivate;
 
   const handleLike = async (postId: string) => {
     const post = posts.find(p => p._id === postId);
@@ -38,16 +42,25 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser }
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-6">
+    <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-4 md:p-6">
       <div className="max-w-xl mx-auto w-full mb-10">
-         <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
-            <div className="w-10 h-10 rounded-xl bg-nexus-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
-            <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all">Broadcast to the Matrix...</div>
-            <div className="p-2 text-nexus-blue group-hover:scale-110 transition-transform"><span className="text-xs font-black uppercase tracking-widest text-nexus-blue">Share</span></div>
-         </div>
+         {canPost ? (
+           <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
+              <div className="w-10 h-10 rounded-xl bg-nexus-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
+              <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
+                {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
+              </div>
+              <div className="p-2 text-nexus-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-nexus-blue">Share</span></div>
+           </div>
+         ) : (
+           <div className="bg-white/[0.02] border border-dashed border-white/10 p-6 rounded-[32px] text-center">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Private_Node_Detected</div>
+              <p className="text-[9px] text-gray-500 mt-2 uppercase leading-relaxed">Public identity sync required for global matrix transmissions.</p>
+           </div>
+         )}
       </div>
 
-      <div className="max-w-xl mx-auto w-full space-y-12 pb-20">
+      <div className="max-w-xl mx-auto w-full space-y-8 md:space-y-12 pb-20">
         {posts.map((post) => (
           <PostCard key={post._id} post={post} currentUser={currentUser} onLike={() => handleLike(post._id)} onDoubleTap={() => handleDoubleTap(post._id)} isHearting={showHeart === post._id} onOpen={() => setSelectedPost(post)} />
         ))}

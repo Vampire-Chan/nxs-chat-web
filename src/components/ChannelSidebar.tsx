@@ -1,99 +1,88 @@
-import { Hash, Image as ImageIcon, Settings, Plus, Film, Mic } from 'lucide-react';
+import { Plus, Hash, Volume2, Image as ImageIcon, Megaphone, Settings, ChevronDown } from 'lucide-react';
 import type { IRealm, IChannel, IUser } from '../services/api';
+import { useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   realm: IRealm | null;
   channels: IChannel[];
   selectedChannelId: string | null;
   onSelectChannel: (channel: IChannel) => void;
-  user: IUser | null;
-  onLogout: () => void;
-  onAddChannel?: () => void;
+  user: IUser;
+  onAddChannel: () => void;
+  onSettings?: () => void;
 }
 
-export const ChannelSidebar = ({ realm, channels, selectedChannelId, onSelectChannel, user, onAddChannel }: Props) => {
-  if (!realm) return <div className="w-60 bg-discord-channel border-r border-gray-900" />;
+export const ChannelSidebar = ({ 
+  realm, 
+  channels, 
+  selectedChannelId, 
+  onSelectChannel, 
+  user, 
+  onAddChannel, 
+  onSettings 
+}: Props) => {
+  const { t } = useLanguage();
+  const [expanded, setExpanded] = useState({ announcements: true, chat: true, voice: true, media: true });
+  const toggle = (key: keyof typeof expanded) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const textChannels = channels.filter(c => c.type === 'text');
-  const feedChannels = channels.filter(c => c.type === 'feed' || c.type === 'reels');
+  const announcements = channels.filter(c => c.type === 'announcement');
+  const chatChannels = channels.filter(c => c.type === 'text');
   const voiceChannels = channels.filter(c => c.type === 'voice');
-  const isOwner = realm.owner === (user?.id || user?._id);
+  const mediaChannels = channels.filter(c => c.type === 'feed' || c.type === 'reels');
 
   return (
-    <div className="w-60 bg-discord-channel flex flex-col h-full border-r border-gray-900">
-      {/* Realm Header */}
-      <div className="h-12 border-b border-gray-900 flex items-center justify-between px-4 hover:bg-white/[0.03] transition cursor-pointer group">
-        <span className="font-black text-white uppercase tracking-wider text-[10px] truncate">{realm.name}</span>
-        {isOwner && (
-          <Plus 
-            size={14} 
-            className="text-gray-500 hover:text-nexus-blue transition-colors" 
-            onClick={(e) => { e.stopPropagation(); onAddChannel?.(); }}
-          />
-        )}
+    <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-white/5">
+      <div onClick={onSettings} className="relative h-24 flex flex-col justify-end p-4 border-b border-white/5 shadow-sm group cursor-pointer overflow-hidden transition-all">
+         {realm?.banner && (
+           <div className="absolute inset-0 z-0">
+             <img src={realm.banner} className="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity" />
+             <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
+           </div>
+         )}
+         <div className="relative z-10 flex items-center justify-between w-full">
+           <div className="flex flex-col">
+              <h2 className="text-sm font-black text-white uppercase tracking-tighter truncate max-w-[140px] drop-shadow-lg">{realm?.name || 'Loading_Node'}</h2>
+              <div className="text-[8px] font-black text-nexus-blue uppercase tracking-[0.2em] drop-shadow-md">{realm?.tier || 'STANDARD'}_REALM</div>
+           </div>
+           <div className="flex items-center space-x-2">
+              {realm?.owner === (user.id || user._id) && <Settings size={14} className="text-gray-400 group-hover:text-white drop-shadow-md" />}
+              <ChevronDown size={16} className="text-gray-400 group-hover:text-white drop-shadow-md" />
+           </div>
+         </div>
       </div>
 
-      {/* Channel List */}
-      <div className="p-2 space-y-0.5 overflow-y-auto flex-1 custom-scrollbar">
-        
-        {/* VOICE CHANNELS */}
-        {voiceChannels.length > 0 && (
-          <div className="pt-4 px-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
-            Neural Links
-          </div>
-        )}
-        {voiceChannels.map(channel => (
-          <ChannelItem 
-            key={channel._id} 
-            channel={channel} 
-            active={selectedChannelId === channel._id} 
-            onClick={() => onSelectChannel(channel)} 
-          />
-        ))}
-
-        {/* FEEDS & REELS */}
-        {feedChannels.length > 0 && (
-          <div className="pt-4 px-2 flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Visual Matrix</span>
-          </div>
-        )}
-        {feedChannels.map(channel => (
-          <ChannelItem 
-            key={channel._id} 
-            channel={channel} 
-            active={selectedChannelId === channel._id} 
-            onClick={() => onSelectChannel(channel)} 
-          />
-        ))}
-
-        {/* CHATS */}
-        {textChannels.length > 0 && (
-           <div className="pt-4 px-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
-             Encrypted Comms
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-6 pt-4">
+         {announcements.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label={t('help.realms')} onToggle={() => toggle('announcements')} />
+              {expanded.announcements && announcements.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Megaphone size={14} className="text-nexus-accent" />} />)}
            </div>
-        )}
-        {textChannels.map(channel => (
-          <ChannelItem 
-            key={channel._id} 
-            channel={channel} 
-            active={selectedChannelId === channel._id} 
-            onClick={() => onSelectChannel(channel)} 
-          />
-        ))}
-
+         )}
+         <div className="space-y-1">
+            <CornerHeader label={t('nav.social')} onToggle={() => toggle('chat')} onAdd={onAddChannel} />
+            {expanded.chat && chatChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Hash size={16} />} />)}
+         </div>
+         <div className="space-y-1">
+            <CornerHeader label={t('help.matrix')} onToggle={() => toggle('voice')} />
+            {expanded.voice && voiceChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Volume2 size={16} />} />)}
+         </div>
+         <div className="space-y-1">
+            <CornerHeader label={t('nav.explore')} onToggle={() => toggle('media')} />
+            {expanded.media && mediaChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ImageIcon size={16} />} />)}
+         </div>
       </div>
     </div>
   );
 };
 
-const ChannelItem = ({ channel, active, onClick }: { channel: IChannel, active: boolean, onClick: () => void }) => (
-  <div 
-    onClick={onClick}
-    className={`group flex items-center px-2 py-1.5 rounded-xl mx-1 cursor-pointer transition-all ${active ? 'bg-nexus-gradient text-white shadow-md shadow-red-500/10' : 'text-gray-400 hover:bg-white/[0.03] hover:text-gray-200'}`}
-  >
-    <div className={`mr-2 transition-colors ${active ? 'text-white' : 'text-gray-500 group-hover:text-nexus-blue'}`}>
-       {channel.type === 'voice' ? <Mic size={16} /> : channel.type === 'reels' ? <Film size={16} /> : channel.type === 'feed' ? <ImageIcon size={16} /> : <Hash size={16} />}
-    </div>
-    <span className={`text-sm font-bold tracking-tight ${active ? 'text-white' : 'text-gray-400'}`}>{channel.name}</span>
+const CornerHeader = ({ label, onToggle, onAdd }: any) => (
+  <div className="flex items-center justify-between px-2 mb-1 group">
+     <div onClick={(e) => { e.stopPropagation(); onToggle(); }} className="flex items-center space-x-1 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors"><span className="text-[9px] font-black uppercase tracking-widest">{label}</span></div>
+     {onAdd && <Plus size={14} className="text-gray-500 hover:text-white cursor-pointer opacity-0 group-hover:opacity-100 transition-all" onClick={(e) => { e.stopPropagation(); onAdd(); }} />}
   </div>
+);
+
+const ChannelItem = ({ channel, active, onClick, icon }: any) => (
+  <div onClick={onClick} className={`group flex items-center space-x-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'}`}><div className={`${active ? 'text-nexus-blue' : 'text-gray-600'}`}>{icon}</div><span className={`text-xs font-bold uppercase tracking-tight ${active ? 'text-white' : ''}`}>{channel.name}</span></div>
 );

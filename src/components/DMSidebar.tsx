@@ -1,4 +1,4 @@
-import { MessageSquare, CheckCircle2, ShieldQuestion } from 'lucide-react';
+import { CheckCircle2, Users, BellOff, XCircle } from 'lucide-react';
 import type { IChannel, IUser } from '../services/api';
 import { api } from '../services/api';
 import { useState } from 'react';
@@ -9,15 +9,12 @@ interface Props {
   selectedDmId: string | null;
   onSelectDm: (dm: IChannel) => void;
   user: IUser | null;
-  onLogout: () => void;
   onlineUserIds: Set<string>;
+  onInitGroup?: () => void;
 }
 
-export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds }: Props) => {
+export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, onInitGroup }: Props) => {
   const [menu, setMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
-
-  const activeDms = dms.filter(d => d.status === 'active');
-  const pendingDms = dms.filter(d => d.status === 'pending');
 
   const handleContextMenu = (e: React.MouseEvent, dmId: string) => {
     e.preventDefault();
@@ -25,91 +22,67 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds }
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: 'Sync as Read', icon: <CheckCircle2 size={14} />, onClick: () => alert('Private Link Synchronized') },
+        { label: 'Sync as Read', icon: <CheckCircle2 size={14} />, onClick: () => api.markChannelRead(dmId).then(() => window.location.reload()) },
+        { label: 'Mark as Unread', icon: <BellOff size={14} />, onClick: () => api.markChannelUnread(dmId).then(() => window.location.reload()) },
+        { label: 'Close Link', icon: <XCircle size={14} />, variant: 'danger' as const, onClick: () => {
+            if(window.confirm("Sever this identity link?")) {
+              api.closeDM(dmId).then(() => window.location.reload());
+            }
+        }}
       ]
     });
   };
 
-  const handleAccept = async (e: React.MouseEvent, dmId: string) => {
-    e.stopPropagation();
-    try {
-      await api.acceptDM(dmId);
-      window.location.reload(); // Quick sync
-    } catch (e) { alert("Activation failed."); }
-  };
+  const activeDms = dms.filter(d => d.type === 'dm' || d.type === 'group_dm');
 
   return (
-    <div className="w-60 bg-discord-channel flex flex-col h-full border-r border-gray-900">
-      <div className="h-12 border-b border-gray-900 flex items-center px-4 font-black text-white truncate uppercase tracking-widest text-[10px]">
-        Encrypted DM Link
+    <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-gray-900">
+      <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm">
+         <div className="flex flex-col">
+            <span className="font-black text-white uppercase tracking-widest text-[10px]">Neural Links</span>
+            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Secure_Layer_Active</span>
+         </div>
+         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-nexus-blue/20 hover:text-nexus-blue rounded-xl transition-all border border-white/5 group" title="Initialize Group">
+            <Users size={16} className="group-hover:scale-110 transition-transform" />
+         </button>
       </div>
 
       <div className="p-2 space-y-0.5 overflow-y-auto flex-1 custom-scrollbar">
-        
-        {/* PENDING REQUESTS */}
-        {pendingDms.length > 0 && (
-          <div className="mb-6">
-             <div className="px-3 text-[9px] font-black text-nexus-blue uppercase tracking-widest mb-2 flex items-center">
-                <ShieldQuestion size={10} className="mr-1" /> Identity Requests
-             </div>
-             {pendingDms.map(dm => {
-                const otherUser = dm.members?.find(m => (m._id || m.id) !== (user?.id || user?._id)) || dm.members?.[0];
-                return (
-                  <div key={dm._id} className="p-2 rounded-xl bg-white/[0.02] border border-gray-800 mx-2 mb-1 flex items-center justify-between group">
-                     <div className="flex items-center min-w-0 mr-2">
-                        <img src={otherUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username}`} className="w-7 h-7 rounded-lg mr-2" />
-                        <span className="text-[10px] font-bold text-gray-300 truncate">{otherUser?.username}</span>
-                     </div>
-                     <button 
-                       onClick={(e) => handleAccept(e, dm._id)}
-                       className="bg-nexus-blue text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-widest hover:scale-105 transition-all"
-                     >
-                        Accept
-                     </button>
-                  </div>
-                );
-             })}
-          </div>
-        )}
-
-        {/* ACTIVE LINKS */}
-        <div className="px-3 text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Active Nodes</div>
         {activeDms.map(dm => {
-          const otherUser = dm.members?.find(m => (m._id || m.id) !== (user?.id || user?._id)) || dm.members?.[0];
+          const isGroup = dm.type === 'group_dm';
+          const otherUser = !isGroup ? dm.members?.find(m => (m._id || m.id) !== (user?.id || user?._id)) : null;
           const isOnline = otherUser ? onlineUserIds.has(otherUser._id || otherUser.id) : false;
+          
+          const myLastSeen = (dm as any).lastSeen?.[user?.id || user?._id || ''];
+          const isUnread = !myLastSeen || new Date((dm as any).lastMessageAt) > new Date(myLastSeen);
 
           return (
             <div 
               key={dm._id}
               onClick={() => onSelectDm(dm)}
               onContextMenu={(e) => handleContextMenu(e, dm._id)}
-              className={`group flex items-center px-2 py-2 rounded-xl mx-2 cursor-pointer transition-all ${selectedDmId === dm._id ? 'bg-nexus-gradient text-white shadow-md shadow-red-500/10' : 'text-gray-400 hover:bg-white/[0.03] hover:text-gray-200'}`}
+              className={`group flex items-center px-2 py-2.5 rounded-xl mx-2 cursor-pointer transition-all ${selectedDmId === dm._id ? 'bg-nexus-gradient text-white shadow-md' : 'text-gray-400 hover:bg-white/[0.03] hover:text-gray-200'}`}
             >
-              <div className="relative mr-3">
-                 <div className={`w-9 h-9 rounded-xl bg-gray-800 overflow-hidden border border-gray-700 transition-all ${selectedDmId === dm._id ? 'border-white/20' : ''}`}>
-                    <img src={otherUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username}`} className="w-full h-full object-cover" alt="u" />
+              <div className="relative mr-3 flex-shrink-0">
+                 <div className={`w-10 h-10 rounded-xl overflow-hidden border border-gray-700 transition-all ${selectedDmId === dm._id ? 'border-white/20' : ''} ${isGroup ? 'bg-nexus-blue/10 flex items-center justify-center' : 'bg-gray-800'}`}>
+                    {isGroup ? (
+                      dm.icon ? <img src={dm.icon} className="w-full h-full object-cover" /> : <Users size={18} className="text-nexus-blue" />
+                    ) : <img src={otherUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username}`} className="w-full h-full object-cover" />}
                  </div>
-                 {isOnline && (
-                   <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-discord-channel shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                 )}
+                 {isOnline && !isGroup && <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-[3px] border-discord-channel" />}
+                 {isUnread && selectedDmId !== dm._id && <div className="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full border-2 border-discord-channel shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />}
               </div>
               <div className="flex-1 min-w-0">
-                 <div className={`font-black text-xs truncate uppercase tracking-tighter ${selectedDmId === dm._id ? 'text-white' : 'text-gray-300'}`}>
-                    {otherUser?.username || 'Unknown'}
+                 <div className={`font-black text-xs truncate uppercase tracking-tighter ${isUnread && selectedDmId !== dm._id ? 'text-white' : (selectedDmId === dm._id ? 'text-white' : 'text-gray-400')}`}>
+                    {isGroup ? (dm.name || 'Unnamed_Group') : (otherUser?.username || 'Ghost_Node')}
                  </div>
-                 <div className="text-[9px] text-gray-500 truncate font-mono uppercase">Node_Connected</div>
+                 <div className="text-[9px] text-gray-500 truncate font-mono uppercase tracking-widest">{isGroup ? `${dm.members?.length} Nodes` : (isUnread ? 'NEW_TRANSMISSION' : 'Identity_Linked')}</div>
               </div>
             </div>
           );
         })}
-
-        {dms.length === 0 && (
-           <div className="text-center py-10 px-4">
-              <MessageSquare size={24} className="mx-auto text-gray-700 mb-2 opacity-20" />
-              <div className="text-[10px] text-gray-600 uppercase font-bold tracking-widest">No Active Nodes</div>
-           </div>
-        )}
       </div>
+
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
     </div>
   );

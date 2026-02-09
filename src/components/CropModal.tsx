@@ -1,6 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import Cropper from 'react-easy-crop';
-import { motion } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 
 interface Props {

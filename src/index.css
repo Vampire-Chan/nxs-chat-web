@@ -20,11 +20,16 @@
   --nexus-font-family: "Inter", sans-serif;
 }
 
+html {
+  font-size: var(--nexus-font-size);
+}
+
 body {
   margin: 0;
   background-color: var(--nexus-bg);
   color: var(--text-main);
   font-family: var(--nexus-font-family);
+  line-height: var(--nexus-line-height);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }

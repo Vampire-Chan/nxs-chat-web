@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import { Zap, Camera, ArrowRight, User as UserIcon, Calendar, Info, Check } from
 type AuthStep = 'start' | 'register-info' | 'register-qr' | 'register-setup' | 'login-code';
 
 export default function AuthPage() {
+  const { t, language, setLanguage } = useLanguage();
   const [step, setStep] = useState<AuthStep>('start');
   const [formData, setFormData] = useState({ 
     username: '', 
@@ -109,11 +111,20 @@ export default function AuthPage() {
                      <Zap size={40} className="-rotate-12 text-white" />
                   </div>
                   <h2 className="text-4xl font-black tracking-tighter uppercase">Nexus Core</h2>
-                  <p className="text-gray-500 text-sm mt-2 font-medium tracking-widest uppercase">Select Access Protocol</p>
+                  <p className="text-gray-500 text-sm mt-2 font-medium tracking-widest uppercase">{t('login.subtitle')}</p>
                </div>
+
+               <div className="flex justify-center space-x-2 bg-black/20 p-1 rounded-xl">
+                  {['en', 'hi', 'ne'].map((lang) => (
+                    <button key={lang} type="button" onClick={() => setLanguage(lang as any)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${language === lang ? 'bg-nexus-blue text-black' : 'text-gray-500 hover:text-white'}`}>
+                      {lang}
+                    </button>
+                  ))}
+               </div>
+
                <div className="space-y-4">
-                  <button onClick={() => setStep('login-code')} className="w-full bg-nexus-gradient text-white font-black py-4 rounded-2xl shadow-xl shadow-red-500/20 hover:scale-105 transition-all uppercase tracking-widest text-xs">Verify Existing Identity</button>
-                  <button onClick={() => setStep('register-info')} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/5 transition-all uppercase tracking-widest text-xs">Establish New Node</button>
+                  <button onClick={() => setStep('login-code')} className="w-full bg-nexus-gradient text-white font-black py-4 rounded-2xl shadow-xl shadow-red-500/20 hover:scale-105 transition-all uppercase tracking-widest text-xs">{t('login.submit')}</button>
+                  <button onClick={() => setStep('register-info')} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/5 transition-all uppercase tracking-widest text-xs">{t('login.register')}</button>
                </div>
             </motion.div>
           )}
@@ -121,11 +132,11 @@ export default function AuthPage() {
           {/* 2. REGISTER INFO */}
           {step === 'register-info' && (
             <motion.form key="info" onSubmit={handleRegisterStart} className="space-y-6">
-               <h2 className="text-2xl font-black uppercase tracking-tight">Identity Specs</h2>
+               <h2 className="text-2xl font-black uppercase tracking-tight">{t('register.title')}</h2>
                <div className="space-y-4">
-                  <InputField label="Identity Handle" icon={<UserIcon size={14}/>} value={formData.username} onChange={(v) => setFormData({...formData, username: v})} placeholder="username" />
-                  <InputField label="Public Name" icon={<Info size={14}/>} value={formData.displayName} onChange={(v) => setFormData({...formData, displayName: v})} placeholder="Display Name" />
-                  <InputField label="Date of Creation" icon={<Calendar size={14}/>} type="date" value={formData.dob} onChange={(v) => setFormData({...formData, dob: v})} />
+                  <InputField label={t('login.email')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
+                  <InputField label={t('profile.displayname')} icon={<Info size={14}/>} value={formData.displayName} onChange={(v: string) => setFormData({...formData, displayName: v})} placeholder="Display Name" />
+                  <InputField label={t('profile.dob')} icon={<Calendar size={14}/>} type="date" value={formData.dob} onChange={(v: string) => setFormData({...formData, dob: v})} />
                </div>
                <button type="submit" disabled={loading} className="w-full bg-nexus-gradient text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs flex items-center justify-center space-x-2">
                   <span>Continue</span> <ArrowRight size={16} />
@@ -188,20 +199,20 @@ export default function AuthPage() {
             <motion.form key="login" onSubmit={handleLogin} className="space-y-8">
                <div className="text-center">
                   <h2 className="text-2xl font-black uppercase tracking-tight">Access Protocol</h2>
-                  <p className="text-gray-500 text-xs mt-2 uppercase font-black tracking-widest">Verify identity signature</p>
+                  <p className="text-gray-500 text-xs mt-2 uppercase font-black tracking-widest">{t('login.subtitle')}</p>
                </div>
                <div className="space-y-4">
-                  <InputField label="Identity Handle" icon={<UserIcon size={14}/>} value={formData.username} onChange={(v) => setFormData({...formData, username: v})} placeholder="username" />
+                  <InputField label={t('login.email')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
                   <div className="pt-4">
-                    <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3 ml-1">Secure Code</label>
+                    <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3 ml-1">{t('login.password')}</label>
                     <input 
                       className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-center text-3xl font-black tracking-[0.4em] text-nexus-accent"
                       placeholder="000000" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)}
                     />
                   </div>
                </div>
-               <button type="submit" className="w-full bg-nexus-gradient text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs">Authorize Access</button>
-               <button type="button" onClick={() => setStep('start')} className="w-full text-[10px] text-gray-600 uppercase font-black tracking-widest">Cancel</button>
+               <button type="submit" className="w-full bg-nexus-gradient text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs">{t('login.submit')}</button>
+               <button type="button" onClick={() => setStep('start')} className="w-full text-[10px] text-gray-600 uppercase font-black tracking-widest">{t('common.cancel')}</button>
             </motion.form>
           )}
         </AnimatePresence>

@@ -11,6 +11,9 @@ export default {
         'discord-sidebar': '#202225',
         'discord-channel': '#2f3136',
         'nexus-accent': '#5865F2', // Blurple
+      },
+      animation: {
+        'spin-slow': 'spin 10s linear infinite',
       }
     },
   },

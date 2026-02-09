@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser } from '../services/api';
 import { Heart, MessageCircle, Send, Music, Zap } from 'lucide-react';
@@ -58,9 +57,9 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
 
   const handleLike = async () => {
     try {
-      const { isFollowing } = await api.likePost(post._id); // API returns likes array, but we can infer
-      setIsLiked(!isLiked);
-      setLikesCount(prev => isLiked ? prev - 1 : prev + 1);
+      const res = await api.likePost(post._id); 
+      setIsLiked(res.likes.includes(currentUser.id || currentUser._id));
+      setLikesCount(res.likes.length);
     } catch (e) { console.error(e); }
   };
 

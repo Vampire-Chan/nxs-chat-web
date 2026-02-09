@@ -1,7 +1,7 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { AtSign, Hash, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { api, IUser } from '../services/api';
+import { api } from '../services/api';
 
 interface Props {
   query: string;
@@ -19,16 +19,13 @@ export const NeuralSuggester = ({ query, type, onSelect, position }: Props) => {
       const fetchUsers = async () => {
         setLoading(true);
         try {
-          const data = await fetch(`http://localhost:5000/api/search/mentions?q=${query.slice(1)}`, {
-            headers: { 'x-auth-token': localStorage.getItem('token') || '' }
-          }).then(res => res.json());
-          setResults(data);
+          const data = await api.globalSearch(query.slice(1));
+          setResults(data.users || []);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
       };
       fetchUsers();
     } else {
-      // Hashtag logic (Local/Hardcoded for now)
       const tags = ['nexus', 'cyber', 'matrix', 'cinema', 'identity', 'transmission'].filter(t => t.startsWith(query.slice(1)));
       setResults(tags);
     }

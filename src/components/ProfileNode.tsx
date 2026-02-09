@@ -2,25 +2,42 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser } from '../services/api';
-import { Grid, Layers, User as UserIcon, Heart, MessageCircle, Lock } from 'lucide-react';
+import { User as UserIcon, Heart, MessageCircle, Lock, Share2, Check, Clock, Shield, Star } from 'lucide-react';
 import { PostViewerModal } from './PostViewerModal';
 
 interface Props {
   user: IUser;
   isOwnProfile: boolean;
   onEdit?: () => void;
-  onFollow?: () => void;
+  onFollow?: (id: string) => void;
   currentUser?: IUser | null;
 }
 
 export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser }: Props) => {
   const [posts, setPosts] = useState<IPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
 
   const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
   const currentUserId = currentUser?.id || currentUser?._id;
+  
   const isFollowing = user.followers?.some((f: any) => (f._id || f) === currentUserId);
+  const isFriend = user.friends?.some((f: any) => (f._id || f) === currentUserId);
+  const isRequestSent = user.inboundRequests?.some((id: any) => (id._id || id) === currentUserId);
+  const isRequestReceived = currentUser?.inboundRequests?.some((id: any) => (id._id || id) === (user.id || user._id));
+
+  const gridLimit = user.tier === 'elite' ? 64 : 8;
+  const displayedPosts = posts.slice(0, gridLimit);
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/id/${user.username}`;
+    navigator.clipboard.writeText(url);
+    alert("Identity link copied to clipboard buffer.");
+  };
+
+  const handleAccept = async () => {
+    try { await api.acceptSync(user.id || user._id); window.location.reload(); } catch (e) { alert("Fail"); }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -30,87 +47,105 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    if (user.isLocked) { setLoading(false); return; }
-    fetchPosts();
-  }, [user]);
+  useEffect(() => { if (!user.isLocked || isOwnProfile || isFriend) fetchPosts(); else setLoading(false); }, [user]);
+
+  const renderActionButton = () => {
+    if (isOwnProfile) return <button onClick={onEdit} className="bg-white/5 hover:bg-white/10 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all backdrop-blur-md">Modify Node</button>;
+    
+    // FIXED: Added onClick to Break Link
+    if (isFriend) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-green-500/10 text-green-500 border border-green-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">Break Link</button>;
+    
+    if (isFollowing && !user.isPrivate) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-white/5 text-white border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">Unsync Node</button>;
+    
+    if (isRequestReceived) return <button onClick={handleAccept} className="bg-green-500/20 text-green-500 border border-green-500/50 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-2"><Check size={12} /> Accept Link</button>;
+    
+    if (isRequestSent) return <button disabled className="bg-white/5 text-gray-500 border border-white/5 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center gap-2"><Clock size={12} /> Pending</button>;
+    
+    return (
+      <button onClick={() => onFollow?.(user.id || user._id)} className="bg-nexus-gradient text-white shadow-red-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95">
+        {user.isPrivate ? 'Request Access' : 'Establish Sync'}
+      </button>
+    );
+  };
 
   return (
     <div className="flex-1 bg-discord-dark overflow-y-auto custom-scrollbar relative">
       <div className="relative">
-         <div className="h-64 bg-gray-900 overflow-hidden border-b border-gray-800 z-0">
-            {user.banner ? <img src={user.banner} className="w-full h-full object-cover opacity-60" /> : <div className="w-full h-full bg-nexus-gradient opacity-10" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-discord-dark to-transparent" />
+         <div className="h-48 bg-gray-900 overflow-hidden border-b border-gray-800/50 z-0">
+            {user.banner ? <img src={user.banner} className="w-full h-full object-cover opacity-40" /> : <div className="w-full h-full bg-nexus-gradient opacity-5" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-discord-dark via-discord-dark/40 to-transparent" />
          </div>
-         <div className="max-w-5xl mx-auto px-10 -mt-24 relative z-10 pb-16">
-            <div className="flex flex-col md:flex-row items-end md:items-end space-y-6 md:space-y-0 md:space-x-10">
+         <div className="max-w-4xl mx-auto px-6 -mt-16 relative z-10 pb-10">
+            <div className="flex flex-col md:flex-row items-center md:items-end space-y-4 md:space-y-0 md:space-x-8">
                <div className="relative group z-20">
-                  <div className="w-44 h-44 rounded-[48px] bg-nexus-gradient p-1 shadow-[0_20px_50px_rgba(0,0,0,0.5)] shadow-red-500/20">
-                     <div className="w-full h-full rounded-[44px] bg-discord-dark overflow-hidden border-8 border-discord-dark">
+                  <div className="w-32 h-32 rounded-[32px] bg-nexus-gradient p-0.5 shadow-2xl">
+                     <div className="w-full h-full rounded-[30px] bg-discord-dark overflow-hidden border-4 border-discord-dark">
                         <img src={user.avatar || defaultAvatar} className="w-full h-full object-cover" alt="pfp" />
                      </div>
                   </div>
-                  <div className="absolute -bottom-2 -right-2 bg-nexus-blue w-10 h-10 rounded-2xl flex items-center justify-center border-4 border-discord-dark shadow-xl z-30"><UserIcon size={18} className="text-white" /></div>
+                  <div className="absolute -bottom-1 -right-1 bg-nexus-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-discord-dark shadow-xl z-30">
+                     {user.isPrivate ? <Shield size={14} className="text-white" /> : <UserIcon size={14} className="text-white" />}
+                  </div>
                </div>
-               <div className="flex-1 pb-4 z-10">
-                  <div className="flex flex-col md:flex-row md:items-center md:space-x-6 mb-6">
-                     <h2 className="text-4xl font-black text-white uppercase tracking-tight drop-shadow-2xl">{user.username}</h2>
-                     <div className="flex space-x-3 mt-4 md:mt-0">
-                        {isOwnProfile ? (
-                          <button onClick={onEdit} className="bg-white/5 hover:bg-white/10 text-white px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all backdrop-blur-md">Modify Node</button>
-                        ) : (
-                          <button onClick={onFollow} className={`px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 ${isFollowing ? 'bg-white/5 text-white border border-white/10' : 'bg-nexus-gradient text-white shadow-red-500/20'}`}>{isFollowing ? 'Break Sync' : 'Establish Sync'}</button>
-                        )}
+               <div className="flex-1 pb-2 text-center md:text-left">
+                  <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-4">
+                     <div className="flex items-center justify-center md:justify-start gap-2">
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{user.username}</h2>
+                        {user.tier === 'elite' && <Star size={18} className="text-yellow-500 fill-yellow-500" />}
+                     </div>
+                     <div className="flex space-x-2 mt-3 md:mt-0 justify-center">
+                        <button onClick={handleShare} className="bg-white/5 hover:bg-white/10 text-white p-2 rounded-xl border border-white/10 flex items-center justify-center"><Share2 size={14} /></button>
+                        {renderActionButton()}
                      </div>
                   </div>
-                  <div className="flex space-x-12 mb-6">
-                     <Stat label="Broadcasts" value={posts.length} />
-                     <Stat label="Followers" value={user.followers?.length || 0} />
+                  <div className="flex justify-center md:justify-start space-x-8 opacity-80">
+                     <Stat label="Transmissions" value={posts.length} />
+                     {user.isPrivate ? <Stat label="Synced" value={user.friends?.length || 0} /> : <Stat label="Followers" value={user.followers?.length || 0} />}
                      <Stat label="Following" value={user.following?.length || 0} />
                   </div>
                </div>
             </div>
-            <div className="mt-10 max-w-2xl bg-white/[0.02] p-6 rounded-3xl border border-white/5 backdrop-blur-sm z-10 relative">
-               <p className="text-gray-300 text-sm leading-relaxed font-medium">{user.bio ? <span className="italic">"{user.bio}"</span> : <span className="text-gray-600 font-mono text-[10px] uppercase tracking-widest">Awaiting bio transmission...</span>}</p>
+            <div className="mt-6 flex flex-col md:flex-row gap-4 items-start">
+               <div className="flex-1 bg-white/[0.02] p-5 rounded-2xl border border-white/5 backdrop-blur-sm relative overflow-hidden group">
+                  <p className="text-gray-300 text-sm leading-relaxed font-medium relative z-10">{user.bio || "Node awaiting identity calibration."}</p>
+               </div>
+               <div className="w-full md:w-48 bg-white/[0.01] border border-white/5 rounded-2xl p-4 flex flex-col space-y-2">
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Handle</span><span className="text-[8px] font-mono text-nexus-blue">@{user.username}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Tier</span><span className="text-[8px] font-mono text-yellow-500 uppercase">{user.tier}</span></div>
+               </div>
             </div>
          </div>
       </div>
 
-      {user.isLocked && !isOwnProfile ? (
-        <div className="max-w-5xl mx-auto px-10 py-32 flex flex-col items-center border-t border-gray-900">
-           <div className="w-24 h-24 bg-white/5 rounded-[32px] flex items-center justify-center mb-6 border border-white/5"><Lock size={40} className="text-gray-600" /></div>
-           <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-2">Private Identity Locked</h3>
-           <p className="text-gray-500 text-xs font-mono uppercase tracking-widest text-center max-w-xs leading-relaxed">Establishing a mutual sync link is required to access this node's visual matrix.</p>
+      {user.isLocked && !isOwnProfile && !isFriend ? (
+        <div className="max-w-4xl mx-auto px-6 py-20 flex flex-col items-center border-t border-gray-900/50">
+           <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/5"><Lock size={24} className="text-gray-600" /></div>
+           <h3 className="text-lg font-black text-white uppercase tracking-widest mb-1">Stealth Node Active</h3>
+           <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest text-center max-w-xs leading-relaxed">Establish a mutual sync to unlock visual matrix.</p>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto px-10">
-           <div className="flex justify-center space-x-16 mb-12 text-[10px] font-black uppercase tracking-[0.4em] border-t border-gray-900 pt-8">
-              <button className="flex items-center space-x-3 text-white border-b-2 border-nexus-blue pb-4 transition-all"><Grid size={16} /> <span>Visual_Matrix</span></button>
-              <button className="flex items-center space-x-3 text-gray-600 hover:text-gray-400 transition-all pb-4"><Layers size={16} /> <span>Stored_Nodes</span></button>
-           </div>
-           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 pb-20">
-              {posts.map((post) => (
-                <motion.div key={post._id} onClick={() => setSelectedPost(post)} whileHover={{ y: -5, scale: 1.02 }} className="aspect-square bg-discord-channel rounded-3xl overflow-hidden border border-gray-800 relative group cursor-pointer shadow-xl transition-all">
-                   <img src={post.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                   <div className="absolute inset-0 bg-nexus-gradient/20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center space-x-8 backdrop-blur-[3px]">
-                      <div className="flex flex-col items-center text-white space-y-1"><Heart size={24} className="fill-white" /><span className="font-black text-xs uppercase tracking-tighter">{post.likes?.length || 0}</span></div>
-                      <div className="flex flex-col items-center text-white space-y-1"><MessageCircle size={24} className="fill-white" /><span className="font-black text-xs uppercase tracking-tighter">{post.comments?.length || 0}</span></div>
+        <div className="max-w-4xl mx-auto px-6">
+           <div className="grid gap-3 md:gap-4 pb-20 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {displayedPosts.map((post) => (
+                <motion.div key={post._id} onClick={() => setSelectedPost(post)} whileHover={{ y: -3, scale: 1.01 }} className="aspect-square bg-discord-channel rounded-2xl overflow-hidden border border-gray-800/50 relative group cursor-pointer shadow-lg transition-all">
+                   <img src={post.imageUrl} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500" />
+                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center space-x-4 backdrop-blur-[1px]">
+                      <div className="flex items-center text-white text-[10px] font-black"><Heart size={12} className="fill-white mr-1" />{post.likes?.length || 0}</div>
+                      <div className="flex items-center text-white text-[10px] font-black"><MessageCircle size={12} className="fill-white mr-1" />{post.comments?.length || 0}</div>
                    </div>
                 </motion.div>
               ))}
            </div>
-           {posts.length === 0 && !loading && <div className="text-center py-32 opacity-20 border-2 border-dashed border-gray-800 rounded-[64px] mb-20"><div className="text-5xl font-black text-gray-700 uppercase tracking-[0.2em] mb-6">ZERO_DATA</div><p className="text-xs font-mono tracking-widest uppercase">Node transmission history is empty.</p></div>}
         </div>
       )}
-
-      {selectedPost && <PostViewerModal post={selectedPost} onClose={() => setSelectedPost(null)} currentUser={currentUser} onUpdate={fetchPosts} />}
+      {selectedPost && <PostViewerModal post={selectedPost} onClose={() => setSelectedPost(null)} currentUser={currentUser || null} onUpdate={fetchPosts} />}
     </div>
   );
 };
 
-const Stat = ({ label, value }: { label: string, value: number }) => (
-  <div className="text-left">
-     <div className="text-2xl font-black text-white tracking-tighter leading-none">{value}</div>
-     <div className={`text-[10px] font-black uppercase tracking-widest mt-1 ${value > 0 ? 'text-nexus-blue' : 'text-gray-600'}`}>{label}</div>
+const Stat = ({ label, value }: any) => (
+  <div className="flex flex-col">
+     <div className="text-xl font-black text-white tracking-tighter">{value}</div>
+     <div className={`text-[8px] font-black uppercase text-gray-600`}>{label}</div>
   </div>
 );

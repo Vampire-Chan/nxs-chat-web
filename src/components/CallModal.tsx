@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { Phone, PhoneOff, Mic, MicOff, User } from 'lucide-react';
 import type { IUser } from '../services/api';
 

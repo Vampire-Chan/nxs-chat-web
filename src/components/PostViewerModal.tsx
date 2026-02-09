@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, MessageCircle, MoreHorizontal, Send, Trash2, Edit3, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { X, Heart, MessageCircle, Send, Trash2, Edit3 } from 'lucide-react';
 import type { IPost, IUser } from '../services/api';
 import { api } from '../services/api';
 
@@ -118,9 +118,11 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate }: Props)
                  <div className="space-y-4">
                     {post.comments?.map((c, i) => (
                       <div key={i} className="flex space-x-3 group">
-                         <div className="w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0" />
+                         <div className="w-8 h-8 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5">
+                            <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username}`} className="w-full h-full object-cover" />
+                         </div>
                          <div className="flex-1">
-                            <div className="text-[10px] font-black text-white uppercase tracking-tight">Node_Visitor</div>
+                            <div className="text-[10px] font-black text-white uppercase tracking-tight">{c.user?.username || 'Identity_Lost'}</div>
                             <div className="text-xs text-gray-400 mt-0.5">{c.text}</div>
                          </div>
                       </div>

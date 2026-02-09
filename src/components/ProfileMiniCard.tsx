@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { User, MessageSquare, Zap, Shield, ExternalLink } from 'lucide-react';
+import { MessageSquare, Zap, Shield, ExternalLink } from 'lucide-react';
 import type { IUser } from '../services/api';
 
 interface Props {

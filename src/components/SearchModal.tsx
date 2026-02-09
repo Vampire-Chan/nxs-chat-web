@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Search, User as UserIcon, Globe, Image as ImageIcon, Zap, X, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import type { IUser, IRealm, IPost } from '../services/api';

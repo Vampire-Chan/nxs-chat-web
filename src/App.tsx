@@ -140,6 +140,19 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   }, [username, code]);
 
   useEffect(() => {
+    let context = 'Nexus';
+    if (viewMode === 'home') context = activeChannel ? `@${activeChannel.name}` : 'Neural_Links';
+    else if (viewMode === 'explore') context = 'Global_Matrix';
+    else if (viewMode === 'profile') context = 'Identity_Node';
+    else if (viewMode === 'architect') context = 'Architect_Realm';
+    else if (viewMode === 'notifications') context = 'Alert_Buffer';
+    else if (viewMode === 'social') context = 'Social_Matrix';
+    else if (activeRealm) context = activeChannel ? `#${activeChannel.name}` : activeRealm.name;
+    
+    document.title = `${context} - Nexus`;
+  }, [viewMode, activeRealm, activeChannel]);
+
+  useEffect(() => {
     const userId = user?.id || user?._id;
     const token = localStorage.getItem('token');
     if (!user || !userId || !token) return;

@@ -3,7 +3,7 @@ import axios from 'axios';
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.');
 const API_BASE = import.meta.env.VITE_API_URL || (isLocal ? `http://${hostname}:5000` : '');
-const API_URL = `${API_BASE}/api`;
+export const API_URL = `${API_BASE}/api`;
 
 export interface IUser {
   _id: string;

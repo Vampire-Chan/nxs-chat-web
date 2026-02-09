@@ -5,6 +5,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Camera, ArrowRight, User as UserIcon, Calendar, Info, Check } from 'lucide-react';
+import { API_URL } from '../services/api';
 
 type AuthStep = 'start' | 'register-info' | 'register-qr' | 'register-setup' | 'login-code';
 
@@ -35,7 +36,7 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', { 
+      const res = await axios.post(`${API_URL}/auth/register`, { 
         username: formData.username,
         displayName: formData.displayName,
         dob: formData.dob
@@ -51,7 +52,7 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/verify-registration', { 
+      const res = await axios.post(`${API_URL}/auth/verify-registration`, { 
         username: formData.username, 
         token: code 
       });
@@ -71,7 +72,7 @@ export default function AuthPage() {
     fd.append('bio', formData.bio);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/setup', fd);
+      const res = await axios.post(`${API_URL}/auth/setup`, fd);
       login(localStorage.getItem('token')!, res.data.user);
       navigate('/');
     } catch (err) { setError(getErrorMessage(err)); }
@@ -83,7 +84,7 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', { 
+      const res = await axios.post(`${API_URL}/auth/login`, { 
         username: formData.username, 
         token: code 
       });

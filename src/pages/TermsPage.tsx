@@ -16,18 +16,18 @@ export default function TermsPage() {
 
         <header className="mb-20">
           <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 flex items-center gap-4">
-            <Scale size={40} className="text-nexus-blue" /> {t('settings.legal')}
+            <Scale size={40} className="text-vani-blue" /> {t('settings.legal')}
           </h1>
-          <div className="h-1 w-20 bg-nexus-gradient rounded-full" />
-          <p className="mt-6 text-gray-500 uppercase text-[10px] font-black tracking-[0.3em]">Revision 2026.04.AT // Matrix Legal Framework</p>
+          <div className="h-1 w-20 bg-vani-gradient rounded-full" />
+          <p className="mt-6 text-gray-500 uppercase text-[10px] font-black tracking-[0.3em]">Revision 2026.04.AT // Vani Matrix Legal Framework</p>
         </header>
 
         <div className="space-y-12 text-sm text-gray-400 leading-relaxed max-w-3xl">
           <section className="space-y-4">
             <h2 className="text-white font-black uppercase tracking-widest flex items-center gap-3">
-              <ScrollText size={18} className="text-nexus-blue" /> 01. Identity Ownership
+              <ScrollText size={18} className="text-vani-blue" /> 01. Identity Ownership
             </h2>
-            <p>By Establishing a Node in the Nexus Matrix, you maintain primary sovereignty over your generated visual data and neural transmissions. However, you grant Nexus a global, non-exclusive license to host, cache, and synchronize this data across the network.</p>
+            <p>By Establishing a Node in the Yantravani Vani Matrix, you maintain primary sovereignty over your generated visual data and neural transmissions. However, you grant Yantravani a global, non-exclusive license to host, cache, and synchronize this data across the network.</p>
           </section>
 
           <section className="space-y-4">
@@ -51,13 +51,13 @@ export default function TermsPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-white font-black uppercase tracking-widest">04. Matrix Connectivity</h2>
-            <p>Nexus does not guarantee 100% neural link uptime. System maintenance and matrix recalibrations may occur without notice. We are not liable for any data loss occurring during sector collapses or unauthorized node breaches.</p>
+            <h2 className="text-white font-black uppercase tracking-widest">04. Vani Matrix Connectivity</h2>
+            <p>Yantravani does not guarantee 100% neural link uptime. System maintenance and Vani Matrix recalibrations may occur without notice. We are not liable for any data loss occurring during sector collapses or unauthorized node breaches.</p>
           </section>
         </div>
 
         <div className="mt-20 pt-10 border-t border-white/5 text-[10px] font-mono text-gray-600">
-          BY CLICKING "ENTER THE MATRIX", YOU ACKNOWLEDGE AND CALIBRATE YOUR NODE TO THESE TERMS. FAILURE TO COMPLY WILL RESULT IN SEVERANCE.
+          BY CLICKING "ENTER THE Vani Matrix", YOU ACKNOWLEDGE AND CALIBRATE YOUR NODE TO THESE TERMS. FAILURE TO COMPLY WILL RESULT IN SEVERANCE.
         </div>
       </div>
     </div>

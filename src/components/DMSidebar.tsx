@@ -42,7 +42,7 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
             <span className="font-black text-white uppercase tracking-widest text-[10px]">Neural Links</span>
             <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Secure_Layer_Active</span>
          </div>
-         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-nexus-blue/20 hover:text-nexus-blue rounded-xl transition-all border border-white/5 group" title="Initialize Group">
+         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-vani-blue/20 hover:text-vani-blue rounded-xl transition-all border border-white/5 group" title="Initialize Group">
             <Users size={16} className="group-hover:scale-110 transition-transform" />
          </button>
       </div>
@@ -50,10 +50,11 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
       <div className="p-2 space-y-0.5 overflow-y-auto flex-1 custom-scrollbar">
         {activeDms.map(dm => {
           const isGroup = dm.type === 'group_dm';
-          const otherUser = !isGroup ? dm.members?.find(m => (m._id || m.id) !== (user?.id || user?._id)) : null;
-          const isOnline = otherUser ? onlineUserIds.has(otherUser._id || otherUser.id) : false;
+          // RE-CALIBRATED USER RESOLUTION: Always look in members array first
+          const otherUser = !isGroup ? dm.members?.find(m => (m._id || m.id).toString() !== (user?.id || user?._id)?.toString()) : null;
+          const isOnline = otherUser ? onlineUserIds.has((otherUser._id || otherUser.id).toString()) : false;
           
-          const myLastSeen = (dm as any).lastSeen?.[user?.id || user?._id || ''];
+          const myLastSeen = (dm as any).lastSeen?.[(user?.id || user?._id || '').toString()];
           const isUnread = !myLastSeen || new Date((dm as any).lastMessageAt) > new Date(myLastSeen);
 
           return (
@@ -61,12 +62,12 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
               key={dm._id}
               onClick={() => onSelectDm(dm)}
               onContextMenu={(e) => handleContextMenu(e, dm._id)}
-              className={`group flex items-center px-2 py-2.5 rounded-xl mx-2 cursor-pointer transition-all ${selectedDmId === dm._id ? 'bg-nexus-gradient text-white shadow-md' : 'text-gray-400 hover:bg-white/[0.03] hover:text-gray-200'}`}
+              className={`group flex items-center px-2 py-2.5 rounded-xl mx-2 cursor-pointer transition-all ${selectedDmId === dm._id ? 'bg-vani-gradient text-white shadow-md' : 'text-gray-400 hover:bg-white/[0.03] hover:text-gray-200'}`}
             >
               <div className="relative mr-3 flex-shrink-0">
-                 <div className={`w-10 h-10 rounded-xl overflow-hidden border border-gray-700 transition-all ${selectedDmId === dm._id ? 'border-white/20' : ''} ${isGroup ? 'bg-nexus-blue/10 flex items-center justify-center' : 'bg-gray-800'}`}>
+                 <div className={`w-10 h-10 rounded-xl overflow-hidden border border-gray-700 transition-all ${selectedDmId === dm._id ? 'border-white/20' : ''} ${isGroup ? 'bg-vani-blue/10 flex items-center justify-center' : 'bg-gray-800'}`}>
                     {isGroup ? (
-                      dm.icon ? <img src={dm.icon} className="w-full h-full object-cover" /> : <Users size={18} className="text-nexus-blue" />
+                      dm.icon ? <img src={dm.icon} className="w-full h-full object-cover" /> : <Users size={18} className="text-vani-blue" />
                     ) : <img src={otherUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username}`} className="w-full h-full object-cover" />}
                  </div>
                  {isOnline && !isGroup && <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-[3px] border-discord-channel" />}

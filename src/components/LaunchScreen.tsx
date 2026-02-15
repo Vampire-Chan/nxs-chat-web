@@ -6,26 +6,26 @@ interface Props {
   progress: number;
 }
 
-const NEXUS_LORE = [
+const Yantravani_LORE = [
   "Initializing identity kernels...",
   "Calibrating neural frequencies...",
   "Syncing with the Global Matrix...",
   "Encrypting social fragments...",
-  "Booting Nexus Core v1.0.42...",
-  "Did you know? The first version of Nexus was coded in a basement during a power outage.",
+  "Booting Yantravani Core v1.0.42...",
+  "Did you know? The first version of Yantravani was coded in a basement during a power outage.",
   "Easter Egg: Pressing F12 won't help you find the secret mojais.",
   "Absolute Cinema: Why did the identity go to therapy? Because it had too many multiple personalities in its following list. 🗿💀",
   "Establishing secure P2P audio link...",
   "Establishing trust with remote nodes...",
-  "Nexus Lore: Created by the Great Architect to bridge Discord and Instagram.",
+  "Yantravani Lore: Created by the Great Architect to bridge Discord and Instagram.",
 ];
 
 export const LaunchScreen = ({ progress }: Props) => {
-  const [message, setMessage] = useState(NEXUS_LORE[0]);
+  const [message, setMessage] = useState(Yantravani_LORE[0]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setMessage(NEXUS_LORE[Math.floor(Math.random() * NEXUS_LORE.length)]);
+      setMessage(Yantravani_LORE[Math.floor(Math.random() * Yantravani_LORE.length)]);
     }, 1500);
     return () => clearInterval(interval);
   }, []);
@@ -40,7 +40,7 @@ export const LaunchScreen = ({ progress }: Props) => {
         animate={{ scale: 1, opacity: 1 }}
         className="relative mb-12"
       >
-        <div className="w-24 h-24 bg-nexus-gradient rounded-[32px] flex items-center justify-center shadow-[0_0_60px_rgba(255,60,60,0.3)] rotate-12">
+        <div className="w-24 h-24 bg-vani-gradient rounded-[32px] flex items-center justify-center shadow-[0_0_60px_rgba(255,60,60,0.3)] rotate-12">
            <Zap size={48} className="text-white -rotate-12" />
         </div>
       </motion.div>
@@ -48,10 +48,10 @@ export const LaunchScreen = ({ progress }: Props) => {
       <div className="w-64">
          <div className="flex justify-between items-end mb-2 font-mono text-[9px] tracking-[0.2em] text-gray-500 uppercase h-4 overflow-hidden">
             <motion.span key={message} initial={{y:10, opacity:0}} animate={{y:0, opacity:1}}>{message}</motion.span>
-            <span className="text-nexus-blue">{Math.round(progress)}%</span>
+            <span className="text-vani-blue">{Math.round(progress)}%</span>
          </div>
          <div className="h-1 w-full bg-gray-900 rounded-full overflow-hidden border border-white/5">
-            <motion.div animate={{ width: `${progress}%` }} className="h-full bg-nexus-gradient" />
+            <motion.div animate={{ width: `${progress}%` }} className="h-full bg-vani-gradient" />
          </div>
       </div>
     </div>

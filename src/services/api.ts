@@ -5,12 +5,39 @@ const isLocal = hostname === 'localhost' || hostname.startsWith('192.168.') || h
 const API_BASE = import.meta.env.VITE_API_URL || (isLocal ? `http://${hostname}:5000` : '');
 export const API_URL = `${API_BASE}/api`;
 
+// IDENTITY SYNC: Attach Auth Token to all requests
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers['x-auth-token'] = token;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// IDENTITY SYNC: Handle 401 Unauthorized globally
+axios.interceptors.response.use((response) => {
+  return response;
+}, (error) => {
+  if (error.response && error.response.status === 401) {
+    console.warn('⚠️ UNAUTHORIZED: Severing session and redirecting to login...');
+    localStorage.removeItem('token');
+    localStorage.removeItem('vani_view_state');
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+  }
+  return Promise.reject(error);
+});
+
 export interface IUser {
   _id: string;
   id: string; 
   username: string;
   displayName?: string; // Added
   dob?: string; // Added
+  showAge?: boolean; // Added
   email?: string;
   avatar: string;
   banner?: string;
@@ -61,6 +88,7 @@ export interface IRealm {
   roles?: IRole[];
   memberRoles?: { user: string, roleId: string }[];
   vanityHandle?: string;
+  isDiscoverable?: boolean; // Added
   tier?: 'standard' | 'elite';
 }
 
@@ -116,14 +144,18 @@ export const api = {
   rejectTransaction: async (id: string) => { const res = await axios.post(`${API_URL}/admin/finance/reject/${id}`); return res.data; },
   submitPayment: async (data: { method: string, transactionId: string, amount: string }) => { const res = await axios.post(`${API_URL}/payments/submit`, data); return res.data; },
   getUserProfile: async (id: string) => { const res = await axios.get<IUser>(`${API_URL}/users/${id}`); return res.data; },
+  getSuggestedUsers: async () => { const res = await axios.get<IUser[]>(`${API_URL}/users/public/list`); return res.data; },
   getUserByHandle: async (handle: string) => { const res = await axios.get<{ id: string }>(`${API_URL}/users/handle/${handle}`); return res.data; },
   updateProfile: async (formData: FormData) => { const res = await axios.put<IUser>(`${API_URL}/users/me`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); return res.data; },
   generateRecoveryKeys: async () => { const res = await axios.post<{ keys: { code: string, isUsed: boolean }[] }>(`${API_URL}/users/me/security/keys`); return res.data; },
-  syncIdentity: async (id: string) => { const res = await axios.post(`${API_URL}/users/nexus/sync/${id}`); return res.data; },
-  unfollowUser: async (id: string) => { const res = await axios.post(`${API_URL}/users/nexus/unsync/${id}`); return res.data; },
-  acceptSync: async (id: string) => { const res = await axios.post(`${API_URL}/users/nexus/sync/${id}/accept`); return res.data; },
-  getNotifications: async () => { const res = await axios.get<INotification[]>(`${API_URL}/users/nexus/alerts`); return res.data; },
+  syncIdentity: async (id: string) => { const res = await axios.post(`${API_URL}/users/vani/sync/${id}`); return res.data; },
+  unfollowUser: async (id: string) => { const res = await axios.post(`${API_URL}/users/vani/unsync/${id}`); return res.data; },
+  acceptSync: async (id: string) => { const res = await axios.post(`${API_URL}/users/vani/sync/${id}/accept`); return res.data; },
+  getNotifications: async () => { const res = await axios.get<INotification[]>(`${API_URL}/users/vani/alerts`); return res.data; },
   markNotificationsRead: async () => { const res = await axios.put(`${API_URL}/users/me/notifications/read`); return res.data; },
+  exportData: async () => { window.location.href = `${API_URL}/users/me/archive/export?token=${localStorage.getItem('token')}`; },
+  terminateIdentity: async () => { const res = await axios.delete(`${API_URL}/users/me/terminate`); return res.data; },
+  toggleDisableAccount: async (status: boolean) => { const res = await axios.post(`${API_URL}/users/me/disable`, { status }); return res.data; },
   getMyDMs: async () => { const res = await axios.get<IChannel[]>(`${API_URL}/dms`); return res.data; },
   startDM: async (targetUserId: string) => { const res = await axios.post<IChannel>(`${API_URL}/dms`, { targetUserId }); return res.data; },
   createGroupDM: async (userIds: string[], name?: string) => { const res = await axios.post<IChannel>(`${API_URL}/dms/group`, { userIds, name }); return res.data; },

@@ -23,7 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<IUser | null>(JSON.parse(localStorage.getItem('user') || 'null'));
-  const [accounts, setAccounts] = useState<AccountSession[]>(JSON.parse(localStorage.getItem('nexus_accounts') || '[]'));
+  const [accounts, setAccounts] = useState<AccountSession[]>(JSON.parse(localStorage.getItem('Yantravani_accounts') || '[]'));
 
   useEffect(() => {
     if (token) {
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Update Multi-Account Matrix
     const newAccounts = [...accounts.filter(acc => (acc.user._id || acc.user.id) !== (newUser._id || newUser.id)), { token: newToken, user: newUser }];
     setAccounts(newAccounts);
-    localStorage.setItem('nexus_accounts', JSON.stringify(newAccounts));
+    localStorage.setItem('Yantravani_accounts', JSON.stringify(newAccounts));
   };
 
   const switchAccount = (userId: string) => {
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else if (user) {
       const remaining = accounts.filter(acc => (acc.user._id || acc.user.id) !== (user._id || user.id));
       setAccounts(remaining);
-      localStorage.setItem('nexus_accounts', JSON.stringify(remaining));
+      localStorage.setItem('Yantravani_accounts', JSON.stringify(remaining));
       
       if (remaining.length > 0) {
         switchAccount(remaining[0].user._id || remaining[0].user.id);

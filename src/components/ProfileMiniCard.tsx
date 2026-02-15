@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { MessageSquare, Zap, Shield, ExternalLink } from 'lucide-react';
 import type { IUser } from '../services/api';
+import { getIdentityName, getIdentityAge } from '../services/identity';
 
 interface Props {
   user: IUser;
@@ -24,7 +25,7 @@ export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM
         className="fixed z-[151] w-72 bg-[#0a0a0c] border border-gray-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden"
       >
         {/* Banner */}
-        <div className="h-20 bg-nexus-gradient opacity-40 relative">
+        <div className="h-20 bg-vani-gradient opacity-40 relative">
            {user.banner && <img src={user.banner} className="w-full h-full object-cover" />}
         </div>
 
@@ -41,7 +42,7 @@ export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM
                  {!isMe && (
                    <button 
                      onClick={(e) => { e.stopPropagation(); onFollow(); }}
-                     className={`p-2 rounded-xl transition-all ${isFollowing ? 'bg-white/5 text-nexus-accent border border-red-500/20' : 'bg-nexus-gradient text-white shadow-lg shadow-red-500/20'}`}
+                     className={`p-2 rounded-xl transition-all ${isFollowing ? 'bg-white/5 text-vani-accent border border-red-500/20' : 'bg-vani-gradient text-white shadow-lg shadow-red-500/20'}`}
                    >
                       {isFollowing ? <Shield size={16} /> : <Zap size={16} />}
                    </button>
@@ -51,10 +52,16 @@ export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM
 
            <div className="space-y-1">
               <div className="flex items-center space-x-2">
-                 <h3 className="font-black text-white uppercase tracking-tighter text-lg">{user.username}</h3>
-                 {isMe && <span className="text-[7px] bg-nexus-blue/10 text-nexus-blue px-1.5 py-0.5 rounded font-black">YOU</span>}
+                 <h3 className="font-black text-white uppercase tracking-tighter text-lg">{getIdentityName(user)}</h3>
+                 {isMe && <span className="text-[7px] bg-vani-blue/10 text-vani-blue px-1.5 py-0.5 rounded font-black">YOU</span>}
+                 {getIdentityAge(user) !== null && (
+                   <span className="text-[10px] font-black text-vani-blue/60 ml-1">{getIdentityAge(user)}Y</span>
+                 )}
               </div>
               <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">Node_Established: {new Date(user.createdAt || Date.now()).getFullYear()}</p>
+              {user.displayName && (
+                <p className="text-[8px] text-gray-600 font-mono uppercase tracking-tighter">@{user.username}</p>
+              )}
            </div>
 
            {user.bio && (
@@ -74,7 +81,7 @@ export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM
               {!isMe && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); onStartDM(); }}
-                  className="flex items-center justify-center space-x-2 bg-nexus-blue/10 hover:bg-nexus-blue/20 text-nexus-blue text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl border border-nexus-blue/20 transition-all"
+                  className="flex items-center justify-center space-x-2 bg-vani-blue/10 hover:bg-vani-blue/20 text-vani-blue text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl border border-vani-blue/20 transition-all"
                 >
                    <MessageSquare size={12} />
                    <span>Direct Link</span>

@@ -49,13 +49,13 @@ export const LogoutModal = ({ onClose }: Props) => {
                      <div 
                        key={acc.user._id || acc.user.id} 
                        onClick={() => !isCurrent && handleSwitch(acc.user._id || acc.user.id)}
-                       className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${isCurrent ? 'bg-nexus-blue/10 border-nexus-blue/30 cursor-default' : 'bg-white/[0.02] border-white/5 hover:bg-white/5 cursor-pointer'}`}
+                       className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${isCurrent ? 'bg-vani-blue/10 border-vani-blue/30 cursor-default' : 'bg-white/[0.02] border-white/5 hover:bg-white/5 cursor-pointer'}`}
                      >
                         <div className="flex items-center space-x-3">
                            <img src={acc.user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${acc.user.username}`} className="w-8 h-8 rounded-lg" />
                            <div>
                               <div className="text-xs font-black text-white uppercase">{acc.user.username}</div>
-                              {isCurrent && <div className="text-[8px] text-nexus-blue font-black uppercase">Current_Link</div>}
+                              {isCurrent && <div className="text-[8px] text-vani-blue font-black uppercase">Current_Link</div>}
                            </div>
                         </div>
                         {!isCurrent && <RefreshCw size={14} className="text-gray-600" />}

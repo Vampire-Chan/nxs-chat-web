@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
-import type { IPost, IUser } from '../services/api';
-import { Image as ImageIcon, Heart, MessageCircle, Send, MoreHorizontal } from 'lucide-react';
-import { PostViewerModal } from './PostViewerModal';
+import type { IPost, IUser, IRealm } from '../services/api';
+import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users } from 'lucide-react';
+import { ExploreLeftSidebar } from './ExploreLeftSidebar';
+import { ExploreRightSidebar } from './ExploreRightSidebar';
+import { getIdentityName } from '../services/identity';
 
 interface Props {
   posts: IPost[];
@@ -16,11 +18,49 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
   const [posts, setPosts] = useState(initialPosts);
   const [showHeart, setShowHeart] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
+  
+  // Explore States
+  const [trendingTags, setTrendingTags] = useState<string[]>([]);
+  const [popularPosts, setPopularPosts] = useState<IPost[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<IUser[]>([]);
+  const [pulseEvents, setPulseEvents] = useState<any[]>([]);
 
   if (initialPosts.length !== posts.length) setPosts(initialPosts);
 
   const isGlobal = channelId === 'global' || !channelId;
   const canPost = !isGlobal || !currentUser.isPrivate;
+
+  // Refresh mechanism for the sidebar
+  const triggerRefresh = async () => {
+    if (isGlobal) {
+      const ps = await api.getGlobalPosts();
+      setPosts(ps);
+      if (selectedPost) {
+        const updated = ps.find(p => p._id === selectedPost._id);
+        if (updated) setSelectedPost(updated);
+      }
+    } else {
+      const ps = await api.getPosts(channelId!);
+      setPosts(ps);
+    }
+  };
+
+  useEffect(() => {
+    if (isGlobal) {
+      // Fetch actual suggested users
+      api.getSuggestedUsers().then(setSuggestedUsers).catch(console.error);
+      
+      setTrendingTags(['Yantravani', 'matrix', 'cyberpunk', 'web3', 'identity', 'privacy']);
+      setPopularPosts(initialPosts.slice(0, 5));
+      
+      const mockEvents = [
+        { id: '1', type: 'like', user: 'System_Admin', timestamp: new Date() },
+        { id: '2', type: 'sync', user: 'Ghost_Node', timestamp: new Date() },
+        { id: '3', type: 'broadcast', user: 'Reality_Coder', timestamp: new Date() },
+      ];
+      setPulseEvents(mockEvents);
+    }
+  }, [isGlobal, initialPosts]);
 
   const handleLike = async (postId: string) => {
     const post = posts.find(p => p._id === postId);
@@ -28,6 +68,9 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
     try {
       const { likes } = await api.likePost(postId);
       setPosts(prev => prev.map(p => p._id === postId ? { ...p, likes } : p));
+      if (selectedPost?._id === postId) {
+        setSelectedPost(prev => prev ? { ...prev, likes } : null);
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -37,66 +80,210 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
     setTimeout(() => setShowHeart(null), 1000);
   };
 
-  const refreshFeed = () => {
-    // This is a placeholder, ideally fetch from parent but we'll let parent trigger refresh via props
+  const handleSyncActionFromUser = async (targetUser: IUser) => {
+    try {
+      await api.syncIdentity(targetUser._id || targetUser.id);
+      // Remove from suggested list locally for immediate feedback
+      setSuggestedUsers(prev => prev.filter(u => (u._id || u.id) !== (targetUser._id || targetUser.id)));
+    } catch (e) { alert("Sync Protocol Failed"); }
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-4 md:p-6">
-      <div className="max-w-xl mx-auto w-full mb-10">
-         {canPost ? (
-           <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
-              <div className="w-10 h-10 rounded-xl bg-nexus-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
-              <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
-                {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
-              </div>
-              <div className="p-2 text-nexus-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-nexus-blue">Share</span></div>
-           </div>
-         ) : (
-           <div className="bg-white/[0.02] border border-dashed border-white/10 p-6 rounded-[32px] text-center">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Private_Node_Detected</div>
-              <p className="text-[9px] text-gray-500 mt-2 uppercase leading-relaxed">Public identity sync required for global matrix transmissions.</p>
-           </div>
-         )}
+    <div className="flex-1 flex overflow-hidden h-full bg-[#050507]">
+      {isGlobal && (
+        <ExploreLeftSidebar 
+          trendingTags={trendingTags} 
+          popularPosts={popularPosts} 
+          suggestedUsers={suggestedUsers}
+          onSelectTag={(t) => console.log(t)}
+          onSelectUser={(u) => console.log(u)}
+        />
+      )}
+
+      <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-4 md:p-6 lg:px-12">
+        {/* Suggested Carousel */}
+        {isGlobal && suggestedUsers.length > 0 && (
+          <div className="max-w-2xl mx-auto w-full mb-12">
+             <div className="flex items-center justify-between mb-4 px-2">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Suggested_Identities</span>
+                <button className="text-[9px] font-black text-vani-blue uppercase tracking-widest hover:text-white transition-colors">See_All</button>
+             </div>
+             <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-4 -mx-2 px-2 mask-fade-edges">
+                {suggestedUsers.map((user) => (
+                  <motion.div 
+                    key={user._id}
+                    whileHover={{ y: -5 }}
+                    className="flex-shrink-0 w-32 bg-discord-channel border border-white/5 rounded-3xl p-4 flex flex-col items-center text-center group cursor-pointer hover:border-vani-blue/30 transition-all shadow-xl"
+                  >
+                     <div className="w-16 h-16 rounded-2xl bg-vani-gradient p-0.5 mb-3 shadow-lg group-hover:scale-110 transition-transform">
+                        <div className="w-full h-full rounded-[14px] overflow-hidden bg-discord-dark">
+                           <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+                        </div>
+                     </div>
+                     <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{user.displayName || user.username}</span>
+                     <span className="text-[8px] text-gray-600 font-mono truncate w-full mb-3">@{user.username}</span>
+                     <button 
+                       onClick={(e) => { e.stopPropagation(); handleSyncActionFromUser(user); }}
+                       className="w-full py-1.5 bg-white/5 hover:bg-vani-blue text-white hover:text-black rounded-xl text-[8px] font-black uppercase tracking-widest border border-white/5 hover:border-vani-blue transition-all"
+                     >
+                       Sync
+                     </button>
+                  </motion.div>
+                ))}
+             </div>
+          </div>
+        )}
+
+        <div className="max-w-2xl mx-auto w-full mb-10">
+           {canPost && (
+             <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
+                <div className="w-10 h-10 rounded-xl bg-vani-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
+                <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
+                  {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
+                </div>
+                <div className="p-2 text-vani-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-vani-blue">Share</span></div>
+             </div>
+           )}
+        </div>
+
+        <div className="max-w-2xl mx-auto w-full space-y-12 md:space-y-16 pb-20">
+          {posts.map((post) => (
+            <PostCard 
+              key={post._id} 
+              post={post} 
+              currentUser={currentUser} 
+              onDoubleTap={() => handleDoubleTap(post._id)} 
+              isHearting={showHeart === post._id} 
+              onOpen={() => setSelectedPost(post)} 
+              isGlobal={isGlobal} 
+              isActive={selectedPost?._id === post._id}
+            />
+          ))}
+          {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-vani-blue font-black text-xl mb-2 opacity-20 uppercase">No Data Found</div></div>}
+        </div>
       </div>
 
-      <div className="max-w-xl mx-auto w-full space-y-8 md:space-y-12 pb-20">
-        {posts.map((post) => (
-          <PostCard key={post._id} post={post} currentUser={currentUser} onLike={() => handleLike(post._id)} onDoubleTap={() => handleDoubleTap(post._id)} isHearting={showHeart === post._id} onOpen={() => setSelectedPost(post)} />
-        ))}
-        {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-nexus-blue font-black text-xl mb-2 opacity-20 uppercase">No Data Found</div></div>}
-      </div>
-
-      {selectedPost && <PostViewerModal post={selectedPost} onClose={() => setSelectedPost(null)} currentUser={currentUser} onUpdate={refreshFeed} />}
+      {isGlobal && (
+        <ExploreRightSidebar 
+          events={pulseEvents} 
+          selectedPost={selectedPost} 
+          currentUser={currentUser}
+          onClosePost={() => setSelectedPost(null)}
+          onRefresh={triggerRefresh}
+        />
+      )}
     </div>
   );
 };
 
-const PostCard = ({ post, currentUser, onLike, onDoubleTap, isHearting, onOpen }: any) => {
-  const isLiked = post.likes?.includes(currentUser.id || currentUser._id);
-  const isMe = post.author._id === (currentUser.id || currentUser._id) || post.author.id === (currentUser.id || currentUser._id);
+const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal, isActive }: any) => {
+  const isMe = (post.author._id || post.author.id) === (currentUser.id || currentUser._id);
+  const isFollowing = currentUser.following?.some((id: string) => id === (post.author._id || post.author.id));
+  const isFriend = currentUser.friends?.some((id: string) => id === (post.author._id || post.author.id));
+  const isSyncing = isFollowing || isFriend;
+
+  // Distinguisher Logic
+  const sourceRealm = post.sourceRealm as IRealm | undefined;
+  const isDiscoverable = sourceRealm?.isDiscoverable;
+  const isMemberOfSource = currentUser.realms?.includes(sourceRealm?._id || '');
+
+  const handleSyncAction = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      if (isSyncing) {
+        await api.unfollowUser(post.author._id || post.author.id);
+      } else {
+        await api.syncIdentity(post.author._id || post.author.id);
+      }
+    } catch (e) { alert("Sync Protocol Failed"); }
+  };
+
+  const handleJoinRealm = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!sourceRealm) return;
+    try {
+      await api.joinRealm(sourceRealm._id);
+      alert(`Synchronized with ${sourceRealm.name}`);
+      window.location.reload(); 
+    } catch (e) { alert("Realm Access Denied"); }
+  };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`bg-discord-channel rounded-3xl overflow-hidden shadow-2xl border ${isMe ? 'border-nexus-blue/30' : 'border-gray-800'} group`}>
-      <div className="p-4 flex items-center justify-between bg-white/[0.01]">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gray-800 overflow-hidden border border-gray-700"><img src={post.author.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author.username}`} alt="a" className="w-full h-full object-cover" /></div>
-          <div><div className="font-black tracking-tight text-sm uppercase text-white">{post.author.username}</div><div className="text-gray-500 text-[10px] font-mono tracking-tighter uppercase">{new Date(post.createdAt).toLocaleDateString()}</div></div>
+    <motion.div 
+      initial={{ opacity: 0, y: 30 }} 
+      whileInView={{ opacity: 1, y: 0 }} 
+      viewport={{ once: true }} 
+      className={`bg-discord-channel rounded-[40px] overflow-hidden shadow-2xl border transition-all duration-500 ${isActive ? 'border-vani-blue ring-4 ring-vani-blue/10' : (isMe ? 'border-vani-blue/30' : 'border-gray-800')} group`}
+    >
+      {/* Header with Source Info */}
+      <div className="p-5 flex items-center justify-between bg-white/[0.01]">
+        <div className="flex items-center space-x-4">
+          <div className="w-11 h-11 rounded-2xl bg-gray-800 overflow-hidden border border-gray-700 shadow-lg group-hover:scale-105 transition-transform">
+            <img src={post.author.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author.username}`} alt="a" className="w-full h-full object-cover" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <div className="font-black tracking-tight text-sm uppercase text-white">{getIdentityName(post.author)}</div>
+              {isGlobal && sourceRealm && (
+                <div className="flex items-center space-x-1.5 px-2 py-0.5 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-[8px] text-gray-500 font-black uppercase tracking-tighter">IN</span>
+                  <span className="text-[9px] text-vani-blue font-black uppercase tracking-tight truncate max-w-[100px]">
+                    {isDiscoverable ? sourceRealm.name : "Encrypted Realm"}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="text-gray-500 text-[10px] font-mono tracking-tighter uppercase">{new Date(post.createdAt).toLocaleDateString()}</div>
+          </div>
         </div>
-        <MoreHorizontal className="text-gray-600 hover:text-white cursor-pointer" size={20} />
-      </div>
-      <div className="bg-[#050507] relative overflow-hidden flex items-center justify-center cursor-pointer min-h-[400px]" onDoubleClick={!isMe ? onDoubleTap : undefined} onClick={onOpen}>
-         <img src={post.imageUrl} alt="Post" className="max-h-[700px] w-full object-contain transition-transform duration-700 group-hover:scale-[1.02]" />
-         <AnimatePresence>{isHearting && <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }} exit={{ scale: 2, opacity: 0 }} className="absolute z-20 pointer-events-none"><Heart size={100} className="text-white fill-nexus-accent drop-shadow-[0_0_20px_rgba(255,60,60,0.8)]" /></motion.div>}</AnimatePresence>
-      </div>
-      <div className="p-5">
-        <div className="flex items-center space-x-5 mb-4">
-           <button onClick={onLike}><Heart className={`${isLiked ? 'text-nexus-accent fill-nexus-accent' : 'text-gray-400'} transition-colors`} size={26} /></button>
-           <button onClick={onOpen}><MessageCircle className="text-gray-400 hover:text-nexus-blue" size={26} /></button>
-           <Send className="text-gray-400 hover:text-white" size={24} />
+        
+        <div className="flex items-center space-x-2">
+          {isGlobal && sourceRealm && isDiscoverable && !isMemberOfSource && (
+            <button 
+              onClick={handleJoinRealm}
+              className="flex items-center space-x-2 px-4 py-2 bg-vani-blue/10 hover:bg-vani-blue text-vani-blue hover:text-black rounded-2xl border border-vani-blue/20 transition-all font-black text-[10px] uppercase tracking-widest"
+            >
+              <Plus size={14} />
+              <span>Join</span>
+            </button>
+          )}
+          
+          {isGlobal && !isMe && (
+            <button 
+              onClick={handleSyncAction}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-2xl border transition-all font-black text-[10px] uppercase tracking-widest ${isSyncing ? 'bg-white/5 text-gray-400 border-white/10 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20' : 'bg-white/5 text-white border-white/5 hover:border-vani-blue hover:text-vani-blue'}`}
+            >
+              <Users size={14} />
+              <span>{isSyncing ? 'Unsync' : 'Sync'}</span>
+            </button>
+          )}
+          <MoreHorizontal className="text-gray-600 hover:text-white cursor-pointer ml-2" size={20} />
         </div>
-        <div className="text-sm font-black text-white mb-2 uppercase tracking-tighter">{post.likes?.length || 0} Identities Linked</div>
-        <p className="text-sm leading-relaxed text-gray-200"><span className="font-black mr-2 text-white uppercase">{post.author.username}</span>{post.caption}</p>
+      </div>
+
+      <div 
+        className="bg-[#050507] relative overflow-hidden flex items-center justify-center cursor-pointer min-h-[500px]" 
+        onDoubleClick={!isMe ? onDoubleTap : undefined} 
+        onClick={onOpen}
+      >
+         <img src={post.imageUrl} alt="Post" className="w-full object-contain transition-transform duration-1000 group-hover:scale-[1.03]" />
+         
+         {/* Heart Animation */}
+         <AnimatePresence>
+           {isHearting && (
+             <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }} exit={{ scale: 2, opacity: 0 }} className="absolute z-20 pointer-events-none">
+               <Heart size={120} className="text-white fill-vani-accent drop-shadow-[0_0_30px_rgba(255,60,60,0.8)]" />
+             </motion.div>
+           )}
+         </AnimatePresence>
+
+         {/* Visual Stats Overlay on Hover */}
+         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-8">
+            <div className="flex items-center space-x-6 text-white">
+               <div className="flex items-center space-x-2"><Heart size={20} className={post.likes?.includes(currentUser.id || currentUser._id) ? 'fill-vani-accent text-vani-accent' : ''} /> <span className="font-black text-sm">{post.likes?.length || 0}</span></div>
+               <div className="flex items-center space-x-2"><MessageCircle size={20} /> <span className="font-black text-sm">{post.comments?.length || 0}</span></div>
+            </div>
+         </div>
       </div>
     </motion.div>
   );

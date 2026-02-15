@@ -16,13 +16,13 @@ export default function FAQPage() {
         </button>
 
         <header className="mb-20">
-          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">FAQ</h1>
-          <div className="h-1 w-20 bg-nexus-gradient rounded-full" />
-          <p className="mt-6 text-gray-500 uppercase text-xs font-bold tracking-widest leading-relaxed">Frequently Asked Protocols & Matrix Queries</p>
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Vani_Knowledge</h1>
+          <div className="h-1 w-20 bg-vani-gradient rounded-full" />
+          <p className="mt-6 text-gray-500 uppercase text-xs font-bold tracking-widest leading-relaxed">Frequently Asked Protocols & Vani Vani Matrix Queries</p>
         </header>
 
         <div className="space-y-16">
-          <FAQSection title="Identity & Calibration" icon={<User className="text-nexus-blue" size={24} />}>
+          <FAQSection title="Identity & Calibration" icon={<User className="text-vani-blue" size={24} />}>
             <FAQItem 
               q="How do I change my Public Alias?" 
               a="Navigate to Settings > Identity Hub. You can recalibrate your Public Name (Alias) at any time. Your Identity Handle (username) remains a permanent unique identifier." 
@@ -33,7 +33,7 @@ export default function FAQPage() {
             />
             <FAQItem 
               q="What is a 'Private Ghost Node'?" 
-              a="Enabling Private Mode prevents your node from appearing in global Matrix searches and blocks you from broadcasting to the global feed. You can still participate in sovereign Realms." 
+              a="Enabling Private Mode prevents your node from appearing in Yantravani searches and blocks you from broadcasting to the global feed. You can still participate in sovereign Realms." 
             />
           </FAQSection>
 
@@ -48,14 +48,14 @@ export default function FAQPage() {
             />
           </FAQSection>
 
-          <FAQSection title="Matrix Transmissions" icon={<Globe className="text-purple-500" size={24} />}>
+          <FAQSection title="Vani Vani Matrix Transmissions" icon={<Globe className="text-purple-500" size={24} />}>
             <FAQItem 
               q="Who can see my Broadcasts?" 
-              a="If your node is Public, anyone synced with the global Matrix can view your transmissions. If you post within a private Sector of a Realm, only members of that realm can access the data." 
+              a="If your node is Public, anyone synced with the Vani Vani Matrix can view your transmissions. If you post within a private Sector of a Realm, only members of that realm can access the data." 
             />
             <FAQItem 
               q="Supported media formats?" 
-              a="The Matrix currently supports high-resolution images, video streams, and neural voice notes (WebM/WebP/AVIF optimized)." 
+              a="Yantravani currently supports high-resolution images, video streams, and neural voice notes (WebM/WebP/AVIF optimized)." 
             />
           </FAQSection>
         </div>
@@ -63,8 +63,8 @@ export default function FAQPage() {
         <footer className="mt-32 p-10 bg-white/5 rounded-[40px] border border-white/5 text-center">
            <HelpCircle size={40} className="mx-auto mb-6 text-gray-600" />
            <h3 className="text-xl font-bold uppercase tracking-tighter mb-2">Still Uncalibrated?</h3>
-           <p className="text-gray-500 text-sm mb-8">Reach out to the Architect core or consult the System Protocols.</p>
-           <button onClick={() => navigate('/help')} className="px-10 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-nexus-blue hover:text-white transition-all">{t('help.title').split('//')[0]}</button>
+           <p className="text-gray-500 text-sm mb-8">Reach out to the Architect core or consult the Vani Protocols.</p>
+           <button onClick={() => navigate('/help')} className="px-10 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-vani-blue hover:text-white transition-all">System Protocols</button>
         </footer>
       </div>
     </div>
@@ -85,7 +85,7 @@ const FAQSection = ({ title, icon, children }: any) => (
 
 const FAQItem = ({ q, a }: any) => (
   <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} className="group">
-    <h4 className="text-sm font-black uppercase tracking-tight text-white mb-2 group-hover:text-nexus-blue transition-colors">{q}</h4>
+    <h4 className="text-sm font-black uppercase tracking-tight text-white mb-2 group-hover:text-vani-blue transition-colors">{q}</h4>
     <p className="text-gray-500 text-sm leading-relaxed font-medium pl-4 border-l border-white/10">{a}</p>
   </motion.div>
 );

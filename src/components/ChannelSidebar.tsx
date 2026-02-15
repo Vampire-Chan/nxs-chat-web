@@ -43,7 +43,7 @@ export const ChannelSidebar = ({
          <div className="relative z-10 flex items-center justify-between w-full">
            <div className="flex flex-col">
               <h2 className="text-sm font-black text-white uppercase tracking-tighter truncate max-w-[140px] drop-shadow-lg">{realm?.name || 'Loading_Node'}</h2>
-              <div className="text-[8px] font-black text-nexus-blue uppercase tracking-[0.2em] drop-shadow-md">{realm?.tier || 'STANDARD'}_REALM</div>
+              <div className="text-[8px] font-black text-vani-blue uppercase tracking-[0.2em] drop-shadow-md">{realm?.tier || 'STANDARD'}_REALM</div>
            </div>
            <div className="flex items-center space-x-2">
               {realm?.owner === (user.id || user._id) && <Settings size={14} className="text-gray-400 group-hover:text-white drop-shadow-md" />}
@@ -56,7 +56,7 @@ export const ChannelSidebar = ({
          {announcements.length > 0 && (
            <div className="space-y-1">
               <CornerHeader label={t('help.realms')} onToggle={() => toggle('announcements')} />
-              {expanded.announcements && announcements.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Megaphone size={14} className="text-nexus-accent" />} />)}
+              {expanded.announcements && announcements.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Megaphone size={14} className="text-vani-accent" />} />)}
            </div>
          )}
          <div className="space-y-1">
@@ -84,5 +84,5 @@ const CornerHeader = ({ label, onToggle, onAdd }: any) => (
 );
 
 const ChannelItem = ({ channel, active, onClick, icon }: any) => (
-  <div onClick={onClick} className={`group flex items-center space-x-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'}`}><div className={`${active ? 'text-nexus-blue' : 'text-gray-600'}`}>{icon}</div><span className={`text-xs font-bold uppercase tracking-tight ${active ? 'text-white' : ''}`}>{channel.name}</span></div>
+  <div onClick={onClick} className={`group flex items-center space-x-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'}`}><div className={`${active ? 'text-vani-blue' : 'text-gray-600'}`}>{icon}</div><span className={`text-xs font-bold uppercase tracking-tight ${active ? 'text-white' : ''}`}>{channel.name}</span></div>
 );

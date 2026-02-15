@@ -48,7 +48,7 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
       >
         {/* Search Bar */}
         <div className="p-6 flex items-center space-x-4 border-b border-gray-900 bg-white/[0.02]">
-           <Search size={24} className={loading ? 'text-nexus-blue animate-pulse' : 'text-gray-500'} />
+           <Search size={24} className={loading ? 'text-vani-blue animate-pulse' : 'text-gray-500'} />
            <input 
              ref={inputRef}
              className="flex-1 bg-transparent border-none focus:outline-none text-2xl font-bold text-white placeholder-gray-700"
@@ -75,7 +75,7 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
 
            {query && !loading && results.users.length === 0 && results.realms.length === 0 && results.posts.length === 0 && (
              <div className="py-20 text-center">
-                <div className="text-nexus-accent font-black tracking-widest uppercase">Zero Results Match This Signature</div>
+                <div className="text-vani-accent font-black tracking-widest uppercase">Zero Results Match This Signature</div>
              </div>
            )}
 
@@ -91,10 +91,10 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
                       key={u._id} 
                       icon={<UserIcon size={16} />} 
                       title={u.username} 
-                      sub={isMe ? "YOUR_OWN_IDENTITY" : u.bio || "No public bio transmission."}
+                      sub={u.bio || (isMe ? "Node Calibration Active" : "No public bio transmission.")}
                       avatar={u.avatar}
                       badge={isFollowing ? "SYNC_ACTIVE" : null}
-                      onClick={() => { if(!isMe) onSelectUser(u._id || u.id); onClose(); }}
+                      onClick={() => { onSelectUser(u._id || u.id); onClose(); }}
                     />
                   );
                 })}
@@ -137,10 +137,10 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
         {/* Footer */}
         <div className="p-4 bg-discord-sidebar/50 border-t border-gray-900 flex justify-between items-center px-8">
            <div className="flex items-center space-x-4 text-[9px] font-mono text-gray-600 uppercase tracking-widest">
-              <span className="flex items-center space-x-1"><Zap size={10} className="text-nexus-blue" /> <span>Real-time Sync</span></span>
+              <span className="flex items-center space-x-1"><Zap size={10} className="text-vani-blue" /> <span>Real-time Sync</span></span>
               <span>Encrypted Search</span>
            </div>
-           <div className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Nexus Core v1.0</div>
+           <div className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Yantravani Core v1.0</div>
         </div>
       </motion.div>
     </div>
@@ -149,7 +149,7 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
 
 const Section = ({ label, children }: { label: string, children: React.ReactNode }) => (
   <div className="mb-8">
-     <h3 className="px-4 text-[10px] font-black text-nexus-blue uppercase tracking-[0.3em] mb-4">{label}</h3>
+     <h3 className="px-4 text-[10px] font-black text-vani-blue uppercase tracking-[0.3em] mb-4">{label}</h3>
      <div className="space-y-1">{children}</div>
   </div>
 );
@@ -164,12 +164,12 @@ const ResultItem = ({ icon, title, sub, avatar, badge, onClick }: any) => (
      </div>
      <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2">
-           <div className="text-sm font-black text-white uppercase tracking-tight group-hover:text-nexus-blue transition-colors">{title}</div>
-           {badge && <span className="text-[7px] font-black text-nexus-blue border border-nexus-blue/30 px-1 rounded bg-nexus-blue/5">{badge}</span>}
+           <div className="text-sm font-black text-white uppercase tracking-tight group-hover:text-vani-blue transition-colors">{title}</div>
+           {badge && <span className="text-[7px] font-black text-vani-blue border border-vani-blue/30 px-1 rounded bg-vani-blue/5">{badge}</span>}
         </div>
         <div className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-tighter mt-0.5">{sub}</div>
      </div>
-     <div className="opacity-0 group-hover:opacity-100 transition-opacity pr-4 text-nexus-blue">
+     <div className="opacity-0 group-hover:opacity-100 transition-opacity pr-4 text-vani-blue">
         <ArrowRight size={16} />
      </div>
   </div>

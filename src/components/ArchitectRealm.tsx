@@ -41,9 +41,9 @@ export const ArchitectRealm = () => {
 
   return (
     <div className="flex-1 bg-black h-full overflow-hidden flex flex-col font-sans">
-      <div className="h-20 bg-nexus-gradient/5 border-b border-white/5 flex items-center justify-between px-10 backdrop-blur-xl">
+      <div className="h-20 bg-vani-gradient/5 border-b border-white/5 flex items-center justify-between px-10 backdrop-blur-xl">
          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-nexus-gradient rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20">
+            <div className="w-10 h-10 bg-vani-gradient rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20">
                {isArchitect ? <Shield size={24} className="text-white" /> : <Hammer size={20} className="text-white" />}
             </div>
             <div>
@@ -79,7 +79,7 @@ export const ArchitectRealm = () => {
                  <div className="grid grid-cols-1 gap-4">
                     {broadcasts.filter(b => b.caption.toLowerCase().includes(searchTerm.toLowerCase())).map((b) => (
                       <div key={b._id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between group">
-                         <div className="flex items-center space-x-6"><img src={b.imageUrl} className="w-16 h-16 rounded-2xl object-cover border border-white/5" /><div><div className="text-xs font-black text-white uppercase tracking-tight">{b.caption}</div><div className="text-[9px] font-black text-nexus-blue uppercase mt-1">Author: {b.author.username}</div></div></div>
+                         <div className="flex items-center space-x-6"><img src={b.imageUrl} className="w-16 h-16 rounded-2xl object-cover border border-white/5" /><div><div className="text-xs font-black text-white uppercase tracking-tight">{b.caption}</div><div className="text-[9px] font-black text-vani-blue uppercase mt-1">Author: {b.author.username}</div></div></div>
                          <button onClick={() => api.severBroadcast(b._id).then(loadAll)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
                       </div>
                     ))}
@@ -90,7 +90,7 @@ export const ArchitectRealm = () => {
             {activeTab === 'identities' && (
               <motion.div key="identities" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {identities.map((id) => (
-                   <div key={id._id} className="bg-[#0a0a0c] border border-gray-800 p-6 rounded-[32px] hover:border-nexus-blue/30 transition-all">
+                   <div key={id._id} className="bg-[#0a0a0c] border border-gray-800 p-6 rounded-[32px] hover:border-vani-blue/30 transition-all">
                       <div className="flex items-center space-x-4 mb-6">
                          <img src={id.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id.username}`} className="w-12 h-12 rounded-2xl border border-gray-700" />
                          <div><div className="text-sm font-black text-white uppercase">{id.username}</div><div className={`text-[8px] font-black uppercase text-gray-600`}>{id.tier}_TIER_NODE</div></div>
@@ -106,8 +106,8 @@ export const ArchitectRealm = () => {
 
             {activeTab === 'finance' && (
               <motion.div key="finance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                 <div className="p-10 bg-nexus-gradient/5 border border-white/5 rounded-[40px] text-center">
-                    <CreditCard size={48} className="mx-auto text-nexus-blue mb-4" />
+                 <div className="p-10 bg-vani-gradient/5 border border-white/5 rounded-[40px] text-center">
+                    <CreditCard size={48} className="mx-auto text-vani-blue mb-4" />
                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Sovereign_Ledger</h3>
                     <p className="text-xs text-gray-500 uppercase tracking-widest mt-2">Verifying contributions to the Matrix</p>
                  </div>
@@ -118,7 +118,7 @@ export const ArchitectRealm = () => {
                             <img src={tx.user.avatar} className="w-12 h-12 rounded-2xl" />
                             <div>
                                <div className="text-sm font-black text-white uppercase">{tx.user.username}</div>
-                               <div className="text-[10px] font-mono text-nexus-blue uppercase">{tx.method}: {tx.transactionId}</div>
+                               <div className="text-[10px] font-mono text-vani-blue uppercase">{tx.method}: {tx.transactionId}</div>
                             </div>
                          </div>
                          <div className="flex gap-3">
@@ -139,12 +139,12 @@ export const ArchitectRealm = () => {
          {selectedIdentity && (
            <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[48px] border border-white/5 p-10">
-                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3"><Fingerprint size={28} className="text-nexus-blue" /> Node_Authority</h2>
+                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3"><Fingerprint size={28} className="text-vani-blue" /> Node_Authority</h2>
                  
                  <div className="space-y-6">
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <span className="text-xs font-black text-white uppercase">Architect Clearance</span>
-                       <input type="checkbox" checked={selectedIdentity.isAdmin} onChange={(e) => setSelectedIdentity({...selectedIdentity, isAdmin: e.target.checked})} className="w-5 h-5 accent-nexus-blue" />
+                       <input type="checkbox" checked={selectedIdentity.isAdmin} onChange={(e) => setSelectedIdentity({...selectedIdentity, isAdmin: e.target.checked})} className="w-5 h-5 accent-vani-blue" />
                     </div>
 
                     <div className="space-y-3">
@@ -158,7 +158,7 @@ export const ArchitectRealm = () => {
                                 const newBadges = exists ? selectedIdentity.badges?.filter(b => b.type !== type) : [...(selectedIdentity.badges || []), { type, label: type.toUpperCase() }];
                                 setSelectedIdentity({...selectedIdentity, badges: newBadges});
                               }}
-                              className={`p-3 rounded-xl border text-[9px] font-black uppercase text-center cursor-pointer transition-all ${selectedIdentity.badges?.some(b => b.type === type) ? 'bg-nexus-blue/20 border-nexus-blue text-white' : 'bg-white/5 border-transparent text-gray-600'}`}
+                              className={`p-3 rounded-xl border text-[9px] font-black uppercase text-center cursor-pointer transition-all ${selectedIdentity.badges?.some(b => b.type === type) ? 'bg-vani-blue/20 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-600'}`}
                             >
                                {type}
                             </div>
@@ -167,7 +167,7 @@ export const ArchitectRealm = () => {
                     </div>
 
                     <div className="flex gap-3 pt-6">
-                       <button onClick={() => handleGrantAuthority(selectedIdentity._id, selectedIdentity.badges || [], selectedIdentity.isAdmin || false)} className="flex-1 bg-nexus-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl">Confirm Sync</button>
+                       <button onClick={() => handleGrantAuthority(selectedIdentity._id, selectedIdentity.badges || [], selectedIdentity.isAdmin || false)} className="flex-1 bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl">Confirm Sync</button>
                        <button onClick={() => setSelectedIdentity(null)} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Cancel</button>
                     </div>
                  </div>

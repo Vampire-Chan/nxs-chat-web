@@ -26,7 +26,7 @@ export const NeuralSuggester = ({ query, type, onSelect, position }: Props) => {
       };
       fetchUsers();
     } else {
-      const tags = ['nexus', 'cyber', 'matrix', 'cinema', 'identity', 'transmission'].filter(t => t.startsWith(query.slice(1)));
+      const tags = ['Yantravani', 'cyber', 'matrix', 'cinema', 'identity', 'transmission'].filter(t => t.startsWith(query.slice(1)));
       setResults(tags);
     }
   }, [query, type]);
@@ -37,12 +37,12 @@ export const NeuralSuggester = ({ query, type, onSelect, position }: Props) => {
     <motion.div 
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="absolute bg-[#0a0a0c] border border-nexus-blue/30 rounded-2xl shadow-[0_0_30px_rgba(0,210,255,0.15)] overflow-hidden z-[1000] min-w-[200px]"
+      className="absolute bg-[#0a0a0c] border border-vani-blue/30 rounded-2xl shadow-[0_0_30px_rgba(0,210,255,0.15)] overflow-hidden z-[1000] min-w-[200px]"
       style={{ bottom: '100%', left: position.left, marginBottom: '12px' }}
     >
       <div className="p-2 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
          <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Neural_Suggestions</span>
-         <Zap size={10} className="text-nexus-blue animate-pulse" />
+         <Zap size={10} className="text-vani-blue animate-pulse" />
       </div>
       
       <div className="max-h-48 overflow-y-auto custom-scrollbar">
@@ -50,15 +50,15 @@ export const NeuralSuggester = ({ query, type, onSelect, position }: Props) => {
           <div 
             key={i}
             onClick={() => onSelect(type === 'mention' ? item.username : item)}
-            className="p-3 hover:bg-nexus-blue/10 flex items-center space-x-3 cursor-pointer transition-colors group border-b border-white/[0.02] last:border-0"
+            className="p-3 hover:bg-vani-blue/10 flex items-center space-x-3 cursor-pointer transition-colors group border-b border-white/[0.02] last:border-0"
           >
-            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center text-nexus-blue border border-white/5 group-hover:border-nexus-blue/50">
+            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center text-vani-blue border border-white/5 group-hover:border-vani-blue/50">
                {type === 'mention' ? (
                  item.avatar ? <img src={item.avatar} className="w-full h-full object-cover rounded-lg" /> : <AtSign size={14} />
                ) : <Hash size={14} />}
             </div>
             <div>
-               <div className="text-xs font-black text-white uppercase tracking-tight group-hover:text-nexus-blue transition-colors">
+               <div className="text-xs font-black text-white uppercase tracking-tight group-hover:text-vani-blue transition-colors">
                   {type === 'mention' ? item.username : item}
                </div>
                {type === 'mention' && <div className="text-[9px] text-gray-600 font-mono">{item.displayName || 'Identity_Node'}</div>}

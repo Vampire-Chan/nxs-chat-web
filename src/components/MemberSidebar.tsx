@@ -31,7 +31,7 @@ export const MemberSidebar = ({ members, onMemberClick, currentUser }: Props) =>
   const handleFollow = async (targetId: string) => {
     try {
       await api.syncIdentity(targetId);
-      alert("Sync Request Transmitted to Nexus.");
+      alert("Sync Request Transmitted to Yantravani.");
     } catch (err) { console.error(err); }
   };
 
@@ -53,18 +53,18 @@ export const MemberSidebar = ({ members, onMemberClick, currentUser }: Props) =>
               >
                 {/* Avatar */}
                 <div className="relative mr-3">
-                  <div className={`w-9 h-9 rounded-xl bg-gray-800 overflow-hidden border border-gray-700 group-hover:border-nexus-blue transition-all ${isMe ? 'border-nexus-blue/50' : ''}`}>
+                  <div className={`w-9 h-9 rounded-xl bg-gray-800 overflow-hidden border border-gray-700 group-hover:border-vani-blue transition-all ${isMe ? 'border-vani-blue/50' : ''}`}>
                     <img src={member.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.username}`} className="w-full h-full object-cover" alt="u" />
                   </div>
                   {isMe && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-nexus-blue rounded-full border-2 border-discord-channel shadow-lg" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-vani-blue rounded-full border-2 border-discord-channel shadow-lg" />
                   )}
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-1">
-                    <span className={`text-xs font-black truncate uppercase tracking-tighter ${isMe ? 'text-nexus-blue' : 'text-gray-200'}`}>
+                    <span className={`text-xs font-black truncate uppercase tracking-tighter ${isMe ? 'text-vani-blue' : 'text-gray-200'}`}>
                       {member.username}
                     </span>
                   </div>

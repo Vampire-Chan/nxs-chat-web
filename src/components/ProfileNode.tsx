@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser } from '../services/api';
+import { getIdentityName, getIdentityAge } from '../services/identity';
 import { User as UserIcon, Heart, MessageCircle, Lock, Share2, Check, Clock, Shield, Star } from 'lucide-react';
 import { PostViewerModal } from './PostViewerModal';
 
@@ -10,15 +11,26 @@ interface Props {
   isOwnProfile: boolean;
   onEdit?: () => void;
   onFollow?: (id: string) => void;
+  onViewSocials?: (tab: 'friends' | 'following' | 'followers', userId: string) => void;
   currentUser?: IUser | null;
 }
 
-export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser }: Props) => {
+export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocials, currentUser }: Props) => {
   const [posts, setPosts] = useState<IPost[]>([]);
   const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
 
-  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
+  if (!user || (!user.id && !user._id)) {
+    return (
+      <div className="flex-1 bg-discord-dark flex flex-col items-center justify-center p-10 text-center">
+         <div className="w-20 h-20 bg-red-500/10 rounded-[32px] mb-6 flex items-center justify-center border border-red-500/20 text-red-500"><Shield size={40} /></div>
+         <h3 className="text-xl font-black text-white uppercase tracking-widest mb-2">Severed Identity</h3>
+         <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">This node has been purged from the matrix or the transmission link is broken.</p>
+      </div>
+    );
+  }
+
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || 'deleted'}`;
   const currentUserId = currentUser?.id || currentUser?._id;
   
   const isFollowing = user.followers?.some((f: any) => (f._id || f) === currentUserId);
@@ -43,7 +55,12 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
     try {
       const data = await api.getUserPosts(user.id || user._id);
       setPosts(data);
-    } catch (err) { console.error(err); }
+    } catch (err: any) { 
+      // 401 is handled by global interceptor
+      if (err.response?.status !== 401) {
+        console.error(err); 
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -57,12 +74,12 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
     
     if (isFollowing && !user.isPrivate) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-white/5 text-white border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">Unsync Node</button>;
     
-    if (isRequestReceived) return <button onClick={handleAccept} className="bg-green-500/20 text-green-500 border border-green-500/50 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-2"><Check size={12} /> Accept Link</button>;
+    if (isRequestReceived) return <button onClick={handleAccept} className="bg-green-500/20 text-green-500 border border-green-500/50 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-2 shadow-lg shadow-green-500/10"><Check size={12} /> Accept Invasion</button>;
     
-    if (isRequestSent) return <button disabled className="bg-white/5 text-gray-500 border border-white/5 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center gap-2"><Clock size={12} /> Pending</button>;
+    if (isRequestSent) return <button disabled className="bg-white/5 text-gray-500 border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center gap-2 animate-pulse"><Clock size={12} /> Sync Pending</button>;
     
     return (
-      <button onClick={() => onFollow?.(user.id || user._id)} className="bg-nexus-gradient text-white shadow-red-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95">
+      <button onClick={() => onFollow?.(user.id || user._id)} className="bg-vani-gradient text-white shadow-red-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95">
         {user.isPrivate ? 'Request Access' : 'Establish Sync'}
       </button>
     );
@@ -72,25 +89,30 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
     <div className="flex-1 bg-discord-dark overflow-y-auto custom-scrollbar relative">
       <div className="relative">
          <div className="h-48 bg-gray-900 overflow-hidden border-b border-gray-800/50 z-0">
-            {user.banner ? <img src={user.banner} className="w-full h-full object-cover opacity-40" /> : <div className="w-full h-full bg-nexus-gradient opacity-5" />}
+            {user.banner ? <img src={user.banner} className="w-full h-full object-cover opacity-40" /> : <div className="w-full h-full bg-vani-gradient opacity-5" />}
             <div className="absolute inset-0 bg-gradient-to-t from-discord-dark via-discord-dark/40 to-transparent" />
          </div>
          <div className="max-w-4xl mx-auto px-6 -mt-16 relative z-10 pb-10">
             <div className="flex flex-col md:flex-row items-center md:items-end space-y-4 md:space-y-0 md:space-x-8">
                <div className="relative group z-20">
-                  <div className="w-32 h-32 rounded-[32px] bg-nexus-gradient p-0.5 shadow-2xl">
+                  <div className="w-32 h-32 rounded-[32px] bg-vani-gradient p-0.5 shadow-2xl">
                      <div className="w-full h-full rounded-[30px] bg-discord-dark overflow-hidden border-4 border-discord-dark">
                         <img src={user.avatar || defaultAvatar} className="w-full h-full object-cover" alt="pfp" />
                      </div>
                   </div>
-                  <div className="absolute -bottom-1 -right-1 bg-nexus-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-discord-dark shadow-xl z-30">
+                  <div className="absolute -bottom-1 -right-1 bg-vani-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-discord-dark shadow-xl z-30">
                      {user.isPrivate ? <Shield size={14} className="text-white" /> : <UserIcon size={14} className="text-white" />}
                   </div>
                </div>
                <div className="flex-1 pb-2 text-center md:text-left">
                   <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-4">
                      <div className="flex items-center justify-center md:justify-start gap-2">
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{user.username}</h2>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                          {getIdentityName(user)}
+                        </h2>
+                        {getIdentityAge(user) !== null && (
+                          <span className="text-sm font-black text-vani-blue/60">{getIdentityAge(user)}Y</span>
+                        )}
                         {user.tier === 'elite' && <Star size={18} className="text-yellow-500 fill-yellow-500" />}
                      </div>
                      <div className="flex space-x-2 mt-3 md:mt-0 justify-center">
@@ -100,8 +122,11 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
                   </div>
                   <div className="flex justify-center md:justify-start space-x-8 opacity-80">
                      <Stat label="Transmissions" value={posts.length} />
-                     {user.isPrivate ? <Stat label="Synced" value={user.friends?.length || 0} /> : <Stat label="Followers" value={user.followers?.length || 0} />}
-                     <Stat label="Following" value={user.following?.length || 0} />
+                     {isOwnProfile && (
+                       <Stat label="Parallel" value={user.friends?.length || 0} onClick={() => onViewSocials?.('friends', user.id || user._id)} />
+                     )}
+                     <Stat label="Synced" value={user.following?.length || 0} onClick={() => onViewSocials?.('following', user.id || user._id)} />
+                     <Stat label="Nodes" value={user.followers?.length || 0} onClick={() => onViewSocials?.('followers', user.id || user._id)} />
                   </div>
                </div>
             </div>
@@ -110,7 +135,10 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
                   <p className="text-gray-300 text-sm leading-relaxed font-medium relative z-10">{user.bio || "Node awaiting identity calibration."}</p>
                </div>
                <div className="w-full md:w-48 bg-white/[0.01] border border-white/5 rounded-2xl p-4 flex flex-col space-y-2">
-                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Handle</span><span className="text-[8px] font-mono text-nexus-blue">@{user.username}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Handle</span><span className="text-[8px] font-mono text-vani-blue">@{user.username}</span></div>
+                  {user.displayName && (
+                    <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Alias</span><span className="text-[8px] font-mono text-white truncate max-w-[80px]">{user.displayName}</span></div>
+                  )}
                   <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Tier</span><span className="text-[8px] font-mono text-yellow-500 uppercase">{user.tier}</span></div>
                </div>
             </div>
@@ -143,9 +171,9 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, currentUser 
   );
 };
 
-const Stat = ({ label, value }: any) => (
-  <div className="flex flex-col">
-     <div className="text-xl font-black text-white tracking-tighter">{value}</div>
-     <div className={`text-[8px] font-black uppercase text-gray-600`}>{label}</div>
+const Stat = ({ label, value, onClick }: any) => (
+  <div className={`flex flex-col ${onClick ? 'cursor-pointer hover:opacity-100 transition-opacity group' : ''}`} onClick={onClick}>
+     <div className="text-xl font-black text-white tracking-tighter group-hover:text-vani-blue">{value}</div>
+     <div className={`text-[8px] font-black uppercase text-gray-600 group-hover:text-gray-400`}>{label}</div>
   </div>
 );

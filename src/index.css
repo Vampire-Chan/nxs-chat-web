@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  --color-discord-dark: var(--nexus-bg);
+  --color-discord-dark: var(--vani-bg);
   --color-discord-sidebar: var(--sidebar-bg);
   --color-discord-channel: var(--sidebar-bg);
-  --color-nexus-blue: #00d2ff;
-  --color-nexus-accent: #ff0055;
-  --background-image-nexus-gradient: linear-gradient(135deg, #ff0055 0%, #00d2ff 100%);
+  --color-vani-blue: #00d2ff;
+  --color-vani-accent: #ff0055;
+  --background-image-vani-gradient: linear-gradient(135deg, #ff0055 0%, #00d2ff 100%);
 }
 
 :root {
-  --nexus-bg: #0a0a0c;
+  --vani-bg: #0a0a0c;
   --sidebar-bg: #111214;
   --text-main: #eeeeee;
-  --nexus-font-size: 14px;
-  --nexus-spacing: 1rem;
-  --nexus-padding: 0.75rem;
-  --nexus-line-height: 1.5;
-  --nexus-font-family: "Inter", sans-serif;
+  --vani-font-size: 14px;
+  --vani-spacing: 1rem;
+  --vani-padding: 0.75rem;
+  --vani-line-height: 1.5;
+  --vani-font-family: "Inter", sans-serif;
 }
 
 html {
-  font-size: var(--nexus-font-size);
+  font-size: var(--vani-font-size);
 }
 
 body {
   margin: 0;
-  background-color: var(--nexus-bg);
+  background-color: var(--vani-bg);
   color: var(--text-main);
-  font-family: var(--nexus-font-family);
-  line-height: var(--nexus-line-height);
+  font-family: var(--vani-font-family);
+  line-height: var(--vani-line-height);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -46,7 +46,7 @@ body {
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--color-nexus-blue);
+  background: var(--color-vani-blue);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -54,5 +54,5 @@ body {
 }
 
 .markdown-content p {
-  margin-bottom: var(--nexus-spacing);
+  margin-bottom: var(--vani-spacing);
 }

@@ -28,7 +28,7 @@ export const MediaPlayer = ({ type, url, onClose, onForward, onReply }: Props) =
 
   const handleShare = () => {
     if (navigator.share) {
-      navigator.share({ title: 'Nexus Media', url }).catch(() => {});
+      navigator.share({ title: 'Yantravani Media', url }).catch(() => {});
     } else {
       navigator.clipboard.writeText(url);
       alert("Link copied to clipboard.");
@@ -40,7 +40,7 @@ export const MediaPlayer = ({ type, url, onClose, onForward, onReply }: Props) =
       {/* HEADER */}
       <div className="h-20 px-6 flex items-center justify-between bg-black/40 border-b border-white/5">
          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 rounded-xl bg-nexus-blue/10 flex items-center justify-center text-nexus-blue border border-nexus-blue/20">
+            <div className="w-10 h-10 rounded-xl bg-vani-blue/10 flex items-center justify-center text-vani-blue border border-vani-blue/20">
                {type === 'image' ? <ZoomIn size={20} /> : type === 'video' ? <Play size={20} /> : <Volume2 size={20} />}
             </div>
             <div>
@@ -74,7 +74,7 @@ export const MediaPlayer = ({ type, url, onClose, onForward, onReply }: Props) =
            <div className="w-full max-w-4xl relative group">
               <video ref={videoRef} src={url} controls className="w-full rounded-3xl shadow-2xl border border-white/5" />
               <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <button onClick={cycleRate} className="px-4 py-2 bg-black/60 backdrop-blur-md rounded-xl text-white font-black text-[10px] uppercase border border-white/10 hover:bg-nexus-blue transition-all">
+                 <button onClick={cycleRate} className="px-4 py-2 bg-black/60 backdrop-blur-md rounded-xl text-white font-black text-[10px] uppercase border border-white/10 hover:bg-vani-blue transition-all">
                     {playbackRate}x speed
                  </button>
               </div>
@@ -83,7 +83,7 @@ export const MediaPlayer = ({ type, url, onClose, onForward, onReply }: Props) =
 
          {type === 'audio' && (
            <div className="w-full max-w-xl bg-[#0a0a0c] border border-white/5 p-10 rounded-[48px] shadow-2xl text-center">
-              <div className="w-24 h-24 bg-nexus-gradient rounded-[32px] mx-auto mb-8 flex items-center justify-center shadow-lg shadow-red-500/20">
+              <div className="w-24 h-24 bg-vani-gradient rounded-[32px] mx-auto mb-8 flex items-center justify-center shadow-lg shadow-red-500/20">
                  <Volume2 size={40} className="text-white" />
               </div>
               <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Neural_Audio_Transmission</h4>
@@ -110,7 +110,7 @@ export const MediaPlayer = ({ type, url, onClose, onForward, onReply }: Props) =
            <div className="text-xs font-mono text-gray-500 bg-white/5 px-6 py-2 rounded-full border border-white/5">ZOOM: {Math.round(zoom * 100)}%</div>
            <button onClick={() => handleZoom(0.25)} className="p-4 bg-white/5 rounded-2xl text-gray-400 hover:text-white transition-all"><ZoomIn size={24} /></button>
            <div className="w-[1px] h-8 bg-gray-800 mx-4" />
-           <a href={url} download className="p-4 bg-nexus-blue/10 text-nexus-blue rounded-2xl hover:bg-nexus-blue hover:text-white transition-all border border-nexus-blue/20"><Download size={24} /></a>
+           <a href={url} download className="p-4 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all border border-vani-blue/20"><Download size={24} /></a>
         </div>
       )}
     </motion.div>

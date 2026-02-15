@@ -6,7 +6,7 @@ import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { BrowserRouter } from 'react-router-dom'
 
-console.log('🚀 NEXUS CLIENT BOOTSTRAPPING...');
+console.log('🚀 Yantravani CLIENT BOOTSTRAPPING...');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

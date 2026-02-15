@@ -21,7 +21,7 @@ export const HeartBeatEmoji = () => (
     transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
     className="inline-block"
   >
-    <Heart size={18} className="text-nexus-accent fill-nexus-accent" />
+    <Heart size={18} className="text-vani-accent fill-vani-accent" />
   </motion.span>
 );
 
@@ -41,7 +41,7 @@ export const MatrixSpinEmoji = () => (
     transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
     className="inline-block"
   >
-    <Cpu size={18} className="text-nexus-blue" />
+    <Cpu size={18} className="text-vani-blue" />
   </motion.span>
 );
 

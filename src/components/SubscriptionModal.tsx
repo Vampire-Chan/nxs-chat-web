@@ -45,13 +45,13 @@ export const SubscriptionModal = ({ onClose, currentUser }: Props) => {
 
          {/* Left: Pitch */}
          <div className="w-1/2 bg-gradient-to-br from-gray-900 to-black p-12 flex flex-col relative overflow-hidden">
-            <div className="absolute top-[-20%] left-[-20%] w-96 h-96 bg-nexus-gradient opacity-10 blur-[100px] rounded-full pointer-events-none" />
+            <div className="absolute top-[-20%] left-[-20%] w-96 h-96 bg-vani-gradient opacity-10 blur-[100px] rounded-full pointer-events-none" />
             
             <div className="relative z-10">
-               <div className="inline-flex items-center space-x-2 bg-nexus-blue/10 text-nexus-blue px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 border border-nexus-blue/20">
+               <div className="inline-flex items-center space-x-2 bg-vani-blue/10 text-vani-blue px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 border border-vani-blue/20">
                   <Zap size={12} /> <span>Status: {currentUser.tier === 'elite' ? 'ACTIVE' : 'STANDARD'}</span>
                </div>
-               <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-6 leading-tight">Elevate Your<br /><span className="text-nexus-gradient-text">Digital Reality</span></h2>
+               <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-6 leading-tight">Elevate Your<br /><span className="text-vani-gradient-text">Digital Reality</span></h2>
                
                <div className="space-y-6 mt-8">
                   <Perk label="64-Slot Visual Mosaic Grid" />
@@ -69,7 +69,7 @@ export const SubscriptionModal = ({ onClose, currentUser }: Props) => {
 
          {/* Right: Payment */}
          <div className="w-1/2 bg-discord-channel p-12 flex flex-col justify-center">
-            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3"><CreditCard size={24} className="text-nexus-blue" /> Secure Payment</h3>
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3"><CreditCard size={24} className="text-vani-blue" /> Secure Payment</h3>
             
             <div className="flex bg-gray-900 p-1 rounded-xl mb-8">
                <MethodBtn label="UPI (India)" active={method === 'UPI'} onClick={() => setMethod('UPI')} icon={<Smartphone size={16} />} />
@@ -81,13 +81,13 @@ export const SubscriptionModal = ({ onClose, currentUser }: Props) => {
                  <>
                     <div className="w-48 h-48 bg-white mx-auto rounded-xl mb-4 flex items-center justify-center">
                        {/* Placeholder for QR Code */}
-                       <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=YOUR_VPA_HERE&pn=NexusCorp&am=1000&tn=NexusElite`} alt="QR" className="w-40 h-40" />
+                       <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=YOUR_VPA_HERE&pn=YantravaniCorp&am=1000&tn=YantravaniElite`} alt="QR" className="w-40 h-40" />
                     </div>
                     <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Scan with GPay / PhonePe / Paytm</div>
                  </>
                ) : (
                  <div className="py-10">
-                    <div className="font-mono text-xs text-nexus-blue bg-nexus-blue/10 p-4 rounded-xl break-all">0x71C7656EC7ab88b098defB751B7401B5f6d8976F</div>
+                    <div className="font-mono text-xs text-vani-blue bg-vani-blue/10 p-4 rounded-xl break-all">0x71C7656EC7ab88b098defB751B7401B5f6d8976F</div>
                     <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mt-4">Send USDT/ETH (ERC-20)</div>
                  </div>
                )}
@@ -97,13 +97,13 @@ export const SubscriptionModal = ({ onClose, currentUser }: Props) => {
                <div>
                   <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Transaction Reference (UTR / Hash)</label>
                   <input 
-                    className="w-full bg-gray-900 border border-gray-700 text-white p-4 rounded-xl focus:border-nexus-blue outline-none font-mono text-xs"
+                    className="w-full bg-gray-900 border border-gray-700 text-white p-4 rounded-xl focus:border-vani-blue outline-none font-mono text-xs"
                     placeholder="Enter 12-digit UTR or Tx Hash..."
                     value={txnId}
                     onChange={(e) => setTxnId(e.target.value)}
                   />
                </div>
-               <button onClick={handleSubmit} className="w-full bg-nexus-gradient text-white font-black py-4 rounded-xl uppercase text-xs tracking-widest hover:scale-[1.02] transition-all shadow-lg shadow-red-500/20">Submit Proof</button>
+               <button onClick={handleSubmit} className="w-full bg-vani-gradient text-white font-black py-4 rounded-xl uppercase text-xs tracking-widest hover:scale-[1.02] transition-all shadow-lg shadow-red-500/20">Submit Proof</button>
             </div>
          </div>
       </div>

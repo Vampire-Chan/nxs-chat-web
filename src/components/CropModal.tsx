@@ -18,7 +18,7 @@ export const CropModal = ({ image, aspect, onCropComplete, onClose, onConfirm }:
     <div className="fixed inset-0 bg-black/95 z-[200] flex flex-col">
       <div className="h-16 flex items-center justify-between px-6 border-b border-gray-800 bg-discord-sidebar">
          <div className="flex items-center space-x-3">
-            <div className="w-2 h-2 bg-nexus-blue rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-vani-blue rounded-full animate-pulse" />
             <span className="text-[10px] font-black text-white uppercase tracking-widest">Image Calibration Mode</span>
          </div>
          <button onClick={onClose} className="text-gray-500 hover:text-white transition">
@@ -51,7 +51,7 @@ export const CropModal = ({ image, aspect, onCropComplete, onClose, onConfirm }:
               max={3}
               step={0.1}
               onChange={(e) => setCropZoom(Number(e.target.value))}
-              className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-nexus-blue"
+              className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-vani-blue"
             />
             <div className="flex justify-between mt-2 font-mono text-[8px] text-gray-600 uppercase tracking-widest">
                <span>Zoom_Min</span>
@@ -61,7 +61,7 @@ export const CropModal = ({ image, aspect, onCropComplete, onClose, onConfirm }:
 
          <button 
            onClick={onConfirm}
-           className="bg-nexus-gradient text-white px-16 py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all flex items-center space-x-3"
+           className="bg-vani-gradient text-white px-16 py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all flex items-center space-x-3"
          >
            <Check size={18} />
            <span>Confirm Matrix Crop</span>

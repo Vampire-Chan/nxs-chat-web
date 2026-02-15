@@ -67,7 +67,7 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate }: Props)
            <img src={post.imageUrl} className="w-full h-full object-contain" alt="broadcast" />
            <div className="absolute top-8 left-8 flex space-x-2">
               <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/5 flex items-center space-x-2">
-                 <div className="w-2 h-2 bg-nexus-blue rounded-full animate-pulse" />
+                 <div className="w-2 h-2 bg-vani-blue rounded-full animate-pulse" />
                  <span className="text-[10px] font-black text-white uppercase tracking-widest">High_Res_Link</span>
               </div>
            </div>
@@ -96,12 +96,12 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate }: Props)
                  {isEditing ? (
                    <div className="space-y-3">
                       <textarea 
-                        className="w-full bg-black/40 border border-nexus-blue p-4 rounded-2xl text-sm text-gray-200 outline-none resize-none h-24"
+                        className="w-full bg-black/40 border border-vani-blue p-4 rounded-2xl text-sm text-gray-200 outline-none resize-none h-24"
                         value={editCaption}
                         onChange={(e) => setEditCaption(e.target.value)}
                       />
                       <div className="flex space-x-2">
-                         <button onClick={handleEdit} className="bg-nexus-blue text-black font-black text-[10px] px-4 py-2 rounded-lg uppercase tracking-widest">Apply</button>
+                         <button onClick={handleEdit} className="bg-vani-blue text-black font-black text-[10px] px-4 py-2 rounded-lg uppercase tracking-widest">Apply</button>
                          <button onClick={() => setIsEditing(false)} className="text-gray-500 text-[10px] px-4 py-2 uppercase font-black">Cancel</button>
                       </div>
                    </div>
@@ -136,10 +136,10 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate }: Props)
            <div className="p-6 bg-black/20 border-t border-gray-800 space-y-6">
               <div className="flex items-center justify-between">
                  <div className="flex items-center space-x-6">
-                    <button onClick={handleLike} className={`transition-all hover:scale-110 ${isLiked ? 'text-nexus-accent' : 'text-gray-500'}`}>
+                    <button onClick={handleLike} className={`transition-all hover:scale-110 ${isLiked ? 'text-vani-accent' : 'text-gray-500'}`}>
                        <Heart size={24} fill={isLiked ? 'currentColor' : 'none'} />
                     </button>
-                    <button className="text-gray-500 hover:text-nexus-blue transition-all"><MessageCircle size={24} /></button>
+                    <button className="text-gray-500 hover:text-vani-blue transition-all"><MessageCircle size={24} /></button>
                     <button className="text-gray-500 hover:text-white transition-all"><Send size={24} /></button>
                  </div>
                  {isOwner && (
@@ -158,12 +158,12 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate }: Props)
                  <input 
                    type="text" 
                    placeholder="Input neural comment..."
-                   className="w-full bg-black/40 border border-gray-800 focus:border-nexus-blue p-4 rounded-2xl text-xs text-gray-300 outline-none transition-all pr-12"
+                   className="w-full bg-black/40 border border-gray-800 focus:border-vani-blue p-4 rounded-2xl text-xs text-gray-300 outline-none transition-all pr-12"
                    value={comment}
                    onChange={(e) => setComment(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
                  />
-                 <button onClick={handleAddComment} className="absolute right-4 top-1/2 -translate-y-1/2 text-nexus-blue opacity-50 hover:opacity-100 transition-opacity">
+                 <button onClick={handleAddComment} className="absolute right-4 top-1/2 -translate-y-1/2 text-vani-blue opacity-50 hover:opacity-100 transition-opacity">
                     <ArrowRight size={18} />
                  </button>
               </div>

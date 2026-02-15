@@ -43,8 +43,8 @@ const translations: Record<Language, Record<string, string>> = {
     "common.delete": "Purge",
     "common.edit": "Recalibrate",
     "common.back": "Return",
-    "help.title": "Nexus Protocol // Manual",
-    "help.intro": "Welcome to Nexus. A hybrid social architecture combining sovereign realms with a global neural matrix.",
+    "help.title": "Yantravani Protocol // Manual",
+    "help.intro": "Welcome to Yantravani. A hybrid social architecture combining sovereign realms with a global neural matrix.",
     "help.realms": "Realms & Sectors",
     "help.realms_desc": "Independent community nodes for organized communication.",
     "help.matrix": "Neural Matrix",
@@ -59,7 +59,7 @@ const translations: Record<Language, Record<string, string>> = {
     "settings.appearance": "Visual Interface",
     "settings.security": "Identity Security",
     "settings.billing": "Premium Ledger",
-    "settings.legal": "Nexus Protocols",
+    "settings.legal": "Yantravani Protocols",
     "profile.displayname": "Public Alias",
     "profile.dob": "Date of Creation",
     "profile.bio": "Identity Description",
@@ -195,13 +195,13 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguage] = useState<Language>('en');
 
   useEffect(() => {
-    const saved = localStorage.getItem('nexus_lang') as Language;
+    const saved = localStorage.getItem('Yantravani_lang') as Language;
     if (saved && translations[saved]) setLanguage(saved);
   }, []);
 
   const changeLanguage = (lang: Language) => {
     setLanguage(lang);
-    localStorage.setItem('nexus_lang', lang);
+    localStorage.setItem('Yantravani_lang', lang);
   };
 
   const t = (key: string) => {

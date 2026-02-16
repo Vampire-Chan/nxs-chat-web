@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Shield, Lock, History, Zap, Settings, Image as ImageIcon, Camera, Save, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Download, Trash2, AlertCircle, Key, Eye, EyeOff, Globe } from 'lucide-react';
+import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, Save, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Download, AlertCircle as AlertIcon, Key, Eye, EyeOff, Globe } from 'lucide-react';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import type { IUser } from '../services/api';
@@ -15,7 +15,7 @@ interface Props {
 
 export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDockPosition }: Props) => {
   const { language, setLanguage } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'privacy' | 'interface' | 'sovereignty'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'privacy' | 'interface' | 'archive' | 'sovereignty'>('profile');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(true);
   
   // Profile States
@@ -81,6 +81,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
     { id: 'interface', label: 'Interface Protocols', icon: <Layout size={18} />, color: 'text-pink-400' },
     { id: 'security', label: 'Security Protocols', icon: <Shield size={18} />, color: 'text-green-400' },
     { id: 'privacy', label: 'Privacy Shield', icon: <Lock size={18} />, color: 'text-purple-400' },
+    { id: 'archive', label: 'Neural Logs', icon: <HistoryIcon size={18} />, color: 'text-yellow-400' },
     { id: 'sovereignty', label: 'Sovereignty', icon: <Zap size={18} />, color: 'text-vani-accent' }
   ];
 
@@ -282,6 +283,18 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                   </motion.div>
                 )}
 
+                {activeTab === 'archive' && (
+                  <motion.div key="archive" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8 text-center py-10">
+                     <div className="w-20 h-20 bg-vani-blue/10 rounded-[32px] flex items-center justify-center mx-auto mb-6 text-vani-blue border border-vani-blue/20 shadow-2xl shadow-blue-500/20">
+                        <Download size={40} />
+                     </div>
+                     <h3 className="text-2xl font-black text-white uppercase tracking-tight">Export Neural Log</h3>
+                     <p className="text-gray-500 text-xs max-w-md mx-auto leading-relaxed uppercase tracking-widest font-mono">Archive established: v1.0.42</p>
+                     <p className="text-gray-400 text-xs max-w-md mx-auto leading-relaxed">Download a permanent archive of your identity node, including all transmissions, neural links, and matrix interactions.</p>
+                     <button onClick={() => api.exportData()} className="bg-white text-black px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-vani-blue transition-all shadow-xl">Initialize Archive Protocol</button>
+                  </motion.div>
+                )}
+
                 {activeTab === 'sovereignty' && (
                   <motion.div key="sovereignty" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                      {/* Neural Camouflage (Disable) */}
@@ -295,22 +308,10 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         </button>
                      </div>
 
-                     {/* Export Neural Log */}
-                     <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-6">
-                        <div className="flex items-start space-x-4">
-                           <div className="p-3 bg-vani-blue/10 rounded-2xl text-vani-blue"><Download size={24} /></div>
-                           <div>
-                              <div className="text-lg font-black text-white uppercase tracking-tight">Archive Data</div>
-                              <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">Download a permanent archive of your identity node, including all transmissions and interactions.</p>
-                           </div>
-                        </div>
-                        <button onClick={() => api.exportData()} className="w-full bg-white/5 border border-white/10 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-vani-blue hover:text-black transition-all">Initialize Archive Protocol</button>
-                     </div>
-
                      {/* Identity Termination */}
                      <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[32px] space-y-6">
                         <div className="flex items-start space-x-4">
-                           <div className="p-3 bg-red-500/10 rounded-2xl text-red-500"><Trash2 size={24} /></div>
+                           <div className="p-3 bg-red-500/10 rounded-2xl text-red-500"><AlertIcon size={24} /></div>
                            <div className="flex-1">
                               <div className="text-lg font-black text-white uppercase tracking-tight text-red-500">Node Termination</div>
                               <p className="text-[10px] text-gray-400 font-medium max-w-xs mt-1">This will permanently purge your node from the Matrix. 7-day grace period included.</p>
@@ -338,6 +339,30 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
         <input type="file" ref={avatarRef} hidden accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setAvatarBlob(f); setAvatarPreview(URL.createObjectURL(f)); } }} />
         <input type="file" ref={bannerRef} hidden accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setBannerBlob(f); setBannerPreview(URL.createObjectURL(f)); } }} />
       </motion.div>
+    </div>
+  );
+};
+
+export const SystemSettingsModal = ({ onClose, dockPosition, setDockPosition }: any) => {
+  return (
+    <div className="fixed inset-0 bg-black/90 z-[2500] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden">
+          <div className="p-8 border-b border-white/5 flex items-center justify-between">
+             <h2 className="text-xl font-black text-white uppercase tracking-tighter">System_CFG</h2>
+             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button>
+          </div>
+          <div className="p-8 space-y-8">
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2">Dock Position</label>
+                <div className="grid grid-cols-2 gap-3">
+                   {['top', 'bottom', 'left', 'right'].map(pos => (
+                     <button key={pos} onClick={() => setDockPosition(pos)} className={`py-4 rounded-2xl border font-black uppercase text-[10px] transition-all ${dockPosition === pos ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'}`}>{pos}</button>
+                   ))}
+                </div>
+             </div>
+             <button onClick={onClose} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl">Sync System Settings</button>
+          </div>
+       </motion.div>
     </div>
   );
 };

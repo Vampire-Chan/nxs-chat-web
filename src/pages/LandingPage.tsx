@@ -7,7 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   return (
     <div className="h-screen bg-[#0a0a0c] text-white font-sans selection:bg-vani-blue selection:text-black overflow-y-auto custom-scrollbar">
@@ -26,9 +26,9 @@ export default function LandingPage() {
           <span className="text-xl font-black uppercase tracking-tighter">Yantravani</span>
         </div>
         <div className="hidden md:flex items-center space-x-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-          <button onClick={() => navigate('/help')} className="hover:text-white transition-colors uppercase tracking-widest">Protocols</button>
-          <button onClick={() => navigate('/faq')} className="hover:text-white transition-colors uppercase tracking-widest">Knowledge</button>
-          <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors uppercase tracking-widest">Legal</button>
+          <button onClick={() => navigate('/help')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.protocols')}</button>
+          <button onClick={() => navigate('/faq')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.knowledge')}</button>
+          <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.legal')}</button>
           
           <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/5">
             {['en', 'hi', 'ne'].map(l => (
@@ -40,7 +40,7 @@ export default function LandingPage() {
           onClick={() => navigate(isAuthenticated ? '/app' : '/login')}
           className="bg-white text-black px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-vani-blue hover:text-white transition-all shadow-xl"
         >
-          {isAuthenticated ? 'Enter Vani' : 'Establish Link'}
+          {isAuthenticated ? t('nav.enter') : t('nav.link')}
         </button>
       </nav>
 
@@ -49,27 +49,26 @@ export default function LandingPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
           <div className="inline-flex items-center space-x-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
             <Sparkles size={14} className="text-vani-blue" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">The Machine Voice is Active</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t('landing.hero_tag')}</span>
           </div>
-          <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-8 whitespace-pre-line">
-            Where Machine <span className="text-vani-blue">Finds Voice.</span>
-          </h1>
+          <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-8 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: t('landing.hero_title') }} />
+            
           <p className="text-lg md:text-xl text-gray-400 font-light max-w-2xl mx-auto mb-12 leading-relaxed">
-            Welcome to Yantravani. A decentralized Vani Matrix where digital mechanisms and human identities synchronize through the voice of the machine.
+            {t('landing.hero_desc')}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button 
               onClick={() => navigate(isAuthenticated ? '/app' : '/login')}
               className="w-full sm:w-auto bg-vani-gradient text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-105 transition-all flex items-center justify-center space-x-3"
             >
-              <span>Initialize Identity</span>
+              <span>{t('landing.init_identity')}</span>
               <ArrowRight size={18} />
             </button>
             <button 
               onClick={() => navigate('/help')}
               className="w-full sm:w-auto bg-white/5 hover:bg-white/10 border border-white/10 text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
             >
-              Vani Protocols
+              {t('landing.protocols_btn')}
             </button>
           </div>
         </motion.div>
@@ -128,10 +127,9 @@ export default function LandingPage() {
               <Zap size={64} className="text-white" />
            </div>
            <div className="text-center md:text-left space-y-4">
-              <h2 className="text-2xl font-black uppercase tracking-tighter">Genesis_Protocol: Why Yantravani?</h2>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">{t('landing.genesis_title')}</h2>
               <p className="text-gray-400 text-sm leading-relaxed font-medium">
-                Derived from the Sanskrit roots <span className="text-vani-blue font-black">Yantra</span> (Machine/Instrument) and <span className="text-vani-blue font-black">Vani</span> (Voice/Speech). 
-                Yantravani represents the bridge between cold logic and human connection. It is the realization that every touch, every keypress, and every broadcast is the voice of your digital mechanism speaking to the Vani Matrix.
+                {t('landing.genesis_desc')}
               </p>
            </div>
         </div>
@@ -142,18 +140,18 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12">
           <FeatureCard 
             icon={<Server className="text-vani-blue" size={32} />}
-            title="Sovereign Realms"
-            desc="Construct independent community nodes with granular role matrices and specialized sectors."
+            title={t('landing.feat_realms')}
+            desc={t('landing.feat_realms_desc')}
           />
           <FeatureCard 
             icon={<Globe className="text-purple-500" size={32} />}
-            title="Vani Vani Matrix"
-            desc="A decentralized global feed for public identity sync and mass broadcast transmissions."
+            title={t('landing.feat_matrix')}
+            desc={t('landing.feat_matrix_desc')}
           />
           <FeatureCard 
             icon={<Shield className="text-vani-accent" size={32} />}
-            title="Encrypted Identity"
-            desc="Advanced node calibration with TOTP security, private ghost modes, and permanent creation logs."
+            title={t('landing.feat_identity')}
+            desc={t('landing.feat_identity_desc')}
           />
         </div>
       </section>
@@ -162,10 +160,10 @@ export default function LandingPage() {
       <section className="py-32 px-6 overflow-hidden">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-20">
            <div className="flex-1 space-y-8">
-              <div className="text-vani-blue font-black uppercase tracking-[0.4em] text-[10px]">Root_Level_Access</div>
-              <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">Total Sovereignty Over Your <span className="text-vani-blue">Realms.</span></h2>
+              <div className="text-vani-blue font-black uppercase tracking-[0.4em] text-[10px]">{t('landing.architect_tag')}</div>
+              <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter" dangerouslySetInnerHTML={{ __html: t('landing.architect_title').replace('Realms', '<span class="text-vani-blue">Realms</span>').replace('लोकों', '<span class="text-vani-blue">लोकों</span>').replace('क्षेत्रहरू', '<span class="text-vani-blue">क्षेत्रहरू</span>') }}></h2>
               <p className="text-gray-400 leading-relaxed text-lg font-light">
-                 As a Realm Sovereign, you hold the keys to the kingdom. Configure granular role matrices, establish sector-specific protocols, and curate your community with absolute authority.
+                 {t('landing.architect_desc')}
               </p>
               <ul className="space-y-4">
                  {[
@@ -208,19 +206,19 @@ export default function LandingPage() {
           </div>
           <div className="flex space-x-12 text-[10px] font-black uppercase tracking-widest text-gray-500">
             <div className="flex flex-col space-y-4">
-              <span className="text-white">Architecture</span>
-              <button onClick={() => navigate('/help')} className="hover:text-vani-blue transition-colors text-left">Vani_Manual</button>
-              <button onClick={() => navigate('/faq')} className="hover:text-vani-blue transition-colors text-left">Knowledge_Base</button>
+              <span className="text-white">{t('landing.footer_arch')}</span>
+              <button onClick={() => navigate('/help')} className="hover:text-vani-blue transition-colors text-left">{t('landing.protocols_btn')}</button>
+              <button onClick={() => navigate('/faq')} className="hover:text-vani-blue transition-colors text-left">{t('nav.knowledge')}</button>
             </div>
             <div className="flex flex-col space-y-4">
-              <span className="text-white">Sovereignty</span>
+              <span className="text-white">{t('landing.footer_sov')}</span>
               <button onClick={() => navigate('/terms')} className="hover:text-vani-blue transition-colors text-left">Vani_Terms</button>
               <button onClick={() => navigate('/guidelines')} className="hover:text-vani-blue transition-colors text-left">Community_CG</button>
             </div>
           </div>
         </div>
         <div className="text-center mt-20 pt-10 border-t border-white/5">
-          <p className="text-[8px] font-mono text-gray-700 uppercase tracking-[0.5em]">2026 YANTRAVANI PROTOCOL // ALL IDENTITY RIGHTS RESERVED</p>
+          <p className="text-[8px] font-mono text-gray-700 uppercase tracking-[0.5em]">{t('landing.footer_rights')}</p>
         </div>
       </footer>
     </div>

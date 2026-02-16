@@ -46,6 +46,7 @@ export interface IUser {
   customStatus?: string;
   isPrivate?: boolean;
   isLocked?: boolean;
+  isDisabled?: boolean;
   isAdmin?: boolean;
   followers?: string[];
   following?: string[];

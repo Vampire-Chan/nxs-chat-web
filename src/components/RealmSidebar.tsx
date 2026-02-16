@@ -23,9 +23,12 @@ interface Props {
   onSocial: () => void;
   position: 'top' | 'bottom' | 'left' | 'right';
   refreshTrigger?: number;
+  isSearchOpen?: boolean;
+  isSettingsOpen?: boolean;
+  isCreateOpen?: boolean;
 }
 
-export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, onSettings, onProfile, onSeeAllNotifications, onLeaveRealm, onDeleteRealm, onSearch, onSocial, position, refreshTrigger }: Props) => {
+export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, onSettings, onProfile, onSeeAllNotifications, onLeaveRealm, onDeleteRealm, onSearch, onSocial, position, refreshTrigger, isSearchOpen, isSettingsOpen, isCreateOpen }: Props) => {
   const { t } = useLanguage();
   const { accounts, switchAccount, logout } = useAuth();
   const [notifications, setNotifications] = useState<INotification[]>([]);
@@ -118,6 +121,24 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
   const borderClass = position === 'top' ? 'border-b' : position === 'bottom' ? 'border-t' : position === 'left' ? 'border-r' : 'border-l';
   const sizeClass = isVertical ? 'w-[72px] h-full flex-col py-4' : 'h-16 w-full flex-row px-4';
 
+  const getActiveLabel = () => {
+    if (isSettingsOpen) return "Node_Calibration";
+    if (isSearchOpen) return "Matrix_Search";
+    if (isCreateOpen) return "Initialize_Node";
+    if (showNotifs) return "Alert_Buffer";
+    
+    if (selectedRealmId === 'profile') return "Identity_Node";
+    if (selectedRealmId === 'home') return "Neural_Links";
+    if (selectedRealmId === 'explore') return "Global_Matrix";
+    if (selectedRealmId === 'social') return "Social_Matrix";
+    if (selectedRealmId === 'architect') return "Architect_Realm";
+    
+    const activeRealm = realms.find(r => r._id === selectedRealmId);
+    if (activeRealm) return activeRealm.name;
+    
+    return "Yantravani";
+  };
+
   return (
     <div className={`${sizeClass} bg-discord-sidebar flex items-center ${borderClass} border-gray-900 z-[100] shadow-xl`} onClick={() => setShowNotifs(false)}>
       <div className={`flex flex-1 ${isVertical ? 'flex-col overflow-y-auto no-scrollbar' : 'flex-row overflow-x-auto no-scrollbar'} items-center scroll-smooth relative`}>
@@ -157,6 +178,22 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
         </div>
 
         <div className={`${isVertical ? 'w-8 h-[1px] my-4' : 'w-[1px] h-8 mx-4'} bg-gray-800 flex-shrink-0`} />
+
+        {/* CENTRAL PAGE INDICATOR (PC ONLY) */}
+        {!isVertical && (
+          <div className="flex-1 hidden md:flex justify-center items-center pointer-events-none">
+             <motion.div 
+               key={getActiveLabel()}
+               initial={{ opacity: 0, scale: 0.9, filter: 'blur(4px)' }}
+               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+               className="bg-white/5 border border-white/5 px-6 py-1.5 rounded-full shadow-inner"
+             >
+                <span className="text-[10px] font-black text-vani-blue uppercase tracking-[0.4em] drop-shadow-[0_0_8px_rgba(0,210,255,0.3)]">
+                   {getActiveLabel()}
+                </span>
+             </motion.div>
+          </div>
+        )}
 
         <div className={`flex items-center ${isVertical ? 'flex-col space-y-6 mt-auto' : 'flex-row space-x-6 ml-auto'}`}>
           <div className="relative">

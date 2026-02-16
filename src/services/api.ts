@@ -54,6 +54,7 @@ export interface IUser {
   outboundRequests?: string[];
   vanityHandle?: string;
   tier?: 'standard' | 'elite';
+  creationUI?: 'auto' | 'bar' | 'button';
   recoveryKeys?: { code: string, isUsed: boolean }[];
   badges?: { type: string, label: string }[];
   createdAt?: string;
@@ -109,6 +110,7 @@ export interface IPost {
   author: IUser;
   likes: string[];
   comments: any[];
+  tags?: string[];
   createdAt: string;
 }
 
@@ -182,13 +184,14 @@ export const api = {
   editMessage: async (id: string, content: string) => { const res = await axios.put<IMessage>(`${API_URL}/channels/messages/${id}`, { content }); return res.data; },
   deleteMessage: async (id: string) => { const res = await axios.delete(`${API_URL}/channels/messages/${id}`); return res.data; },
   getPosts: async (channelId: string) => { const res = await axios.get<IPost[]>(`${API_URL}/channels/${channelId}/posts`); return res.data; },
-  getGlobalPosts: async () => { const res = await axios.get<IPost[]>(`${API_URL}/posts/all`); return res.data; },
+  getGlobalPosts: async (tag?: string) => { const res = await axios.get<IPost[]>(`${API_URL}/posts/all${tag ? `?tag=${tag}` : ''}`); return res.data; },
   getUserPosts: async (userId: string) => { const res = await axios.get<IPost[]>(`${API_URL}/posts/user/${userId}`); return res.data; },
   createPost: async (channelId: string, formData: FormData) => { formData.append('channelId', channelId); const res = await axios.post<IPost>(`${API_URL}/posts`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); return res.data; },
   likePost: async (postId: string) => { const res = await axios.post<{ likes: string[] }>(`${API_URL}/posts/${postId}/like`); return res.data; },
+  getTrends: async () => { const res = await axios.get<any[]>(`${API_URL}/posts/trends`); return res.data; },
   editPost: async (postId: string, caption: string) => { const res = await axios.put(`${API_URL}/posts/${postId}`, { caption }); return res.data; },
   deletePost: async (postId: string) => { const res = await axios.delete(`${API_URL}/posts/${postId}`); return res.data; },
-  addComment: async (postId: string, text: string) => { const res = await axios.post<any>(`${API_URL}/posts/${postId}/comment`, { text }); return res.data; },
+  addComment: async (postId: string, text: string, parentCommentId?: string) => { const res = await axios.post<any>(`${API_URL}/posts/${postId}/comment`, { text, parentCommentId }); return res.data; },
   uploadMedia: async (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => { 
     const res = await axios.post<IMessage>(`${API_URL}/media/upload`, formData, { 
       headers: { 'Content-Type': 'multipart/form-data' },

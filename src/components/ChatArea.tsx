@@ -354,7 +354,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                    }} 
                    className={`w-9 h-9 rounded-xl bg-gray-800 flex-shrink-0 mt-1 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
                  >
-                   <img src={msg.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=deleted`} className="w-full h-full object-cover" />
+                   <img src={msg.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender?.username || 'deleted'}`} className="w-full h-full object-cover" />
                  </div>
                ) : <div className="w-9 flex-shrink-0" />}
                  <div className="min-w-0 flex-1 relative overflow-hidden">

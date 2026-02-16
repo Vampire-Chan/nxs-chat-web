@@ -46,8 +46,8 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-4 md:p-10 backdrop-blur-xl">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-5xl h-[80vh] bg-[#0a0a0c] border border-white/5 rounded-[48px] shadow-2xl flex overflow-hidden">
+    <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-4 md:p-10 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-5xl h-[80vh] bg-[#0a0a0c] border border-white/5 rounded-[48px] shadow-2xl flex overflow-hidden">
         <div className="w-64 bg-discord-sidebar/50 border-r border-white/5 p-8 flex flex-col shrink-0">
            <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-10 flex items-center gap-2"><Settings size={20} className="text-vani-blue" /> Realm_CFG</h2>
            <div className="space-y-2">
@@ -139,8 +139,8 @@ const NavBtn = ({ label, active, onClick, icon }: any) => (
 export const CreateRealmModal = ({ onClose, onSubmit }: any) => {
   const [name, setName] = useState('');
   return (
-    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden">
+    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden">
          <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">Initialize_Realm</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
          <div className="p-8 space-y-6"><input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Realm Name..." value={name} onChange={(e) => setName(e.target.value)} /><button onClick={() => onSubmit(name)} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl">Create Matrix Node</button></div>
       </motion.div>
@@ -152,8 +152,8 @@ export const CreateChannelModal = ({ onClose, onSubmit }: any) => {
   const [name, setName] = useState('');
   const [type, setType] = useState('text');
   return (
-    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5">
+    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5">
          <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">New_Sector</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
          <div className="p-8 space-y-6">
             <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Sector Name..." value={name} onChange={(e) => setName(e.target.value)} />
@@ -186,8 +186,8 @@ export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose
   }, [currentUser]);
   const toggle = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : (prev.length < 49 ? [...prev, id] : prev));
   return (
-    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#0a0a0c] w-full max-w-lg rounded-[40px] shadow-2xl border border-white/5 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-lg rounded-[40px] shadow-2xl border border-white/5 flex flex-col overflow-hidden">
          <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">Initialize_Group</h2><button onClick={onClose} className="p-3 bg-white/5 hover:bg-red-500 rounded-2xl transition-all"><X size={18} /></button></div>
          <div className="p-8 space-y-6">
             <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Group Name..." value={groupName} onChange={(e) => setGroupName(e.target.value)} />
@@ -234,26 +234,26 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
   const isGlobal = channelId === 'global';
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#0a0a0c] w-full max-w-lg rounded-[40px] border border-white/5 overflow-hidden flex flex-col shadow-2xl">
-         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-lg font-black text-white uppercase tracking-widest">{isGlobal ? 'Global_Broadcast' : 'Sector_Post'}</h2>
+    <div className="fixed inset-0 bg-black/90 z-[2000] flex items-center justify-center p-2 lg:p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-lg rounded-[32px] lg:rounded-[40px] border border-white/5 overflow-hidden flex flex-col shadow-2xl max-h-[95vh]">
+         <div className="p-5 lg:p-6 border-b border-white/5 flex items-center justify-between">
+            <h2 className="text-base lg:text-lg font-black text-white uppercase tracking-widest">{isGlobal ? 'Global_Broadcast' : 'Sector_Post'}</h2>
             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button>
          </div>
          
-         <div className="p-6 space-y-6">
-            <div onClick={() => fileRef.current?.click()} className={`w-full h-64 rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-vani-blue/50 hover:bg-white/[0.02] transition-all overflow-hidden relative group`}>
+         <div className="p-5 lg:p-6 space-y-5 lg:space-y-6 overflow-y-auto custom-scrollbar">
+            <div onClick={() => fileRef.current?.click()} className={`w-full h-48 lg:h-64 rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-vani-blue/50 hover:bg-white/[0.02] transition-all overflow-hidden relative group`}>
                {preview ? <img src={preview} className="w-full h-full object-cover" /> : (
                  <>
-                   <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><ImageIcon size={32} className="text-gray-400 group-hover:text-white" /></div>
-                   <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Upload Visual Data</span>
+                   <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-gray-800 flex items-center justify-center mb-3 lg:mb-4 group-hover:scale-110 transition-transform"><ImageIcon size={24} className="text-gray-400 group-hover:text-white" /></div>
+                   <span className="text-[8px] lg:text-[10px] font-black uppercase text-gray-500 tracking-widest">Upload Visual Data</span>
                  </>
                )}
                <input type="file" ref={fileRef} hidden accept="image/*" onChange={(e) => { const f=e.target.files?.[0]; if(f){ setFile(f); setPreview(URL.createObjectURL(f)); } }} />
             </div>
 
             <textarea 
-              className="w-full bg-[#050507] border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-vani-blue resize-none h-32 custom-scrollbar"
+              className="w-full bg-[#050507] border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-vani-blue resize-none h-24 lg:h-32 custom-scrollbar text-sm"
               placeholder="Add a caption..."
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
@@ -262,24 +262,24 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
             {!isGlobal && !currentUser.isPrivate && (
               <div 
                 onClick={() => setIsPublic(!isPublic)}
-                className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isPublic ? 'bg-vani-blue/10 border-vani-blue/30' : 'bg-white/[0.02] border-white/5'}`}
+                className={`p-3 lg:p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isPublic ? 'bg-vani-blue/10 border-vani-blue/30' : 'bg-white/[0.02] border-white/5'}`}
               >
                  <div className="flex items-center space-x-3">
-                    <Globe size={18} className={isPublic ? 'text-vani-blue' : 'text-gray-600'} />
+                    <Globe size={16} className={isPublic ? 'text-vani-blue' : 'text-gray-600'} />
                     <div className="flex flex-col">
-                       <span className="text-[10px] font-black text-white uppercase tracking-widest">Broadcast to Matrix</span>
-                       <span className="text-[8px] text-gray-500 font-mono uppercase">Visible in Explore Feed</span>
+                       <span className="text-[9px] lg:text-[10px] font-black text-white uppercase tracking-widest">Broadcast to Matrix</span>
+                       <span className="text-[7px] lg:text-[8px] text-gray-500 font-mono uppercase">Visible in Explore Feed</span>
                     </div>
                  </div>
-                 <div className={`w-10 h-5 rounded-full relative transition-all ${isPublic ? 'bg-vani-blue' : 'bg-gray-800'}`}>
-                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${isPublic ? 'left-6' : 'left-1'}`} />
+                 <div className={`w-8 lg:w-10 h-4 lg:h-5 rounded-full relative transition-all ${isPublic ? 'bg-vani-blue' : 'bg-gray-800'}`}>
+                    <div className={`absolute top-0.5 w-3 lg:w-4 h-3 lg:h-4 rounded-full bg-white transition-all ${isPublic ? 'left-4.5 lg:left-5.5' : 'left-0.5'}`} />
                  </div>
               </div>
             )}
          </div>
 
-         <div className="p-6 border-t border-white/5 bg-black/40">
-            <button onClick={handleSubmit} disabled={loading} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg disabled:opacity-50 transition-all hover:scale-[1.02]">
+         <div className="p-5 lg:p-6 border-t border-white/5 bg-black/40">
+            <button onClick={handleSubmit} disabled={loading} className="w-full bg-vani-gradient text-white py-3.5 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[9px] lg:text-[10px] shadow-lg disabled:opacity-50 transition-all hover:scale-[1.02]">
                {loading ? 'Transmitting...' : (isGlobal || isPublic ? 'Broadcast to Matrix' : 'Send to Sector')}
             </button>
          </div>
@@ -312,8 +312,8 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#0a0a0c] w-full max-w-2xl rounded-[48px] border border-white/5 flex flex-col max-h-[85vh] shadow-2xl">
+    <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-2xl rounded-[48px] border border-white/5 flex flex-col max-h-[85vh] shadow-2xl">
          <div className="p-8 border-b border-white/5 flex items-center justify-between">
             <h2 className="text-xl font-black text-white uppercase tracking-widest">Group_Calibration</h2>
             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button>

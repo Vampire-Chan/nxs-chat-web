@@ -40,10 +40,11 @@ export const SearchModal = ({ onClose, onSelectUser, onSelectRealm, currentUser 
   }, [query]);
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[300] flex items-start justify-center pt-[10vh] backdrop-blur-md">
+    <div className="fixed inset-0 bg-black/90 z-[300] flex items-start justify-center pt-[10vh] backdrop-blur-md" onClick={onClose}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: -20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
+        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl bg-[#0a0a0c] border border-gray-800 rounded-[32px] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden"
       >
         {/* Search Bar */}

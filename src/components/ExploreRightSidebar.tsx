@@ -19,12 +19,56 @@ interface Props {
   currentUser: IUser | null;
   onClosePost: () => void;
   onRefresh: () => void;
+  onSelectTag?: (tag: string) => void;
+  onViewProfile?: (userId: string) => void;
 }
 
-export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClosePost, onRefresh }: Props) => {
+export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClosePost, onRefresh, onSelectTag, onViewProfile }: Props) => {
   const [comment, setComment] = useState('');
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [replyingTo, setReplyingTo] = useState<{ id: string, username: string, userId?: string } | null>(null);
+
+  const renderCaption = (text: string) => {
+    if (!text) return null;
+    return text.split(/(\s+)/).map((part, i) => {
+      if (part.startsWith('#') && part.length > 1) {
+        const tag = part.substring(1).replace(/[^\w]/g, '');
+        return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
+      }
+      if (part.startsWith('@') && part.length > 1) {
+        const username = part.substring(1).replace(/[^\w]/g, '');
+        return (
+          <span 
+            key={i} 
+            onClick={async (e) => { 
+              e.stopPropagation(); 
+              try {
+                const res = await api.getUserByHandle(username);
+                if (res.id) onViewProfile?.(res.id);
+              } catch (e) { console.error("Identity resolution failed"); }
+            }} 
+            className="text-vani-accent hover:underline cursor-pointer"
+          >
+            @{username}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
+  const renderComment = (text: string) => {
+    if (!text) return null;
+    return text.split(/(\s+)/).map((part, i) => {
+      if (part.startsWith('#') && part.length > 1) {
+        const tag = part.substring(1).replace(/[^\w]/g, '');
+        return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
+      }
+      // Manual @mentions in comments are plain text as per Protocol
+      return part;
+    });
+  };
 
   useEffect(() => {
     if (selectedPost) {
@@ -46,8 +90,9 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
   const handleAddComment = async () => {
     if (!selectedPost || !comment.trim()) return;
     try {
-      await api.addComment(selectedPost._id, comment);
+      await api.addComment(selectedPost._id, comment, replyingTo?.id);
       setComment('');
+      setReplyingTo(null);
       onRefresh();
     } catch (e) { console.error(e); }
   };
@@ -84,13 +129,13 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                {/* Description & Tags */}
                <div className="space-y-4">
                   <p className="text-sm text-gray-300 leading-relaxed font-medium">
-                     {selectedPost.caption || "No description provided."}
+                     {renderCaption(selectedPost.caption) || "No description provided."}
                   </p>
                   
                   {/* Mock Tags - If real tags exist in your model, use selectedPost.tags */}
                   <div className="flex flex-wrap gap-2">
-                     {['identity', 'vani', 'matrix'].map(tag => (
-                       <span key={tag} className="text-[9px] font-black text-vani-blue uppercase tracking-widest px-2 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10">#{tag}</span>
+                     {(selectedPost.tags || ['identity', 'vani', 'matrix']).map((tag: string) => (
+                       <span key={tag} onClick={() => onSelectTag?.(tag)} className="text-[9px] font-black text-vani-blue uppercase tracking-widest px-2 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10 cursor-pointer hover:bg-vani-blue/10">#{tag}</span>
                      ))}
                   </div>
 
@@ -106,17 +151,52 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                      <span className="text-[9px] font-mono text-vani-blue">{selectedPost.comments?.length || 0} Nodes</span>
                   </div>
                   <div className="space-y-5">
-                     {selectedPost.comments?.map((c, i) => (
-                       <div key={i} className="flex space-x-3 group">
-                          <div className="w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5">
-                             <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username}`} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                             <div className="text-[9px] font-black text-white uppercase tracking-tight truncate">{getIdentityName(c.user)}</div>
-                             <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{c.text}</div>
-                          </div>
-                       </div>
-                     ))}
+                     {selectedPost.comments?.map((c, i) => {
+                       const isAuthorPrivate = c.user?.isPrivate;
+                       const parentComment = c.parentCommentId ? selectedPost.comments.find(pc => pc._id === c.parentCommentId) : null;
+                       
+                       return (
+                        <div key={i} className={`flex space-x-3 group ${c.parentCommentId ? 'ml-8' : ''}`}>
+                           <div className="relative">
+                              <div 
+                                onClick={() => !isAuthorPrivate && onViewProfile?.(c.user?._id || c.user?.id)}
+                                className={`w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5 cursor-pointer ${isAuthorPrivate ? 'filter blur-[4px] grayscale' : ''}`}
+                              >
+                                 <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username}`} className="w-full h-full object-cover" />
+                              </div>
+                              {isAuthorPrivate && (
+                                <div className="absolute -top-1 -right-1 bg-black text-[6px] font-black text-vani-accent px-1 rounded border border-vani-accent/30 tracking-tighter">GHOST</div>
+                              )}
+                           </div>
+                           <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                 <div 
+                                   onClick={() => onViewProfile?.(c.user?._id || c.user?.id)}
+                                   className="text-[9px] font-black text-white uppercase tracking-tight truncate cursor-pointer hover:text-vani-blue transition-colors"
+                                 >
+                                   {isAuthorPrivate ? 'Encrypted_Node' : getIdentityName(c.user)}
+                                 </div>
+                                 {parentComment && (
+                                   <div 
+                                     onClick={() => onViewProfile?.(parentComment.user?._id || parentComment.user?.id)}
+                                     className="text-[7px] text-gray-600 font-mono flex items-center space-x-1 cursor-pointer hover:text-vani-accent"
+                                   >
+                                      <Send size={8} className="rotate-180" />
+                                      <span>@{parentComment.user?.username}</span>
+                                   </div>
+                                 )}
+                              </div>
+                              <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{renderComment(c.text)}</div>
+                              <button 
+                                onClick={() => setReplyingTo({ id: c._id, username: c.user?.username || 'Unknown', userId: c.user?._id || c.user?.id })}
+                                className="text-[8px] font-black text-vani-blue uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all hover:text-white"
+                              >
+                                Reply
+                              </button>
+                           </div>
+                        </div>
+                       );
+                     })}
                      {selectedPost.comments?.length === 0 && (
                        <div className="py-10 text-center flex flex-col items-center opacity-20">
                           <MessageSquare size={24} className="mb-2" />
@@ -142,18 +222,26 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                   </div>
                </div>
 
-               <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Broadcast comment..."
-                    className="w-full bg-black/40 border border-gray-800 focus:border-vani-blue p-3.5 rounded-2xl text-xs text-gray-300 outline-none transition-all pr-12"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                  />
-                  <button onClick={handleAddComment} className="absolute right-4 top-1/2 -translate-y-1/2 text-vani-blue hover:scale-110 transition-all">
-                     <Send size={16} />
-                  </button>
+               <div className="space-y-2">
+                  {replyingTo && (
+                    <div className="flex items-center justify-between px-3 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10">
+                       <span className="text-[8px] font-mono text-vani-blue uppercase">Replying to @{replyingTo.username}</span>
+                       <button onClick={() => setReplyingTo(null)}><X size={10} className="text-gray-500 hover:text-white" /></button>
+                    </div>
+                  )}
+                  <div className="relative">
+                     <input 
+                       type="text" 
+                       placeholder={replyingTo ? "Broadcast reply..." : "Broadcast comment..."}
+                       className="w-full bg-black/40 border border-gray-800 focus:border-vani-blue p-3.5 rounded-2xl text-xs text-gray-300 outline-none transition-all pr-12"
+                       value={comment}
+                       onChange={(e) => setComment(e.target.value)}
+                       onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                     />
+                     <button onClick={handleAddComment} className="absolute right-4 top-1/2 -translate-y-1/2 text-vani-blue hover:scale-110 transition-all">
+                        <Send size={16} />
+                     </button>
+                  </div>
                </div>
             </div>
           </motion.div>

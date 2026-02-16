@@ -13,9 +13,11 @@ interface Props {
   onFollow?: (id: string) => void;
   onViewSocials?: (tab: 'friends' | 'following' | 'followers', userId: string) => void;
   currentUser?: IUser | null;
+  onSelectTag?: (tag: string) => void;
+  onViewProfile?: (userId: string) => void;
 }
 
-export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocials, currentUser }: Props) => {
+export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocials, currentUser, onSelectTag, onViewProfile }: Props) => {
   const [posts, setPosts] = useState<IPost[]>([]);
   const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
@@ -166,7 +168,16 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
            </div>
         </div>
       )}
-      {selectedPost && <PostViewerModal post={selectedPost} onClose={() => setSelectedPost(null)} currentUser={currentUser || null} onUpdate={fetchPosts} />}
+      {selectedPost && (
+        <PostViewerModal 
+          post={selectedPost} 
+          onClose={() => setSelectedPost(null)} 
+          currentUser={currentUser || null} 
+          onUpdate={fetchPosts} 
+          onSelectTag={onSelectTag}
+          onViewProfile={onViewProfile}
+        />
+      )}
     </div>
   );
 };

@@ -24,8 +24,8 @@ export const LogoutModal = ({ onClose }: Props) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl">
-      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden shadow-2xl">
         <div className="p-8 border-b border-white/5 flex items-center justify-between">
            <div className="flex items-center space-x-3 text-red-500">
               <ShieldAlert size={20} />

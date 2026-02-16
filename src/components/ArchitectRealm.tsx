@@ -115,7 +115,7 @@ export const ArchitectRealm = () => {
                     {pendingTxs.map(tx => (
                       <div key={tx._id} className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex items-center justify-between">
                          <div className="flex items-center space-x-6">
-                            <img src={tx.user.avatar} className="w-12 h-12 rounded-2xl" />
+                            <img src={tx.user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${tx.user.username}`} className="w-12 h-12 rounded-2xl" />
                             <div>
                                <div className="text-sm font-black text-white uppercase">{tx.user.username}</div>
                                <div className="text-[10px] font-mono text-vani-blue uppercase">{tx.method}: {tx.transactionId}</div>

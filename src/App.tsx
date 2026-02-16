@@ -18,7 +18,7 @@ import { SearchModal } from './components/SearchModal';
 import { LaunchScreen } from './components/LaunchScreen';
 import { SocialCorner } from './components/SocialCorner';
 import { CreateRealmModal, CreatePostModal, CreateChannelModal, CreateGroupDMModal, RealmSettingsModal, GroupSettingsModal } from './components/Modals';
-import { UserSettingsModal as IdentitySettingsModal, SystemSettingsModal } from './components/UserSettingsModal';
+import { UserSettingsModal as IdentitySettingsModal } from './components/UserSettingsModal';
 import { LogoutModal } from './components/LogoutModal';
 import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
@@ -147,7 +147,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     else if (viewMode === 'explore') context = 'Global_Matrix';
     else if (viewMode === 'profile') context = 'Identity_Node';
     else if (viewMode === 'architect') context = 'Architect_Realm';
-    else if (viewMode === 'notifications') context = 'Alert_Buffer';
     else if (viewMode === 'social') context = 'Social_Matrix';
     else if (activeRealm) context = activeChannel ? `#${activeChannel.name}` : activeRealm.name;
     
@@ -174,7 +173,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     s.on('receive_post', (post: IPost) => { setPosts(prev => [post, ...prev]); });
     
     s.on('identity_sync_update', async () => {
-      console.log('🔄 REAL-TIME SYNC: Refreshing identity matrix...');
       try {
         const u = await api.getUserProfile(user?.id || user?._id || '');
         updateUserState(localStorage.getItem('token') || '', u);
@@ -184,18 +182,12 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
-    
-    s.on('message_updated', (updated: IMessage) => {
-      setMessages(prev => prev.map(m => m._id === updated._id ? updated : m));
-    });
-
-    s.on('channel_metadata_update', (updated: IChannel) => {
-      setDms(prev => prev.map(d => d._id === updated._id ? updated : d));
-      if (activeChannel?._id === updated._id) setActiveChannel(updated);
-    });
+    s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });
+    s.on('channel_metadata_update', (updated: IChannel) => { setDms(prev => prev.map(d => d._id === updated._id ? updated : d)); if (activeChannel?._id === updated._id) setActiveChannel(updated); });
 
     loadRealms(); loadDMs();
     if (activeChannel) handleSelectChannel(activeChannel);
+    if (viewMode === 'explore') api.getGlobalPosts().then(setPosts).catch(console.error);
     return () => { s.disconnect(); };
   }, []);
 
@@ -205,67 +197,23 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const handleSelectRealm = async (realm: IRealm | { _id: string }) => {
     setViewingUserId(null); if (isMobile) setIsSidebarOpen(false);
     
-    if (realm._id === 'home') { 
-      setViewMode('home'); setActiveRealm(null); setActiveChannel(null); loadDMs(); 
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'home', activeRealm: null, activeChannel: null }));
-      return; 
-    }
-    if (realm._id === 'explore') { 
-      setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(); setPosts(d); 
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null }));
-      return; 
-    }
-    if (realm._id === 'profile') { 
-      setViewMode('profile'); setActiveRealm(null); setActiveChannel(null); 
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'profile', activeRealm: null, activeChannel: null }));
-      return; 
-    }
-    if (realm._id === 'architect') { 
-      setViewMode('architect'); setActiveRealm(null); setActiveChannel(null); 
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'architect', activeRealm: null, activeChannel: null }));
-      return; 
-    }
-    if (realm._id === 'social') { 
-      setViewMode('social'); setActiveRealm(null); setActiveChannel(null); 
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'social', activeRealm: null, activeChannel: null }));
-      return; 
-    }
+    if (realm._id === 'home') { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); loadDMs(); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'home', activeRealm: null, activeChannel: null })); return; }
+    if (realm._id === 'explore') { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); return; }
+    if (realm._id === 'profile') { setViewMode('profile'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'profile', activeRealm: null, activeChannel: null })); return; }
+    if (realm._id === 'architect') { setViewMode('architect'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'architect', activeRealm: null, activeChannel: null })); return; }
+    if (realm._id === 'social') { setViewMode('social'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'social', activeRealm: null, activeChannel: null })); return; }
 
-    setViewMode('realm');
-    setActiveChannel(null);
-    try { 
-      const d = await api.getRealmDetails(realm._id); setActiveRealm(d); 
-      const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement');
-      if (firstChannel) handleSelectChannel(firstChannel);
-      localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'realm', activeRealm: d }));
-    } catch(e) { alert("Failed to access node."); }
+    setViewMode('realm'); setActiveChannel(null);
+    try { const d = await api.getRealmDetails(realm._id); setActiveRealm(d); const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement'); if (firstChannel) handleSelectChannel(firstChannel); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'realm', activeRealm: d })); } catch(e) { alert("Failed to access node."); }
   };
 
-    const handleSelectChannel = async (channel: IChannel) => {
-
-      if (isMobile) setIsSidebarOpen(false);
-
-      if (activeChannel) socketRef.current?.emit('leave_channel', activeChannel._id);
-
-      
-
-      let displayName = channel.name;
-
-      if (channel.type === 'dm') {
-
-        const other = channel.members?.find(m => (m._id || m.id) !== (user?.id || user?._id));
-
-        displayName = other ? `@${other.username}` : '@Ghost_Node';
-
-      } else if (channel.type === 'group_dm') { displayName = channel.name; }
-
-  
-
-      const channelWithFixedName = { ...channel, name: displayName };
-
-      setActiveChannel(channelWithFixedName); 
-
-      socketRef.current?.emit('join_channel', channel._id);
+  const handleSelectChannel = async (channel: IChannel) => {
+    if (isMobile) setIsSidebarOpen(false);
+    if (activeChannel) socketRef.current?.emit('leave_channel', activeChannel._id);
+    let displayName = channel.name;
+    if (channel.type === 'dm') { const other = channel.members?.find(m => (m._id || m.id) !== (user?.id || user?._id)); displayName = other ? `@${other.username}` : '@Ghost_Node'; }
+    const channelWithFixedName = { ...channel, name: displayName };
+    setActiveChannel(channelWithFixedName); socketRef.current?.emit('join_channel', channel._id);
     localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), activeChannel: channelWithFixedName }));
     if (channel.type === 'text' || channel.type === 'dm' || channel.type === 'group_dm') { const msgs = await api.getMessages(channel._id); setMessages(msgs); setMatrixRefreshKey(k => k + 1); }
     else { const ps = await api.getPosts(channel._id); setPosts(ps); }
@@ -275,76 +223,50 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [showChannelModal, setShowChannelModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [showIdentitySettings, setShowIdentitySettings] = useState(false);
-  const [showSystemSettings, setShowSystemSettings] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showGroupDMModal, setShowGroupDMModal] = useState(false);
   const [showRealmSettings, setShowRealmSettings] = useState(false);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleViewOtherProfile = (id: string) => { setViewingUserId(id); setViewMode('view-profile'); setActiveRealm(null); setActiveChannel(null); if (isMobile) setIsSidebarOpen(false); };
+  const handleViewSocials = (tab: any, userId: string) => { setSocialTab(tab); setSocialTargetId(userId); setViewMode('social'); setActiveRealm(null); setActiveChannel(null); };
+  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); } catch(e:any){ alert(e.response?.data?.message || "Sync error."); } };
+  const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { alert("Link Init Failed"); } };
+  const handleTagSelect = async (tag: string | null) => { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(tag || undefined); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); };
 
-  const handleViewSocials = (tab: any, userId: string) => {
-    setSocialTab(tab);
-    setSocialTargetId(userId);
-    setViewMode('social');
-    setActiveRealm(null);
-    setActiveChannel(null);
-  };
-
-  const handleFollowUser = async (id: string) => { 
-    try { 
-      const isFollowing = user?.following?.some((f: any) => (f._id || f) === id);
-      const isFriend = user?.friends?.some((f: any) => (f._id || f) === id);
-      const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id);
-      if (isFollowing || isFriend) await api.unfollowUser(id);
-      else if (!isPending) await api.syncIdentity(id);
-      else return;
-      const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1);
-    } catch(e:any){ alert(e.response?.data?.message || "Sync error."); } 
-  };
-
-  const handleStartDM = async (id: string) => {
-    try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { alert("Link Init Failed"); }
-  };
-
-  const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'notifications' && viewMode !== 'profile';
-  
-  // MOBILE NAVIGATION FIX: Show DMSidebar as main content if no channel selected in home mode
+  const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'profile';
   const showDmsAsMain = isMobile && viewMode === 'home' && !activeChannel;
-  
-  // Decide whether to show hamburger
-  const hideHamburger = (viewMode === 'home' && !activeChannel) || 
-                        viewMode === 'profile' || 
-                        viewMode === 'social' || 
-                        viewMode === 'explore' || 
-                        viewMode === 'view-profile' || 
-                        viewMode === 'notifications' || 
-                        activeChannel?.type === 'feed' || 
-                        activeChannel?.type === 'reels';
+  const hideHamburger = (viewMode === 'home' && !activeChannel) || viewMode === 'profile' || viewMode === 'social' || viewMode === 'explore' || viewMode === 'view-profile' || activeChannel?.type === 'feed' || activeChannel?.type === 'reels';
 
   return (
     <div className={`flex h-screen bg-discord-dark text-gray-100 font-sans overflow-hidden ${isMobile ? 'flex-col-reverse' : (dockPosition === 'top' ? 'flex-col' : dockPosition === 'bottom' ? 'flex-col-reverse' : dockPosition === 'left' ? 'flex-row' : 'flex-row-reverse')}`}>
       {isMobile && (
         <div className="h-14 bg-discord-sidebar border-b border-white/5 flex items-center justify-between px-4 z-50">
-           <div className="flex items-center space-x-3">
-              {!hideHamburger && (
-                <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-400 hover:text-white transition-all">
-                  <Menu size={20} />
-                </button>
-              )}
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-vani-blue">
-                {activeChannel ? `${activeChannel.type === 'dm' ? '@' : '#'}${activeChannel.name}` : 
-                 (viewMode === 'home' ? t('nav.home') : (activeRealm?.name || viewMode))}
-              </span>
-           </div>
-           <button onClick={() => setShowSearchModal(true)} className="p-2 text-gray-400 hover:text-white transition-all">
-              <SearchIcon size={18} />
-           </button>
+           <div className="flex items-center space-x-3">{!hideHamburger && <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-400 hover:text-white transition-all"><Menu size={20} /></button>}<span className="text-[10px] font-black uppercase tracking-[0.2em] text-vani-blue">{activeChannel ? `${activeChannel.type === 'dm' ? '@' : '#'}${activeChannel.name}` : (viewMode === 'home' ? t('nav.home') : (activeRealm?.name || viewMode))}</span></div>
+           <button onClick={() => setShowSearchModal(true)} className="p-2 text-gray-400 hover:text-white transition-all"><SearchIcon size={18} /></button>
         </div>
       )}
 
-      <CoreDock realms={realms} selectedRealmId={viewMode} onSelect={handleSelectRealm} onCreate={() => setShowRealmModal(true)} user={user} onSettings={() => setShowSystemSettings(true)} onProfile={() => setViewMode('profile')} onSeeAllNotifications={() => setViewMode('notifications')} onLogout={() => setShowLogoutModal(true)} onSearch={() => setShowSearchModal(true)} onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} position={isMobile ? 'bottom' : dockPosition} refreshTrigger={matrixRefreshKey} />
+      <CoreDock 
+        realms={realms} 
+        selectedRealmId={viewMode} 
+        onSelect={handleSelectRealm} 
+        onCreate={() => setShowRealmModal(true)} 
+        user={user} 
+        onSettings={() => setShowIdentitySettings(true)} 
+        onProfile={() => setViewMode('profile')} 
+        onSeeAllNotifications={() => setShowNotifications(true)} 
+        onLogout={() => setShowLogoutModal(true)} 
+        onSearch={() => setShowSearchModal(true)} 
+        onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} 
+        position={isMobile ? 'bottom' : dockPosition} 
+        refreshTrigger={matrixRefreshKey} 
+        isSearchOpen={showSearchModal}
+        isSettingsOpen={showIdentitySettings}
+        isCreateOpen={showRealmModal || showPostModal || showChannelModal || showGroupDMModal}
+      />
 
       <div className="flex flex-1 overflow-hidden relative">
         <AnimatePresence>
@@ -352,11 +274,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             <motion.div initial={isMobile ? { x: '-100%' } : { width: 0 }} animate={isMobile ? { x: 0 } : { width: sidebarWidth }} exit={isMobile ? { x: '-100%' } : { width: 0 }} className={`flex-shrink-0 flex relative z-40 bg-discord-channel ${isMobile ? 'absolute inset-0 w-[85%] shadow-2xl' : 'border-r border-gray-900'}`}>
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isMobile && <div className="h-16 flex items-center justify-between px-4 bg-discord-sidebar border-b border-white/5"><span className="text-[10px] font-black uppercase text-white tracking-widest">Navigator</span><button onClick={() => setIsSidebarOpen(false)}><X size={18} /></button></div>}
-                {viewMode === 'home' ? (
-                  <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} />
-                ) : (
-                  <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} />
-                )}
+                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} />}
               </div>
               {!isMobile && <div onMouseDown={startResizing} className="absolute top-0 -right-0.5 w-1 h-full cursor-col-resize z-40 hover:bg-vani-blue/30 transition-colors" />}
             </motion.div>
@@ -367,27 +285,10 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
         <main className="flex-1 overflow-hidden relative flex flex-col bg-discord-dark">
           <AnimatePresence mode="wait">
-            {showDmsAsMain ? (
-              <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} />
-            ) : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} /> : viewMode === 'notifications' ? <NotificationsPage key="notifications" onClose={() => setViewMode('home')} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
-              <ChatArea 
-                key="chat" 
-                channelName={activeChannel.name || 'Link'} 
-                messages={messages} 
-                onSendMessage={(c) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user })} 
-                currentUser={user} 
-                channelId={activeChannel._id} 
-                onViewOtherProfile={handleViewOtherProfile} 
-                channelType={activeChannel.type} 
-                activeRealm={activeRealm} 
-                activeChannel={activeChannel} 
-                socket={socketRef.current} 
-                onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
-                onGroupSettings={() => setShowGroupSettings(true)} 
-                onOpenMedia={(type, url) => setActiveMedia({ type, url })} 
-              />
+            {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
+              <ChatArea key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} />
             ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
-              <FeedArea key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} />
+              <FeedArea key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} />
             ) : (
               <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">Awaiting Node Connection.</p></div>
             )}
@@ -396,45 +297,37 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       </div>
 
       <AnimatePresence>
+        {showNotifications && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-0 lg:p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowNotifications(false)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+             <motion.div initial={{ scale: 0.9, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 50 }} className="relative w-full h-full lg:h-auto lg:max-w-xl lg:max-h-[80vh] bg-[#0a0a0c] border border-white/5 lg:rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+                <NotificationsPage onClose={() => setShowNotifications(false)} />
+             </motion.div>
+          </div>
+        )}
         {activeMedia && <MediaPlayer type={activeMedia.type} url={activeMedia.url} onClose={() => setActiveMedia(null)} />}
         {showGroupSettings && activeChannel && <GroupSettingsModal group={activeChannel} onClose={() => setShowGroupSettings(false)} onUpdate={() => loadDMs()} currentUser={user!} />}
         {showLogoutModal && <LogoutModal onClose={() => setShowLogoutModal(false)} />}
       </AnimatePresence>
 
       {showRealmModal && <CreateRealmModal onClose={() => setShowRealmModal(false)} onSubmit={async (n: string) => { try { await api.createRealm(n); setShowRealmModal(false); loadRealms(); } catch(e){} }} />}
-      {showPostModal && (
-        <CreatePostModal 
-          onClose={() => setShowPostModal(false)} 
-          onComplete={async () => { 
-            if (activeChannel) {
-              const ps = await api.getPosts(activeChannel._id);
-              setPosts(ps);
-            } else {
-              const d = await api.getGlobalPosts(); 
-              setPosts(d); 
-            }
-          }} 
-          channelId={activeChannel?._id || 'global'}
-          currentUser={user!}
-        />
-      )}
+      {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} onComplete={async () => { if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } else { const d = await api.getGlobalPosts(); setPosts(d); } }} channelId={activeChannel?._id || 'global'} currentUser={user!} />}
       {showChannelModal && <CreateChannelModal onClose={() => setShowChannelModal(false)} onSubmit={async (n: string, t: string) => { if (!activeRealm) return; try { await api.createChannel(activeRealm._id, n, t); const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); setShowChannelModal(false); handleSelectChannel(d.channels[d.channels.length-1]); } catch(e){} }} />}
       {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); } catch(e){} }} currentUser={user!} />}
-      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); } catch(e){} }} />}
-      {showSystemSettings && <SystemSettingsModal user={user!} onClose={() => setShowSystemSettings(false)} dockPosition={dockPosition} setDockPosition={setDockPosition} />}
+      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); } catch(e){} }} dockPosition={dockPosition} setDockPosition={setDockPosition} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
       {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); } catch (e) {} }} currentUser={user!} />}
     </div>
   );
 }
 
-const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void }) => {
+const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials, onSelectTag, onViewProfile }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void, onSelectTag?: (tag: string) => void, onViewProfile?: (userId: string) => void }) => {
   const [targetUser, setTargetUser] = useState<IUser | null>(null);
   useEffect(() => { api.getUserProfile(userId).then(setTargetUser); }, [userId]);
   if (!targetUser) return <div className="flex-1 flex items-center justify-center font-black uppercase text-vani-blue animate-pulse">Scanning...</div>;
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-discord-dark">
-       <div className="flex-1 overflow-y-auto custom-scrollbar"><ProfileNode user={targetUser} isOwnProfile={false} currentUser={currentUser} onFollow={onFollow} onViewSocials={onViewSocials} /></div>
+       <div className="flex-1 overflow-y-auto custom-scrollbar"><ProfileNode user={targetUser} isOwnProfile={false} currentUser={currentUser} onFollow={onFollow} onViewSocials={onViewSocials} onSelectTag={onSelectTag} onViewProfile={onViewProfile} /></div>
        <div className="p-6 border-t border-white/5 bg-discord-sidebar/30 flex justify-center backdrop-blur-md"><button onClick={() => onStartDM(userId)} className="w-full max-w-sm bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center space-x-4"><MessageSquare size={20} /><span>Initialize Link</span></button></div>
     </div>
   );

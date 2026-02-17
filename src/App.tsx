@@ -108,18 +108,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   
   const socketRef = useRef<Socket | null>(null);
 
-  // ... (inside handleAcceptCall)
-  const handleAcceptCall = (type: 'voice' | 'video') => {
-    if (!incomingCall) return;
-    const channel = dms.find(d => d._id === incomingCall.channelId);
-    if (channel) {
-      handleSelectChannel(channel);
-      // Join options: Pass initial video state to voice component
-      setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
-    }
-    setIncomingCall(null);
-  };
-
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
@@ -273,6 +261,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
     s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });
     s.on('channel_metadata_update', (updated: IChannel) => { setDms(prev => prev.map(d => d._id === updated._id ? updated : d)); if (activeChannel?._id === updated._id) setActiveChannel(updated); });
+    s.on('active_streams', (streamers: IUser[]) => { setLiveStreamers(streamers); });
 
     loadRealms(); loadDMs();
     if (activeChannel) handleSelectChannel(activeChannel);

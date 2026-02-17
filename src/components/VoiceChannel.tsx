@@ -1,33 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, PhoneOff, Users, Volume2, ShieldCheck, Activity } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Users, Volume2, ShieldCheck, Activity, Video, VideoOff, Monitor, MonitorOff, LayoutGrid } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import type { IUser } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface Props {
   channelId: string;
   socket: Socket;
   currentUser: IUser;
   onLeave: () => void;
+  initialVideo?: boolean;
 }
 
-export const VoiceChannel = ({ channelId, socket, currentUser, onLeave }: Props) => {
+export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialVideo }: Props) => {
+  const { addToast } = useToast();
   const [peers, setPeers] = useState<any[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(!!initialVideo);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  
   const peersRef = useRef<any[]>([]);
   const userStream = useRef<MediaStream | null>(null);
+  const userVideoRef = useRef<HTMLVideoElement>(null);
+  const screenStream = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(s => {
+    navigator.mediaDevices.getUserMedia({ audio: true, video: !!initialVideo }).then(s => {
       userStream.current = s;
+      if (initialVideo && userVideoRef.current) userVideoRef.current.srcObject = s;
+      
       socket.emit('join_voice', channelId);
 
       socket.on('all_users', (users: string[]) => {
         const p: any[] = [];
         users.forEach(id => {
-          const peer = createPeer(id, socket.id || '', s); // FIX: Ensure socket.id is string
+          const peer = createPeer(id, socket.id || '', s);
           peersRef.current.push({ peerID: id, peer });
-          p.push(peer);
+          p.push({ peerID: id, peer });
         });
         setPeers(p);
       });
@@ -35,17 +45,18 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave }: Props)
       socket.on('user_joined', (payload: any) => {
         const peer = addPeer(payload.signal, payload.callerID, s);
         peersRef.current.push({ peerID: payload.callerID, peer });
-        setPeers(prev => [...prev, peer]);
+        setPeers(prev => [...prev, { peerID: payload.callerID, peer }]);
       });
 
       socket.on('receiving_returned_signal', (payload: any) => {
         const item = peersRef.current.find(p => p.peerID === payload.id);
         item.peer.signal(payload.signal);
       });
-    });
+    }).catch(e => addToast("Microphone Access Denied", 'error'));
 
     return () => {
       userStream.current?.getTracks().forEach(t => t.stop());
+      screenStream.current?.getTracks().forEach(t => t.stop());
       socket.emit('leave_voice', { channelId });
       socket.off('all_users'); socket.off('user_joined'); socket.off('receiving_returned_signal');
     };
@@ -64,92 +75,191 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave }: Props)
     return p;
   }
 
+  const toggleVideo = async () => {
+    if (isScreenSharing) {
+      addToast("Stop screen share first", 'error');
+      return;
+    }
+
+    if (isVideoOn) {
+      userStream.current?.getVideoTracks().forEach(t => {
+        t.stop();
+        userStream.current?.removeTrack(t);
+      });
+      setIsVideoOn(false);
+      // Replace track for peers
+      peersRef.current.forEach(({ peer }) => {
+        // SimplePeer handles renegotiation usually, but for simple toggle we might need to just restart stream logic or replaceTrack
+        // For this MVP, we toggle off. A robust impl requires stream replacement.
+        // Assuming SimplePeer replaceTrack support:
+        // peer.replaceTrack(oldTrack, null, userStream.current);
+      });
+    } else {
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoTrack = videoStream.getVideoTracks()[0];
+        
+        userStream.current?.addTrack(videoTrack);
+        setIsVideoOn(true);
+        if (userVideoRef.current) userVideoRef.current.srcObject = userStream.current;
+
+        peersRef.current.forEach(({ peer }) => {
+          peer.addTrack(videoTrack, userStream.current);
+        });
+      } catch (e) { addToast("Camera Access Denied", 'error'); }
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      screenStream.current?.getTracks().forEach(t => t.stop());
+      setIsScreenSharing(false);
+      // Logic to revert to camera or audio-only
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
+        screenStream.current = stream;
+        setIsScreenSharing(true);
+        if (userVideoRef.current) userVideoRef.current.srcObject = stream;
+        
+        const screenTrack = stream.getVideoTracks()[0];
+        screenTrack.onended = () => { setIsScreenSharing(false); }; // Handle "Stop Sharing" from browser UI
+
+        peersRef.current.forEach(({ peer }) => {
+          peer.addTrack(screenTrack, userStream.current); // Add as auxiliary track
+        });
+      } catch (e) { addToast("Screen Share Cancelled", 'info'); }
+    }
+  };
+
+  const toggleMute = () => {
+    if (userStream.current) {
+      userStream.current.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+      setIsMuted(!userStream.current.getAudioTracks()[0].enabled);
+    }
+  };
+
   return (
-    <div className="flex-1 bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="flex-1 bg-black flex flex-col p-4 relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,210,255,0.05)_0%,transparent_70%)]" />
       
-      <div className="absolute top-10 left-10 flex items-center space-x-4 z-20">
-         <div className="w-12 h-12 bg-vani-blue/10 rounded-2xl flex items-center justify-center border border-vani-blue/20 shadow-2xl">
-            <Volume2 size={24} className="text-vani-blue animate-pulse" />
-         </div>
-         <div>
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter">Neural_Audio_Link</h2>
-            <div className="flex items-center space-x-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full" /><span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">ENCRYPTION_LAYER_STABLE</span></div>
-         </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-12 w-full max-w-5xl relative z-10">
-         <div className="flex flex-col items-center space-y-4">
-            <div className="relative">
-               <AnimatePresence>
-                  {!isMuted && (
-                    <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.2, 1], opacity: [0, 0.3, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-[-20px] rounded-full border-2 border-vani-blue/30 pointer-events-none" />
-                  )}
-               </AnimatePresence>
-               <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-[48px] p-1 transition-all duration-500 ${isMuted ? 'bg-gray-900 grayscale' : 'bg-vani-gradient shadow-[0_0_40px_rgba(255,0,85,0.2)]'}`}>
-                  <div className="w-full h-full rounded-[44px] bg-discord-dark overflow-hidden border-8 border-discord-dark">
-                     <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 bg-vani-blue w-10 h-10 rounded-2xl flex items-center justify-center border-4 border-discord-dark shadow-xl">
-                     {isMuted ? <MicOff size={18} className="text-red-500" /> : <Mic size={18} className="text-white" />}
-                  </div>
-               </div>
+      {/* HEADER */}
+      <div className="flex items-center justify-between z-20 mb-6">
+         <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-vani-blue/10 rounded-xl flex items-center justify-center border border-vani-blue/20">
+               <Activity size={20} className="text-vani-blue animate-pulse" />
             </div>
-            <div className="text-center"><div className="text-[10px] font-black text-white uppercase tracking-widest">{currentUser.username}</div><div className="text-[8px] font-mono text-gray-600 uppercase mt-1">LOCAL_NODE</div></div>
+            <div>
+               <h2 className="text-lg font-black text-white uppercase tracking-tighter">Secure_Link_Matrix</h2>
+               <div className="flex items-center space-x-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full" /><span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{peers.length + 1} NODES ACTIVE</span></div>
+            </div>
          </div>
-
-         {peers.map((peer, i) => <RemoteNode key={i} peer={peer} />)}
+         <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-xl border border-white/5">
+            <button className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all"><LayoutGrid size={18} /></button>
+            <button className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all"><Users size={18} /></button>
+         </div>
       </div>
 
-      <div className="absolute bottom-12 flex items-center space-x-8 z-20">
-         <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 rounded-[24px] flex items-center justify-center transition-all ${isMuted ? 'bg-red-500 text-white shadow-2xl' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>{isMuted ? <MicOff size={24} /> : <Mic size={24} />}</button>
-         <button onClick={onLeave} className="w-20 h-20 rounded-[32px] bg-vani-gradient text-white flex items-center justify-center shadow-[0_0_50px_rgba(255,0,85,0.4)] hover:scale-110 active:scale-95 transition-all"><PhoneOff size={32} /></button>
-         <button className="w-16 h-16 rounded-[24px] bg-white/5 text-gray-400 flex items-center justify-center hover:bg-white/10 transition-all"><Users size={24} /></button>
+      {/* GRID */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10 overflow-y-auto custom-scrollbar content-center">
+         {/* LOCAL USER */}
+         <div className="relative group bg-gray-900 rounded-[32px] overflow-hidden aspect-video md:aspect-auto border-2 border-white/5 hover:border-vani-blue/30 transition-all shadow-2xl">
+            {(isVideoOn || isScreenSharing) ? (
+              <video ref={userVideoRef} muted autoPlay playsInline className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-discord-dark">
+                 <div className="relative">
+                    <AnimatePresence>{!isMuted && <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.2, 1], opacity: [0, 0.3, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-[-20px] rounded-full border-2 border-vani-blue/30 pointer-events-none" />}</AnimatePresence>
+                    <img src={currentUser.avatar} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl" />
+                    <div className="absolute -bottom-2 -right-2 bg-vani-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-gray-800 shadow-xl">
+                       {isMuted ? <MicOff size={14} className="text-white" /> : <Mic size={14} className="text-white" />}
+                    </div>
+                 </div>
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2">
+               <span className="text-[10px] font-black text-white uppercase tracking-widest">{currentUser.username} (YOU)</span>
+            </div>
+         </div>
+
+         {/* REMOTE PEERS */}
+         {peers.map((p, i) => <RemoteNode key={i} peer={p.peer} />)}
+      </div>
+
+      {/* CONTROLS */}
+      <div className="mt-6 flex justify-center z-20">
+         <div className="bg-[#050507]/90 backdrop-blur-xl border border-white/10 p-2 rounded-[32px] flex items-center space-x-3 shadow-2xl">
+            <ControlBtn icon={isMuted ? <MicOff size={20} /> : <Mic size={20} />} active={!isMuted} onClick={() => { setIsMuted(!isMuted); toggleMute(); }} variant={isMuted ? 'danger' : 'normal'} />
+            <ControlBtn icon={isVideoOn ? <Video size={20} /> : <VideoOff size={20} />} active={isVideoOn} onClick={toggleVideo} variant={isVideoOn ? 'active' : 'normal'} />
+            <ControlBtn icon={isScreenSharing ? <Monitor size={20} /> : <MonitorOff size={20} />} active={isScreenSharing} onClick={toggleScreenShare} variant={isScreenSharing ? 'active' : 'normal'} />
+            <div className="w-px h-8 bg-white/10 mx-2" />
+            <button onClick={onLeave} className="px-8 py-4 bg-red-500 hover:bg-red-600 text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center space-x-2">
+               <PhoneOff size={18} /> <span>Disconnect</span>
+            </button>
+         </div>
       </div>
     </div>
   );
 };
 
+const ControlBtn = ({ icon, active, onClick, variant }: any) => {
+  const bg = variant === 'danger' ? 'bg-white/10 text-red-500' : variant === 'active' ? 'bg-vani-blue text-black' : 'bg-white/5 text-gray-400 hover:text-white';
+  return (
+    <button onClick={onClick} className={`w-14 h-14 rounded-[24px] flex items-center justify-center transition-all hover:scale-110 active:scale-90 ${bg}`}>
+      {icon}
+    </button>
+  );
+};
+
 const RemoteNode = ({ peer }: any) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [talking, setTalking] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
 
   useEffect(() => {
     peer.on('stream', (stream: MediaStream) => {
-      if (audioRef.current) audioRef.current.srcObject = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setHasVideo(stream.getVideoTracks().length > 0);
+
       // SIMPLE TALKING DETECTION
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const check = () => {
-        analyser.getByteFrequencyData(data);
-        const volume = data.reduce((a, b) => a + b) / data.length;
-        setTalking(volume > 10);
-        requestAnimationFrame(check);
-      };
-      check();
+      try {
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const check = () => {
+          if (!peer.destroyed) {
+            analyser.getByteFrequencyData(data);
+            const volume = data.reduce((a, b) => a + b) / data.length;
+            setTalking(volume > 10);
+            requestAnimationFrame(check);
+          }
+        };
+        check();
+      } catch(e) {}
     });
   }, [peer]);
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-       <audio ref={audioRef} autoPlay hidden />
-       <div className="relative">
-          <AnimatePresence>
-             {talking && (
-               <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.4, 1], opacity: [0, 0.4, 0] }} transition={{ repeat: Infinity, duration: 1.5 }} className="absolute inset-[-25px] rounded-full border-2 border-vani-accent/40 pointer-events-none" />
-             )}
-          </AnimatePresence>
-          <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-[48px] bg-white/5 border border-white/10 p-1 transition-all ${talking ? 'shadow-[0_0_30px_rgba(0,210,255,0.3)]' : ''}`}>
-             <div className="w-full h-full rounded-[44px] bg-gray-900 flex items-center justify-center overflow-hidden">
-                <Activity size={40} className={`transition-colors ${talking ? 'text-vani-blue' : 'text-gray-800'}`} />
-             </div>
-             <div className="absolute -top-2 -right-2 bg-green-500 w-8 h-8 rounded-xl flex items-center justify-center border-4 border-discord-dark shadow-xl"><ShieldCheck size={14} className="text-white" /></div>
-          </div>
+    <div className={`relative group bg-gray-900 rounded-[32px] overflow-hidden aspect-video md:aspect-auto border-2 transition-all shadow-2xl ${talking ? 'border-vani-blue shadow-[0_0_30px_rgba(0,210,255,0.2)]' : 'border-white/5'}`}>
+       <video ref={videoRef} autoPlay playsInline className={`w-full h-full object-cover ${hasVideo ? 'block' : 'hidden'}`} />
+       
+       {!hasVideo && (
+         <div className="w-full h-full flex flex-col items-center justify-center bg-discord-dark">
+            <div className="relative">
+               <AnimatePresence>{talking && <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.4, 1], opacity: [0, 0.4, 0] }} transition={{ repeat: Infinity, duration: 1.5 }} className="absolute inset-[-25px] rounded-full border-2 border-vani-accent/40 pointer-events-none" />}</AnimatePresence>
+               <div className="w-24 h-24 rounded-[36px] bg-white/5 border-4 border-white/5 flex items-center justify-center">
+                  <Users size={32} className="text-gray-600" />
+               </div>
+            </div>
+         </div>
+       )}
+
+       <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${talking ? 'bg-green-500' : 'bg-gray-500'}`} />
+          <span className="text-[10px] font-black text-white uppercase tracking-widest">REMOTE_NODE</span>
        </div>
-       <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Remote_Peer_Synced</div>
     </div>
   );
 };

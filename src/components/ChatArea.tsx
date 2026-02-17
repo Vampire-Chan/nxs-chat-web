@@ -46,9 +46,11 @@ interface Props {
   onRefreshMatrix?: () => void;
   onGroupSettings?: () => void;
   onOpenMedia?: (type: 'image' | 'video' | 'audio', url: string) => void;
+  onStartCall?: () => void;
+  onStartVideo?: () => void;
 }
 
-export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia }: Props) => {
+export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo }: Props) => {
   const { addToast } = useToast();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
@@ -224,11 +226,14 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const renderContent = (text: string) => {
     const parts = text.split(/(\s+)/);
     return (
-      <span className="inline-flex flex-wrap items-center gap-x-1">
+      <span className="leading-snug">
         {parts.map((part, i) => {
            const trimmed = part.trim();
-           if (CUSTOM_EMOJI_MAP[trimmed]) { const EmojiComp = CUSTOM_EMOJI_MAP[trimmed]; return <EmojiComp key={i} />; }
-           if (trimmed.startsWith('@')) return <span key={i} className="text-vani-blue font-black">{trimmed}</span>;
+           if (trimmed && CUSTOM_EMOJI_MAP[trimmed]) { 
+             const EmojiComp = CUSTOM_EMOJI_MAP[trimmed]; 
+             return <span key={i} className="inline-flex items-center translate-y-[2px] mx-0.5"><EmojiComp /></span>; 
+           }
+           if (trimmed && trimmed.startsWith('@')) return <span key={i} className="text-vani-blue font-black">{part}</span>;
            return <span key={i}>{part}</span>;
         })}
       </span>
@@ -331,12 +336,31 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
             <span className="font-black text-white uppercase tracking-tighter text-sm">{(channelType === 'group_dm' ? activeChannel?.name : channelName?.replace(/^@/, '')) || 'Unknown_Link'}</span>
             {channelType === 'group_dm' && <button onClick={onGroupSettings} className="p-1.5 text-gray-500 hover:text-white transition-all bg-white/5 rounded-lg ml-2"><Settings size={14} /></button>}
          </div>
-         <div className="flex items-center space-x-4"><button className="p-2 text-gray-500 hover:text-vani-blue"><Phone size={20} /></button><button className="p-2 text-gray-500 hover:text-vani-accent"><Video size={20} /></button></div>
+         
+         {/* CALL ICONS: Only for Private/Group DMs */}
+         {(channelType === 'dm' || channelType === 'group_dm') && (
+           <div className="flex items-center space-x-4">
+              <button 
+                onClick={onStartCall}
+                className="p-2 text-gray-500 hover:text-vani-blue transition-colors" 
+                title="Voice Call"
+              >
+                <Phone size={20} />
+              </button>
+              <button 
+                onClick={onStartVideo}
+                className="p-2 text-gray-500 hover:text-vani-accent transition-colors" 
+                title="Video Call"
+              >
+                <Video size={20} />
+              </button>
+           </div>
+         )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
         {messages.map((msg, i) => {
-           const isSequence = i > 0 && (messages[i-1].sender?.username === msg.sender?.username);
+           const isSequence = i > 0 && (messages[i-1].sender?.username === msg.sender?.username) && !msg.parentMessage;
            const isMe = msg.sender && (msg.sender._id || msg.sender.id) === (currentUser?.id || currentUser?._id);
            const isDeleted = !msg.sender;
            const displayName = getDisplayName(msg.sender);
@@ -346,18 +370,22 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
            return (
              <div key={msg._id || i} className="relative group/msg-outer">
-               {msg.parentMessage && !isSequence && (
-                 <div className="flex items-center space-x-2 ml-12 mb-1 opacity-40 hover:opacity-100 transition-opacity cursor-pointer overflow-hidden max-w-[80%]" onClick={() => {
-                   const el = document.getElementById(`msg-${msg.parentMessage?._id}`);
-                   el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                   el?.classList.add('bg-vani-blue/10');
-                   setTimeout(() => el?.classList.remove('bg-vani-blue/10'), 2000);
-                 }}>
-                    <CornerUpRight size={12} className="text-vani-blue" />
-                    <img src={msg.parentMessage.sender?.avatar} className="w-4 h-4 rounded-md" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">
-                      {msg.parentMessage.sender?.username}: {msg.parentMessage.content || 'Visual_Data'}
-                    </span>
+               {msg.parentMessage && (
+                 <div className="flex items-center ml-12 mb-[-4px] relative z-0">
+                    <div className="absolute -left-6 bottom-0 w-6 h-4 border-l-2 border-t-2 border-white/10 rounded-tl-xl" />
+                    
+                    <div className="flex items-center space-x-2 opacity-40 hover:opacity-100 transition-opacity cursor-pointer overflow-hidden max-w-[80%] py-1 px-2 rounded-lg hover:bg-white/5" onClick={() => {
+                      const el = document.getElementById(`msg-${msg.parentMessage?._id}`);
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el?.classList.add('bg-vani-blue/10');
+                      setTimeout(() => el?.classList.remove('bg-vani-blue/10'), 2000);
+                    }}>
+                       <Reply size={10} className="text-vani-blue shrink-0" />
+                       <img src={msg.parentMessage.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.parentMessage.sender?.username}`} className="w-3.5 h-3.5 rounded-full ring-1 ring-white/10" />
+                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter truncate">
+                         <span className="text-white/60">{msg.parentMessage.sender?.username}</span>: {msg.parentMessage.content || 'Visual_Data'}
+                       </span>
+                    </div>
                  </div>
                )}
                <MessageItem 

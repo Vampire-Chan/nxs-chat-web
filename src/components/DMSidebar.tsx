@@ -33,7 +33,9 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
     });
   };
 
-  const activeDms = dms.filter(d => d.type === 'dm' || d.type === 'group_dm');
+  const activeDms = dms
+    .filter(d => d.type === 'dm' || d.type === 'group_dm')
+    .sort((a, b) => new Date((b as any).lastMessageAt || 0).getTime() - new Date((a as any).lastMessageAt || 0).getTime());
 
   return (
     <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-gray-900">
@@ -57,6 +59,20 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
           const myLastSeen = (dm as any).lastSeen?.[(user?.id || user?._id || '').toString()];
           const isUnread = !myLastSeen || new Date((dm as any).lastMessageAt) > new Date(myLastSeen);
 
+          const getStatusDisplay = () => {
+            if (isGroup) return `${dm.members?.length} Nodes`;
+            if (isUnread && selectedDmId !== dm._id) return 'NEW_TRANSMISSION';
+            if (!isOnline) return 'OFFLINE';
+            
+            if (otherUser?.customStatus) return otherUser.customStatus;
+            
+            switch (otherUser?.status) {
+              case 'dnd': return 'BUSY';
+              case 'idle': return 'AWAY';
+              default: return 'ONLINE';
+            }
+          };
+
           return (
             <div 
               key={dm._id}
@@ -77,7 +93,7 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
                  <div className={`font-black text-xs truncate uppercase tracking-tighter ${isUnread && selectedDmId !== dm._id ? 'text-white' : (selectedDmId === dm._id ? 'text-white' : 'text-gray-400')}`}>
                     {isGroup ? (dm.name || 'Unnamed_Group') : (otherUser?.username || 'Ghost_Node')}
                  </div>
-                 <div className="text-[9px] text-gray-500 truncate font-mono uppercase tracking-widest">{isGroup ? `${dm.members?.length} Nodes` : (isUnread ? 'NEW_TRANSMISSION' : 'Identity_Linked')}</div>
+                 <div className="text-[9px] text-gray-500 truncate font-mono uppercase tracking-widest">{getStatusDisplay()}</div>
               </div>
             </div>
           );

@@ -67,16 +67,17 @@ export const NotificationsPage = ({ onClose }: { onClose?: () => void }) => {
                 className={`p-4 lg:p-6 rounded-[24px] lg:rounded-3xl border transition-all ${!n.isRead ? 'bg-vani-blue/5 border-vani-blue/20 shadow-lg shadow-blue-500/5' : 'bg-discord-channel border-gray-800 opacity-60 hover:opacity-100'}`}
               >
                  <div className="flex items-start space-x-4 lg:space-x-6">
-                    <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center flex-shrink-0 ${n.type === 'like' ? 'bg-red-500/10 text-red-500' : n.type === 'comment' ? 'bg-blue-500/10 text-blue-500' : n.type === 'login' ? 'bg-yellow-500/10 text-yellow-500' : n.type === 'sync_request' ? 'bg-vani-blue/10 text-vani-blue' : 'bg-green-500/10 text-green-500'}`}>
+                    <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center flex-shrink-0 ${n.type === 'like' ? 'bg-red-500/10 text-red-500' : n.type === 'comment' ? 'bg-blue-500/10 text-blue-500' : n.type === 'login' ? 'bg-yellow-500/10 text-yellow-500' : n.type === 'sync_request' ? 'bg-vani-blue/10 text-vani-blue' : n.type === 'mention' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'}`}>
                        {n.type === 'like' && <Heart size={20} className={`lg:w-6 lg:h-6 ${!n.isRead ? 'fill-red-500' : ''}`} />}
                        {n.type === 'comment' && <MessageCircle size={20} className="lg:w-6 lg:h-6" />}
                        {n.type === 'follow' && <UserPlus size={20} className="lg:w-6 lg:h-6" />}
                        {n.type === 'login' && <ShieldAlert size={20} className="lg:w-6 lg:h-6" />}
                        {n.type === 'sync_request' && <Activity size={20} className="lg:w-6 lg:h-6" />}
+                       {n.type === 'mention' && <Zap size={20} className="lg:w-6 lg:h-6" />}
                     </div>
                     <div className="flex-1 min-w-0">
                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[8px] lg:text-[10px] font-black text-gray-500 uppercase tracking-widest truncate">{n.type === 'sync_request' ? 'IDENTITY SYNC' : n.type} transmission</span>
+                          <span className="text-[8px] lg:text-[10px] font-black text-gray-500 uppercase tracking-widest truncate">{n.type === 'sync_request' ? 'IDENTITY SYNC' : n.type === 'mention' ? 'NEURAL SIGNAL' : n.type} transmission</span>
                           <span className="text-[8px] lg:text-[10px] font-mono text-gray-600 whitespace-nowrap ml-2">{new Date(n.createdAt).toLocaleDateString()}</span>
                        </div>
                        <p className="text-white text-sm lg:text-lg font-medium leading-snug break-words">

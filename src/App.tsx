@@ -25,7 +25,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -99,6 +99,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [matrixRefreshKey, setMatrixRefreshKey] = useState(0);
   const [activeMedia, setActiveMedia] = useState<{ type: 'image' | 'video' | 'audio', url: string } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
   
   const socketRef = useRef<Socket | null>(null);
 
@@ -179,13 +180,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     socketRef.current = s;
 
-    s.on('receive_message', (msg: IMessage) => { setMessages(prev => [...prev, msg]); setMatrixRefreshKey(k => k + 1); });
-    s.on('receive_post', (post: IPost) => { setPosts(prev => [post, ...prev]); });
+    s.on('receive_message', (msg: any) => { 
+      if (msg.channel === activeChannel?._id || msg.channel?._id === activeChannel?._id) {
+        setMessages(prev => [...prev, msg]); 
+      }
+      loadDMs();
+      setMatrixRefreshKey(k => k + 1); 
+    });
+
+    s.on('incoming_call', (data: any) => {
+      setIncomingCall(data);
+    });
     
     s.on('identity_sync_update', async () => {
       try {
         const u = await api.getUserProfile(user?.id || user?._id || '');
         updateUserState(localStorage.getItem('token') || '', u);
+        loadDMs();
+        loadRealms();
         setMatrixRefreshKey(k => k + 1);
       } catch (e) {}
     });
@@ -229,6 +241,16 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     else { const ps = await api.getPosts(channel._id); setPosts(ps); }
   };
 
+  const handleAcceptCall = (type: 'voice' | 'video') => {
+    if (!incomingCall) return;
+    const channel = dms.find(d => d._id === incomingCall.channelId);
+    if (channel) {
+      handleSelectChannel(channel);
+      setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
+    }
+    setIncomingCall(null);
+  };
+
   const [showRealmModal, setShowRealmModal] = useState(false);
   const [showChannelModal, setShowChannelModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
@@ -258,6 +280,37 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
            <button onClick={() => setShowSearchModal(true)} className="p-2 text-gray-400 hover:text-white transition-all"><SearchIcon size={18} /></button>
         </div>
       )}
+
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div 
+            initial={{ y: -100, x: '-50%', opacity: 0 }}
+            animate={{ y: 20, x: '-50%', opacity: 1 }}
+            exit={{ y: -100, x: '-50%', opacity: 0 }}
+            className="fixed top-0 left-1/2 z-[5000] w-[90%] max-w-sm pointer-events-auto"
+          >
+             <div className="bg-[#0a0a0c]/90 backdrop-blur-2xl border border-vani-blue/30 rounded-[32px] p-4 shadow-[0_20px_60px_rgba(0,210,255,0.2)] flex items-center justify-between">
+                <div className="flex items-center space-x-4 min-w-0">
+                   <div className="relative shrink-0">
+                      <div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" />
+                      <img src={incomingCall.sender.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${incomingCall.sender.username}`} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" />
+                   </div>
+                   <div className="min-w-0">
+                      <h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4>
+                      <p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest leading-none mt-1">Incoming_{incomingCall.type}_Signal</p>
+                   </div>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                   <button onClick={() => setIncomingCall(null)} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button>
+                   <button onClick={() => handleAcceptCall('voice')} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>
+                   {incomingCall.type === 'video' && (
+                     <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>
+                   )}
+                </div>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <CoreDock 
         realms={realms} 
@@ -305,8 +358,31 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             onPanEnd={handleDragEnd}
           >
             <AnimatePresence mode="wait">
-              {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
-                <ChatArea key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} />
+              {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
+                <ChatArea 
+                  key="chat" 
+                  channelName={activeChannel.name || 'Link'} 
+                  messages={messages} 
+                  onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} 
+                  currentUser={user} 
+                  channelId={activeChannel._id} 
+                  onViewOtherProfile={handleViewOtherProfile} 
+                  channelType={activeChannel.type} 
+                  activeRealm={activeRealm} 
+                  activeChannel={activeChannel} 
+                  socket={socketRef.current} 
+                  onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
+                  onGroupSettings={() => setShowGroupSettings(true)} 
+                  onOpenMedia={(type, url) => setActiveMedia({ type, url })}
+                  onStartCall={() => {
+                    socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
+                    setActiveChannel({ ...activeChannel, type: 'voice' });
+                  }}
+                  onStartVideo={() => {
+                    socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
+                    setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any);
+                  }}
+                />
               ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
                 <FeedArea key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} />
               ) : (

@@ -16,6 +16,8 @@ interface Props {
   channelId?: string;
   onViewProfile?: (userId: string) => void;
   onSelectTag?: (tag: string | null) => void;
+  onRetry?: () => void;
+  isSyncing?: boolean;
 }
 
 export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, channelId, onViewProfile }: Props) => {
@@ -183,7 +185,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                         className="flex-shrink-0 w-32 bg-discord-channel border border-white/5 rounded-3xl p-4 flex flex-col items-center text-center group cursor-pointer hover:border-vani-blue/30 transition-all shadow-xl"
                       >
                          <div className="w-16 h-16 rounded-2xl bg-vani-gradient p-0.5 mb-3 shadow-lg group-hover:scale-110 transition-transform">
-                            <div className="w-full h-full rounded-[14px] overflow-hidden bg-discord-dark">
+                            <div className="full h-full rounded-[14px] overflow-hidden bg-discord-dark">
                                <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
                             </div>
                          </div>
@@ -234,18 +236,17 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
         )}
       </div>
 
-        {/* MODAL OVERLAY: Only on Mobile/Tablet OR if not in Global Matrix (no sidebar) */}
-        {selectedPost && (window.innerWidth < 1280 || !isGlobal) && (
-          <PostViewerModal 
-            post={selectedPost} 
-            onClose={() => setSelectedPost(null)} 
-            currentUser={currentUser} 
-            onUpdate={triggerRefresh}
-            onSelectTag={handleTagSelect}
-            onViewProfile={onViewProfile}
-          />
-        )}
-      </div>
+      {/* MODAL OVERLAY: Only on Mobile/Tablet OR if not in Global Matrix (no sidebar) */}
+      {selectedPost && (window.innerWidth < 1280 || !isGlobal) && (
+        <PostViewerModal 
+          post={selectedPost} 
+          onClose={() => setSelectedPost(null)} 
+          currentUser={currentUser} 
+          onUpdate={triggerRefresh}
+          onSelectTag={handleTagSelect}
+          onViewProfile={onViewProfile}
+        />
+      )}
 
       {canPost && showButton && (
         <button 

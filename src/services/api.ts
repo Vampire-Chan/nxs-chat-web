@@ -100,8 +100,9 @@ export interface IMessage {
   sender: IUser;
   timestamp: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video';
+  mediaType?: 'image' | 'video' | 'audio' | 'file';
   reactions?: Record<string, string[]>;
+  parentMessage?: IMessage | null;
 }
 
 export interface IPost {

@@ -7,6 +7,7 @@ import { ExploreLeftSidebar } from './ExploreLeftSidebar';
 import { ExploreRightSidebar } from './ExploreRightSidebar';
 import { getIdentityName } from '../services/identity';
 import { PostViewerModal } from './PostViewerModal';
+import { useToast } from '../context/ToastContext';
 
 interface Props {
   posts: IPost[];
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, channelId, onViewProfile }: Props) => {
+  const { addToast } = useToast();
   const [posts, setPosts] = useState(initialPosts);
   const [showHeart, setShowHeart] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
@@ -110,7 +112,8 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
     try {
       await api.syncIdentity(targetUser._id || targetUser.id);
       setSuggestedUsers(prev => prev.filter(u => (u._id || u.id) !== (targetUser._id || targetUser.id)));
-    } catch (e) { alert("Sync Protocol Failed"); }
+      addToast("Identity Synced", 'success');
+    } catch (e) { addToast("Sync Protocol Failed", 'error'); }
   };
 
   return (
@@ -236,6 +239,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
 };
 
 const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal, isActive, onSelectTag, onViewProfile }: any) => {
+  const { addToast } = useToast();
   const [quickComment, setQuickComment] = useState('');
   const [localLikes, setLocalLikes] = useState(post.likes || []);
   const isMe = (post.author._id || post.author.id) === (currentUser.id || currentUser._id);
@@ -258,7 +262,7 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     try {
       await api.addComment(post._id, quickComment);
       setQuickComment('');
-      alert("Feedback Synced");
+      addToast("Feedback Synced", 'success');
     } catch (err) { console.error(err); }
   };
 
@@ -300,10 +304,12 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     try {
       if (isSyncing) {
         await api.unfollowUser(post.author._id || post.author.id);
+        addToast("Identity Unsynced", 'success');
       } else {
         await api.syncIdentity(post.author._id || post.author.id);
+        addToast("Identity Synced", 'success');
       }
-    } catch (e) { alert("Sync Protocol Failed"); }
+    } catch (e) { addToast("Sync Protocol Failed", 'error'); }
   };
 
   const handleJoinRealm = async (e: React.MouseEvent) => {
@@ -311,9 +317,9 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     if (!sourceRealm) return;
     try {
       await api.joinRealm(sourceRealm._id);
-      alert(`Synchronized with ${sourceRealm.name}`);
+      addToast(`Synchronized with ${sourceRealm.name}`, 'success');
       window.location.reload(); 
-    } catch (e) { alert("Realm Access Denied"); }
+    } catch (e) { addToast("Realm Access Denied", 'error'); }
   };
 
   return (

@@ -16,48 +16,48 @@ export default function TermsPage() {
 
         <header className="mb-20">
           <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 flex items-center gap-4">
-            <Scale size={40} className="text-vani-blue" /> {t('settings.legal')}
+            <Scale size={40} className="text-vani-blue" /> {t('terms.title')}
           </h1>
           <div className="h-1 w-20 bg-vani-gradient rounded-full" />
-          <p className="mt-6 text-gray-500 uppercase text-[10px] font-black tracking-[0.3em]">Revision 2026.04.AT // Vani Matrix Legal Framework</p>
+          <p className="mt-6 text-gray-500 uppercase text-[10px] font-black tracking-[0.3em]">{t('terms.revision')}</p>
         </header>
 
         <div className="space-y-12 text-sm text-gray-400 leading-relaxed max-w-3xl">
           <section className="space-y-4">
             <h2 className="text-white font-black uppercase tracking-widest flex items-center gap-3">
-              <ScrollText size={18} className="text-vani-blue" /> 01. Identity Ownership
+              <ScrollText size={18} className="text-vani-blue" /> {t('terms.sec1_title')}
             </h2>
-            <p>By Establishing a Node in the Yantravani Vani Matrix, you maintain primary sovereignty over your generated visual data and neural transmissions. However, you grant Yantravani a global, non-exclusive license to host, cache, and synchronize this data across the network.</p>
+            <p>{t('terms.sec1_desc')}</p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-white font-black uppercase tracking-widest flex items-center gap-3">
-              <ShieldAlert size={18} className="text-red-500" /> 02. Prohibited Transmissions
+              <ShieldAlert size={18} className="text-red-500" /> {t('terms.sec2_title')}
             </h2>
-            <p>The following data packets are restricted and will result in immediate node severance (Banning):</p>
+            <p>{t('terms.sec2_desc')}</p>
             <ul className="list-disc pl-6 space-y-2 text-[13px]">
-              <li>Malicious code or binary exploits intended to disrupt realm stability.</li>
-              <li>Unauthorized access to high-tier identity nodes.</li>
-              <li>Transmissions violating the community neural guidelines (see /guidelines).</li>
-              <li>Impersonation of the Architect Core or System Administrators.</li>
+              <li>{t('terms.sec2_li1')}</li>
+              <li>{t('terms.sec2_li2')}</li>
+              <li>{t('terms.sec2_li3')}</li>
+              <li>{t('terms.sec2_li4')}</li>
             </ul>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-white font-black uppercase tracking-widest flex items-center gap-3">
-              <FileWarning size={18} className="text-yellow-500" /> 03. Financial Contributions
+              <FileWarning size={18} className="text-yellow-500" /> {t('terms.sec3_title')}
             </h2>
-            <p>Elite Node upgrades and manual payment submissions are final. Any attempt to reverse a verified financial sync without authorization will result in a permanent security lock on your identity.</p>
+            <p>{t('terms.sec3_desc')}</p>
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-white font-black uppercase tracking-widest">04. Vani Matrix Connectivity</h2>
-            <p>Yantravani does not guarantee 100% neural link uptime. System maintenance and Vani Matrix recalibrations may occur without notice. We are not liable for any data loss occurring during sector collapses or unauthorized node breaches.</p>
+            <h2 className="text-white font-black uppercase tracking-widest">{t('terms.sec4_title')}</h2>
+            <p>{t('terms.sec4_desc')}</p>
           </section>
         </div>
 
         <div className="mt-20 pt-10 border-t border-white/5 text-[10px] font-mono text-gray-600">
-          BY CLICKING "ENTER THE Vani Matrix", YOU ACKNOWLEDGE AND CALIBRATE YOUR NODE TO THESE TERMS. FAILURE TO COMPLY WILL RESULT IN SEVERANCE.
+          {t('terms.footer')}
         </div>
       </div>
     </div>

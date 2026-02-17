@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import { X, Users, Check, Zap, Hash, Shield, Globe, Settings, UserPlus, Trash2, Camera, Image as ImageIcon, Save } from 'lucide-react';
 import { api } from '../services/api';
 import type { IUser, IRealm, IChannel } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm, onClose: () => void, onUpdate: () => void }) => {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'members'>('overview');
   const [name, setName] = useState(realm.name);
   const [vanity, setVanity] = useState(realm.vanityHandle || '');
@@ -22,14 +24,16 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
     try {
       await api.createRole(realm._id, { name: roleName, color: "#00d2ff", permissions: [] });
       onUpdate();
-    } catch (e) { alert("Forge failed."); }
+      addToast("Role Forged", 'success');
+    } catch (e) { addToast("Forge failed.", 'error'); }
   };
 
   const handleAssignRole = async (userId: string, roleId: string) => {
     try {
       await api.assignRole(realm._id, userId, roleId);
       onUpdate();
-    } catch (e) { alert("Assignment failed."); }
+      addToast("Authority Assigned", 'success');
+    } catch (e) { addToast("Assignment failed.", 'error'); }
   };
 
   const handleSaveOverview = async () => {
@@ -40,9 +44,9 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
     if (bannerBlob) fd.append('banner', bannerBlob, 'banner.jpg');
     try {
       await api.updateRealm(realm._id, fd);
-      alert("Calibration complete.");
+      addToast("Calibration complete.", 'success');
       onUpdate();
-    } catch (e) { alert("Calibration failed."); }
+    } catch (e) { addToast("Calibration failed.", 'error'); }
   };
 
   return (
@@ -207,6 +211,7 @@ export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose
 };
 
 export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }: { onClose: () => void, onComplete: (post: any) => void, channelId: string, currentUser: IUser }) => {
+  const { addToast } = useToast();
   const [caption, setCaption] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
@@ -215,7 +220,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
-    if (!file) return alert("Visual data required for broadcast.");
+    if (!file) return addToast("Visual data required for broadcast.", 'error');
     setLoading(true);
     const fd = new FormData();
     fd.append('caption', caption);
@@ -227,7 +232,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
       const res = await api.createPost(channelId, fd); 
       onComplete(res);
       onClose();
-    } catch (e) { alert("Broadcast failed."); }
+    } catch (e) { addToast("Broadcast failed.", 'error'); }
     finally { setLoading(false); }
   };
 
@@ -289,6 +294,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
 };
 
 export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { group: IChannel, onClose: () => void, onUpdate: () => void, currentUser: IUser }) => {
+  const { addToast } = useToast();
   const [name, setName] = useState(group.name);
   const [iconBlob, setIconBlob] = useState<Blob | null>(null);
   const [iconPreview, setIconPreview] = useState(group.icon || '');
@@ -307,7 +313,8 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
       await api.updateChannelMetadata(group._id, fd);
       onUpdate();
       onClose();
-    } catch (e) { alert("Matrix Calibration Failed"); }
+      addToast("Matrix Calibration Applied", 'success');
+    } catch (e) { addToast("Matrix Calibration Failed", 'error'); }
     finally { setLoading(false); }
   };
 

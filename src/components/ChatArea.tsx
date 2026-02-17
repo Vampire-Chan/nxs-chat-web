@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
 import { api } from '../services/api';
-import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle } from 'lucide-react';
+import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, CornerUpRight } from 'lucide-react';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { ProfileMiniCard } from './ProfileMiniCard';
 import { NeuralSuggester } from './NeuralSuggester';
+import { useToast } from '../context/ToastContext';
 
 const AudioPlayer = ({ url }: { url: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -34,7 +35,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
 interface Props {
   channelName: string;
   messages: IMessage[];
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, parentMessageId?: string) => void;
   currentUser: IUser | null;
   channelId: string;
   onViewOtherProfile: (userId: string) => void;
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia }: Props) => {
+  const { addToast } = useToast();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
   const [showCustomPicker, setShowCustomPicker] = useState(false);
@@ -59,6 +61,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState('');
   const [msgContextMenu, setMsgContextMenu] = useState<{ x: number, y: number, msgId: string, isMe: boolean } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<IMessage | null>(null);
   
   const [activeMiniCard, setActiveMiniCard] = useState<{ user: IUser, position: { x: number, y: number } } | null>(null);
   const [suggestion, setSuggestion] = useState<{ query: string, type: 'mention' | 'tag', index: number } | null>(null);
@@ -74,6 +77,8 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<any>(null);
   const longPressTimer = useRef<any>(null);
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   useEffect(() => { setMessages(initialMessages); }, [initialMessages]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -120,11 +125,12 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       setUploadProgress(0);
       await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
       setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
-    } catch (err: any) { alert(`Matrix Sync Failed: ${err.message}`); setUploadProgress(null); }
+      addToast("Transmission Success", 'success');
+    } catch (err: any) { addToast(`Matrix Sync Failed: ${err.message}`, 'error'); setUploadProgress(null); }
   };
 
   const startRecording = async () => {
-    if (!window.isSecureContext && window.location.hostname !== 'localhost') return alert("HTTPS Required");
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') return addToast("HTTPS Required", 'error');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -137,12 +143,13 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           setUploadProgress(0);
           await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
           setUploadProgress(null);
-        } catch (e: any) { alert("Audio Sync Failed"); setUploadProgress(null); }
+          addToast("Audio Note Synced", 'success');
+        } catch (e: any) { addToast("Audio Sync Failed", 'error'); setUploadProgress(null); }
         stream.getTracks().forEach(t => t.stop());
       };
       recorder.start(); setRecording(recorder); setIsRecording(true); setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
-    } catch (err: any) { alert(`Denied: ${err.message}`); }
+    } catch (err: any) { addToast(`Access Denied: ${err.message}`, 'error'); }
   };
 
   const stopRecording = (shouldSend: boolean) => {
@@ -153,7 +160,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
     clearInterval(timerRef.current); setIsRecording(false); setRecording(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const v = e.target.value; setInput(v);
     const words = v.split(' '); const last = words[words.length - 1] || '';
     if (last.startsWith('@') && last.length > 1) setSuggestion({ query: last, type: 'mention', index: v.lastIndexOf(last) });
@@ -173,8 +180,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   };
 
   const handleSeverMessage = async (id: string) => {
-    if (!window.confirm("Sever this transmission permanently?")) return;
-    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); } catch (e) { alert("Fail"); }
+    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); addToast("Transmission Severed", 'success'); } catch (e) { addToast("Severance failed", 'error'); }
   };
 
   const handleStartEdit = (msg: IMessage) => {
@@ -186,7 +192,8 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
     try {
       await api.editMessage(editingMessageId, editInput);
       setEditingMessageId(null); setEditInput('');
-    } catch (e) { alert("Matrix Calibration Failed"); }
+      addToast("Recalibrated", 'success');
+    } catch (e) { addToast("Calibration Failed", 'error'); }
   };
 
   const onMessageContextMenu = (e: React.MouseEvent, msgId: string, isMe: boolean) => {
@@ -294,14 +301,15 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              </div>
 
              <div className="space-y-1">
+                <ContextItem label="Reply Transmission" icon={<Reply size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) { setReplyingTo(m); setMsgContextMenu(null); } }} />
                 {msgContextMenu.isMe && (
                   <>
                     <ContextItem label="Edit Transmission" icon={<Edit3 size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) handleStartEdit(m); }} />
                     <ContextItem label="Sever Transmission" icon={<Trash2 size={14} />} variant="danger" onClick={() => handleSeverMessage(msgContextMenu.msgId)} />
                   </>
                 )}
-                <ContextItem label="Forward Link" icon={<Forward size={14} />} onClick={() => alert("Forward Stub")} />
-                <ContextItem label="Report Violation" icon={<AlertTriangle size={14} />} variant="danger" onClick={() => alert("Oversight notified.")} />
+                <ContextItem label="Forward Link" icon={<Forward size={14} />} onClick={() => addToast("Forward Stub", 'info')} />
+                <ContextItem label="Report Violation" icon={<AlertTriangle size={14} />} variant="danger" onClick={() => addToast("Oversight notified.", 'info')} />
              </div>
           </motion.div>
         )}
@@ -334,85 +342,71 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
            const displayName = getDisplayName(msg.sender);
            const roleColor = msg.sender ? getRoleColor(msg.sender) : '#666666';
            const isEditing = editingMessageId === msg._id;
+           const hasReactions = msg.reactions && Object.values(msg.reactions).some(u => u.length > 0);
+
            return (
-             <motion.div 
-               initial={{ opacity: 0, x: -10 }} 
-               animate={{ opacity: 1, x: 0 }} 
-               key={msg._id || i} 
-               className={`flex space-x-4 group ${isDeleted ? 'opacity-50' : ''}`} 
-               style={{ marginTop: isSequence ? 'calc(var(--vani-spacing) * 0.1)' : 'var(--vani-spacing)' }}
-               onContextMenu={!isDeleted ? (e) => onMessageContextMenu(e, msg._id, !!isMe) : undefined} 
-               onTouchStart={!isDeleted ? (e) => handleLongPressStart(msg._id, !!isMe, e) : undefined} 
-               onTouchEnd={handleLongPressEnd}
-             >
-               {!isSequence ? (
-                 <div 
-                   onClick={(e) => { 
-                     if (isDeleted) return;
-                     const rect = e.currentTarget.getBoundingClientRect(); 
-                     setActiveMiniCard({ user: msg.sender, position: { x: rect.left + 50, y: Math.min(rect.top, window.innerHeight - 400) } }); 
-                   }} 
-                   className={`w-9 h-9 rounded-xl bg-gray-800 flex-shrink-0 mt-1 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
-                 >
-                   <img src={msg.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender?.username || 'deleted'}`} className="w-full h-full object-cover" />
+             <div key={msg._id || i} className="relative group/msg-outer">
+               {msg.parentMessage && !isSequence && (
+                 <div className="flex items-center space-x-2 ml-12 mb-1 opacity-40 hover:opacity-100 transition-opacity cursor-pointer overflow-hidden max-w-[80%]" onClick={() => {
+                   const el = document.getElementById(`msg-${msg.parentMessage?._id}`);
+                   el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                   el?.classList.add('bg-vani-blue/10');
+                   setTimeout(() => el?.classList.remove('bg-vani-blue/10'), 2000);
+                 }}>
+                    <CornerUpRight size={12} className="text-vani-blue" />
+                    <img src={msg.parentMessage.sender?.avatar} className="w-4 h-4 rounded-md" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">
+                      {msg.parentMessage.sender?.username}: {msg.parentMessage.content || 'Visual_Data'}
+                    </span>
                  </div>
-               ) : <div className="w-9 flex-shrink-0" />}
-                 <div className="min-w-0 flex-1 relative overflow-hidden">
-                    {!isSequence && (
-                      <div className="flex items-center space-x-2 mb-0.5">
-                        <span style={{ color: roleColor }} className="font-black uppercase tracking-tighter text-[11px] cursor-pointer hover:underline text-white">
-                          {displayName}
-                        </span>
-                        {msg.sender && renderBadge(msg.sender)}
-                        <span className="text-[8px] text-gray-600 font-mono uppercase">{new Date(msg.timestamp).toLocaleTimeString()}</span>
-                      </div>
-                    )}
-                    <div className="text-gray-300 text-sm leading-snug group-hover:bg-white/[0.02] px-2 py-0.5 rounded-lg transition-colors relative whitespace-pre-wrap break-all overflow-hidden max-w-full">
-                       {isEditing ? (
-                      <div className="space-y-2 py-2">
-                         <textarea 
-                           className="w-full bg-[#050507] border border-vani-blue/50 p-3 rounded-xl text-white outline-none resize-none" 
-                           rows={2} 
-                           value={editInput} 
-                           onChange={(e) => setEditInput(e.target.value)} 
-                           autoFocus 
-                           onKeyDown={(e) => { 
-                             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFinishEdit(); } 
-                             if (e.key === 'Escape') setEditingMessageId(null); 
-                           }} 
-                         />
-                         <div className="text-[8px] font-black uppercase text-gray-500">SHIFT+ENTER for new line • ESC to cancel • ENTER to save</div>
-                      </div>
-                    ) : (
-                      <>
-                        {isDeleted ? (
-                          <div className="italic text-[10px] text-gray-600 uppercase tracking-widest py-1 flex items-center gap-2">
-                            <Lock size={10} /> Transmission_Purged_By_Author
-                          </div>
-                        ) : (
-                          <>
-                            {msg.content && <div className="markdown-content">{renderContent(msg.content)}</div>}
-                            {renderMedia(msg)}
-                          </>
-                        )}
-                      </>
-                    )}
-                    {!isEditing && !isDeleted && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {msg.reactions && Object.entries(msg.reactions).map(([emoji, users]) => users.length > 0 && <div key={emoji} onClick={() => handleReact(msg._id, emoji)} className={`px-1.5 py-0.5 rounded-md border flex items-center gap-1 cursor-pointer transition-all ${users.includes(currentUser?.id || currentUser?._id || '') ? 'bg-vani-blue/10 border-vani-blue/30' : 'bg-white/5 border-transparent'}`}>{CUSTOM_EMOJI_MAP[emoji] ? (() => {const C=CUSTOM_EMOJI_MAP[emoji]; return <div className="scale-50"><C/></div>;})() : <span className="text-[10px]">{emoji}</span>}<span className="text-[9px] font-black">{users.length}</span></div>)}
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1"><button onClick={(e) => {e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setReactionPicker({ messageId: msg._id, position: { x: r.left, y: r.top - 50 } });}} className="p-1 bg-white/5 rounded-lg hover:text-white"><Smile size={12} /></button></div>
-                      </div>
-                    )}
-                 </div>
-               </div>
-             </motion.div>
+               )}
+               <MessageItem 
+                 msg={msg} 
+                 isSequence={isSequence} 
+                 isMe={!!isMe} 
+                 isDeleted={isDeleted} 
+                 displayName={displayName} 
+                 roleColor={roleColor} 
+                 isEditing={isEditing} 
+                 hasReactions={!!hasReactions} 
+                 currentUser={currentUser} 
+                 activeRealm={activeRealm}
+                 onReact={handleReact}
+                 onStartEdit={handleStartEdit}
+                 onSever={handleSeverMessage}
+                 onContext={onMessageContextMenu}
+                 onLongPressStart={handleLongPressStart}
+                 onLongPressEnd={handleLongPressEnd}
+                 onViewProfile={setActiveMiniCard}
+                 onReply={() => setReplyingTo(msg)}
+                 editInput={editInput}
+                 setEditInput={setEditInput}
+                 onFinishEdit={handleFinishEdit}
+                 setEditingMessageId={setEditingMessageId}
+                 renderContent={renderContent}
+                 renderMedia={renderMedia}
+                 renderBadge={renderBadge}
+               />
+             </div>
            );
         })}
         <div ref={bottomRef} />
       </div>
 
-      <div className="p-4 pt-0 relative">
+      <div className="p-4 pt-0 relative pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
         <AnimatePresence>
+          {replyingTo && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="bg-[#0a0a0c] border border-white/5 border-b-0 rounded-t-2xl p-3 flex items-center justify-between">
+               <div className="flex items-center space-x-3 overflow-hidden">
+                  <Reply size={14} className="text-vani-blue shrink-0" />
+                  <div className="text-[10px] text-gray-400 truncate">
+                    Replying to <span className="font-black text-white uppercase">{replyingTo.sender?.username}</span>
+                    <p className="opacity-50 italic truncate">{replyingTo.content || 'Visual_Data'}</p>
+                  </div>
+               </div>
+               <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><X size={14} /></button>
+            </motion.div>
+          )}
           {suggestion && <NeuralSuggester query={suggestion.query} type={suggestion.type} onSelect={handleSelectSuggestion} position={{ top: 0, left: 60 }} />}
           {showMediaMenu && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 left-6 bg-[#0a0a0c] border border-white/5 p-2 rounded-3xl shadow-2xl z-50 flex space-x-2"><MediaBtn icon={<ImageIcon size={18} />} label="Image" onClick={() => imageInputRef.current?.click()} color="text-blue-500" /><MediaBtn icon={<Camera size={18} />} label="Camera" onClick={() => cameraInputRef.current?.click()} color="text-green-500" /><MediaBtn icon={<FileIcon size={18} />} label="File" onClick={() => fileInputRef.current?.click()} color="text-yellow-500" /><MediaBtn icon={<Mic size={18} />} label="Audio" onClick={startRecording} color="text-red-500" /></motion.div>}
           {isRecording && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-4 bottom-4 bg-[#0a0a0c] border border-red-500/30 p-4 rounded-[32px] shadow-2xl z-50 flex items-center justify-between"><div className="flex items-center space-x-4"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="font-mono text-white font-black">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Recording...</span></div><div className="flex items-center space-x-3"><button onClick={() => stopRecording(false)} className="p-3 text-gray-500 hover:text-white transition-all"><X size={20} /></button><button onClick={() => stopRecording(true)} className="w-12 h-12 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Send size={20} /></button></div></motion.div>}
@@ -423,11 +417,11 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
         <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
         <input type="file" ref={cameraInputRef} hidden accept="image/*" capture="environment" onChange={(e) => handleFileUpload(e, 'image')} />
         {canPost ? (
-          <div className="bg-discord-sidebar rounded-[32px] p-1.5 flex items-center space-x-2 border transition-all shadow-2xl border-gray-800 min-h-[56px]">
+          <div className={`bg-discord-sidebar p-1.5 flex items-center space-x-2 border transition-all shadow-2xl border-gray-800 min-h-[56px] ${replyingTo ? 'rounded-b-[32px]' : 'rounded-[32px]'}`}>
              <button onClick={(e) => { e.stopPropagation(); setShowMediaMenu(!showMediaMenu); }} className={`w-10 h-10 rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-vani-blue hover:text-white transition-all ml-1 shrink-0 ${showMediaMenu ? 'bg-vani-blue text-white rotate-45' : ''}`}><Plus size={18} /></button>
              
              <textarea 
-               placeholder={`Secure Transmission to ${channelName}`} 
+               placeholder={`Secure Transmission...`} 
                className="bg-transparent flex-1 focus:outline-none text-gray-200 placeholder-gray-600 py-2.5 text-sm font-medium resize-none max-h-32 min-h-[24px] leading-tight custom-scrollbar" 
                rows={1}
                value={input} 
@@ -438,11 +432,10 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                }} 
                onKeyDown={(e) => { 
                  if (e.key === 'Enter' && !e.shiftKey) { 
-                   const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                   if (!isMobileDevice) {
+                   if (!isMobile) {
                      e.preventDefault(); 
                      if (input.trim()) {
-                       onSendMessage(input); setInput('');
+                       onSendMessage(input, replyingTo?._id); setInput(''); setReplyingTo(null);
                        e.currentTarget.style.height = 'auto';
                      }
                    }
@@ -451,9 +444,9 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              />
 
              <div className="flex items-center space-x-1 pr-2 shrink-0">
-                <div onClick={(e) => { e.stopPropagation(); setShowCustomPicker(!showCustomPicker); }} className="w-9 h-9 flex items-center justify-center cursor-pointer text-gray-500 hover:text-vani-accent transition"><Sparkles size={18} /></div>
+                {!isMobile && <div onClick={(e) => { e.stopPropagation(); setShowCustomPicker(!showCustomPicker); }} className="w-9 h-9 flex items-center justify-center cursor-pointer text-gray-500 hover:text-vani-accent transition"><Sparkles size={18} /></div>}
                 <button 
-                  onClick={() => { if (input.trim()) { onSendMessage(input); setInput(''); const el = document.querySelector('textarea'); if (el) el.style.height = 'auto'; } }}
+                  onClick={() => { if (input.trim()) { onSendMessage(input, replyingTo?._id); setInput(''); setReplyingTo(null); const el = document.querySelector('textarea'); if (el) el.style.height = 'auto'; } }}
                   className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${input.trim() ? 'bg-vani-gradient text-white shadow-lg' : 'text-gray-600 grayscale'}`}
                 >
                    <Send size={16} />
@@ -464,8 +457,133 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">Read-Only Protocol Active</span></div>
         )}
       </div>
-      {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); alert("Sync Sent"); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
+      {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); addToast("Sync Request Buffered", 'success'); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
     </div>
+  );
+};
+
+const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onSever, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge }: any) => {
+  const x = useMotionValue(0);
+  const swipeThreshold = 60;
+  const opacity = useTransform(x, [0, swipeThreshold], [0, 1]);
+  const scale = useTransform(x, [0, swipeThreshold], [0.5, 1.2]);
+
+  return (
+    <motion.div 
+      id={`msg-${msg._id}`}
+      initial={{ opacity: 0, x: -10 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      drag="x"
+      dragConstraints={{ left: 0, right: swipeThreshold + 20 }}
+      dragElastic={0.2}
+      style={{ x, marginTop: isSequence ? 'calc(var(--vani-spacing) * 0.1)' : 'var(--vani-spacing)', marginBottom: hasReactions ? '1rem' : '0' }}
+      onDragEnd={(_, info) => { if (info.offset.x > swipeThreshold) { onReply(); x.set(0); } else { x.set(0); } }}
+      className={`flex space-x-4 group/msg ${isDeleted ? 'opacity-50' : ''} relative transition-colors duration-500 rounded-xl p-1`} 
+      onContextMenu={!isDeleted ? (e) => onContext(e, msg._id, !!isMe) : undefined} 
+      onTouchStart={!isDeleted ? (e) => onLongPressStart(msg._id, !!isMe, e) : undefined} 
+      onTouchEnd={onLongPressEnd}
+    >
+      {/* SWIPE REPLY INDICATOR */}
+      <motion.div style={{ opacity, scale }} className="absolute -left-10 top-1/2 -translate-y-1/2 text-vani-blue">
+         <Reply size={20} />
+      </motion.div>
+
+      {/* FLOATING ACTION BAR (OVERLAY) */}
+      {!isDeleted && !isEditing && (
+        <div className="absolute -top-4 right-0 opacity-0 group-hover/msg:opacity-100 transition-all z-20 flex items-center bg-[#0a0a0c] border border-white/10 rounded-xl shadow-xl overflow-hidden p-0.5 pointer-events-auto">
+           <button 
+             onClick={(e) => { e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); onReact(msg._id, ':matrix:'); }} 
+             className="p-1.5 hover:bg-white/5 text-gray-400 hover:text-vani-blue transition-colors"
+           >
+             <Smile size={14} />
+           </button>
+           <button onClick={onReply} className="p-1.5 hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+             <Reply size={14} />
+           </button>
+           {isMe && (
+             <button onClick={() => onStartEdit(msg)} className="p-1.5 hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+               <Edit3 size={14} />
+             </button>
+           )}
+           <button className="p-1.5 hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+             <MoreVertical size={14} />
+           </button>
+        </div>
+      )}
+
+      {!isSequence ? (
+        <div 
+          onClick={(e) => { 
+            if (isDeleted) return;
+            const rect = e.currentTarget.getBoundingClientRect(); 
+            onViewProfile({ user: msg.sender, position: { x: rect.left + 50, y: Math.min(rect.top, window.innerHeight - 400) } }); 
+          }} 
+          className={`w-9 h-9 rounded-xl bg-gray-800 flex-shrink-0 mt-1 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
+        >
+          <img src={msg.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender?.username || 'deleted'}`} className="w-full h-full object-cover" />
+        </div>
+      ) : <div className="w-9 flex-shrink-0" />}
+        <div className="min-w-0 flex-1 relative">
+           {!isSequence && (
+             <div className="flex items-center space-x-2 mb-0.5">
+               <span style={{ color: roleColor }} className="font-black uppercase tracking-tighter text-[11px] cursor-pointer hover:underline text-white">
+                 {displayName}
+               </span>
+               {msg.sender && renderBadge(msg.sender)}
+               <span className="text-[8px] text-gray-600 font-mono uppercase">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+             </div>
+           )}
+           <div className="text-gray-300 text-sm leading-snug group-hover/msg:bg-white/[0.02] px-2 py-0.5 rounded-lg transition-colors relative whitespace-pre-wrap break-all max-w-full">
+              {isEditing ? (
+             <div className="space-y-2 py-2">
+                <textarea 
+                  className="w-full bg-[#050507] border border-vani-blue/50 p-3 rounded-xl text-white outline-none resize-none" 
+                  rows={2} 
+                  value={editInput} 
+                  onChange={(e) => setEditInput(e.target.value)} 
+                  autoFocus 
+                  onKeyDown={(e) => { 
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onFinishEdit(); } 
+                    if (e.key === 'Escape') setEditingMessageId(null); 
+                  }} 
+                />
+                <div className="text-[8px] font-black uppercase text-gray-500">SHIFT+ENTER for new line • ESC to cancel • ENTER to save</div>
+             </div>
+           ) : (
+             <>
+               {isDeleted ? (
+                 <div className="italic text-[10px] text-gray-600 uppercase tracking-widest py-1 flex items-center gap-2">
+                   <Lock size={10} /> Transmission_Purged_By_Author
+                 </div>
+               ) : (
+                 <>
+                   {msg.content && <div className="markdown-content">{renderContent(msg.content)}</div>}
+                   {renderMedia(msg)}
+                 </>
+               )}
+             </>
+           )}
+           
+           {/* REACTION CHIPS (OVERLAY STYLE) */}
+           {!isEditing && !isDeleted && hasReactions && (
+             <div className="flex flex-wrap gap-1 mt-1 absolute -bottom-4 left-2 z-10 pointer-events-auto">
+               {msg.reactions && Object.entries(msg.reactions).map(([emoji, users]) => users.length > 0 && (
+                 <motion.div 
+                   initial={{ scale: 0.8, opacity: 0 }} 
+                   animate={{ scale: 1, opacity: 1 }}
+                   key={emoji} 
+                   onClick={(e) => { e.stopPropagation(); onReact(msg._id, emoji); }} 
+                   className={`px-1.5 py-0.5 rounded-lg border flex items-center gap-1 cursor-pointer transition-all shadow-lg backdrop-blur-md ${users.includes(currentUser?.id || currentUser?._id || '') ? 'bg-vani-blue/20 border-vani-blue/40 text-white' : 'bg-[#0a0a0c]/80 border-white/10 text-gray-400'}`}
+                 >
+                   {CUSTOM_EMOJI_MAP[emoji] ? (() => {const C=CUSTOM_EMOJI_MAP[emoji]; return <div className="scale-50"><C/></div>;})() : <span className="text-[10px]">{emoji}</span>}
+                   <span className="text-[9px] font-black">{users.length}</span>
+                 </motion.div>
+               ))}
+             </div>
+           )}
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

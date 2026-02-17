@@ -42,8 +42,8 @@ export const ChannelSidebar = ({
          )}
          <div className="relative z-10 flex items-center justify-between w-full">
            <div className="flex flex-col">
-              <h2 className="text-sm font-black text-white uppercase tracking-tighter truncate max-w-[140px] drop-shadow-lg">{realm?.name || 'Loading_Node'}</h2>
-              <div className="text-[8px] font-black text-vani-blue uppercase tracking-[0.2em] drop-shadow-md">{realm?.tier || 'STANDARD'}_REALM</div>
+              <h2 className="text-sm font-black text-white uppercase tracking-tighter truncate max-w-[140px] drop-shadow-lg">{realm?.name || t('ui.loading_node')}</h2>
+              <div className="text-[8px] font-black text-vani-blue uppercase tracking-[0.2em] drop-shadow-md">{(realm?.tier || t('common.standard')).toUpperCase()}_REALM</div>
            </div>
            <div className="flex items-center space-x-2">
               {realm?.owner === (user.id || user._id) && <Settings size={14} className="text-gray-400 group-hover:text-white drop-shadow-md" />}

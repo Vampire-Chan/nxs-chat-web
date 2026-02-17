@@ -16,55 +16,51 @@ export default function FAQPage() {
         </button>
 
         <header className="mb-20">
-          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Vani_Knowledge</h1>
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">{t('faq.title')}</h1>
           <div className="h-1 w-20 bg-vani-gradient rounded-full" />
-          <p className="mt-6 text-gray-500 uppercase text-xs font-bold tracking-widest leading-relaxed">Frequently Asked Protocols & Vani Vani Matrix Queries</p>
+          <p className="mt-6 text-gray-500 uppercase text-xs font-bold tracking-widest leading-relaxed">{t('faq.subtitle')}</p>
         </header>
 
         <div className="space-y-16">
-          <FAQSection title="Identity & Calibration" icon={<User className="text-vani-blue" size={24} />}>
+          <FAQSection title={t('faq.sec_identity')} icon={<User className="text-vani-blue" size={24} />}>
             <FAQItem 
-              q="How do I change my Public Alias?" 
-              a="Navigate to Settings > Identity Hub. You can recalibrate your Public Name (Alias) at any time. Your Identity Handle (username) remains a permanent unique identifier." 
+              q={t('faq.q_alias')} 
+              a={t('faq.a_alias')} 
             />
             <FAQItem 
-              q="Why is my Date of Creation locked?" 
-              a="The Date of Creation (DOB) is a core biological anchor for your node. Once set and saved, it is encrypted and locked to maintain the integrity of your digital lifespan." 
+              q={t('faq.q_dob')} 
+              a={t('faq.a_dob')} 
             />
             <FAQItem 
-              q="What is a 'Private Ghost Node'?" 
-              a="Enabling Private Mode prevents your node from appearing in Yantravani searches and blocks you from broadcasting to the global feed. You can still participate in sovereign Realms." 
-            />
-          </FAQSection>
-
-          <FAQSection title="Realm Sovereignty" icon={<Zap className="text-yellow-400" size={24} />}>
-            <FAQItem 
-              q="What is the difference between a Realm and a Sector?" 
-              a="A Realm is a sovereign community server. A Sector is a specific channel within that Realm (Text, Voice, or Broadcast)." 
-            />
-            <FAQItem 
-              q="How many Realms can I initialize?" 
-              a="Standard nodes can initialize up to 10 sovereign realms. Elite tier nodes have unlimited realm generation capabilities." 
+              q={t('faq.q_ghost')} 
+              a={t('faq.a_ghost')} 
             />
           </FAQSection>
 
-          <FAQSection title="Vani Vani Matrix Transmissions" icon={<Globe className="text-purple-500" size={24} />}>
+          <FAQSection title={t('faq.sec_realm')} icon={<Zap className="text-yellow-400" size={24} />}>
             <FAQItem 
-              q="Who can see my Broadcasts?" 
-              a="If your node is Public, anyone synced with the Vani Vani Matrix can view your transmissions. If you post within a private Sector of a Realm, only members of that realm can access the data." 
+              q={t('faq.q_realm_diff')} 
+              a={t('faq.a_realm_diff')} 
             />
             <FAQItem 
-              q="Supported media formats?" 
-              a="Yantravani currently supports high-resolution images, video streams, and neural voice notes (WebM/WebP/AVIF optimized)." 
+              q={t('faq.q_limit')} 
+              a={t('faq.a_limit')} 
+            />
+          </FAQSection>
+
+          <FAQSection title={t('faq.sec_matrix')} icon={<Globe className="text-purple-500" size={24} />}>
+            <FAQItem 
+              q={t('faq.q_broadcast')} 
+              a={t('faq.a_broadcast')} 
             />
           </FAQSection>
         </div>
 
         <footer className="mt-32 p-10 bg-white/5 rounded-[40px] border border-white/5 text-center">
            <HelpCircle size={40} className="mx-auto mb-6 text-gray-600" />
-           <h3 className="text-xl font-bold uppercase tracking-tighter mb-2">Still Uncalibrated?</h3>
-           <p className="text-gray-500 text-sm mb-8">Reach out to the Architect core or consult the Vani Protocols.</p>
-           <button onClick={() => navigate('/help')} className="px-10 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-vani-blue hover:text-white transition-all">System Protocols</button>
+           <h3 className="text-xl font-bold uppercase tracking-tighter mb-2">{t('faq.footer_title')}</h3>
+           <p className="text-gray-500 text-sm mb-8">{t('faq.footer_desc')}</p>
+           <button onClick={() => navigate('/help')} className="px-10 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-vani-blue hover:text-white transition-all">{t('faq.footer_btn')}</button>
         </footer>
       </div>
     </div>

@@ -17,7 +17,7 @@ const Yantravani_LORE = [
   "Absolute Cinema: Why did the identity go to therapy? Because it had too many multiple personalities in its following list. 🗿💀",
   "Establishing secure P2P audio link...",
   "Establishing trust with remote nodes...",
-  "Yantravani Lore: Created by the Great Architect to bridge Discord and Instagram.",
+  "Yantravani Lore: Created by the Great Architect to bridge structured community and visual discovery.",
 ];
 
 export const LaunchScreen = ({ progress }: Props) => {

@@ -83,6 +83,26 @@ const CornerHeader = ({ label, onToggle, onAdd }: any) => (
   </div>
 );
 
-const ChannelItem = ({ channel, active, onClick, icon }: any) => (
-  <div onClick={onClick} className={`group flex items-center space-x-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'}`}><div className={`${active ? 'text-vani-blue' : 'text-gray-600'}`}>{icon}</div><span className={`text-xs font-bold uppercase tracking-tight ${active ? 'text-white' : ''}`}>{channel.name}</span></div>
+const ChannelItem = ({ channel, active, onClick, icon, membersInVoice }: any) => (
+  <div className="space-y-0.5">
+    <div 
+      onClick={onClick} 
+      className={`group flex items-center space-x-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'}`}
+    >
+      <div className={`${active ? 'text-vani-blue' : 'text-gray-600'}`}>{icon}</div>
+      <span className={`text-xs font-bold uppercase tracking-tight ${active ? 'text-white' : ''}`}>{channel.name}</span>
+    </div>
+    
+    {/* VOICE MEMBERS LIST */}
+    {channel.type === 'voice' && membersInVoice && membersInVoice.length > 0 && (
+      <div className="ml-9 pb-2 space-y-1">
+        {membersInVoice.map((m: any) => (
+          <div key={m._id} className="flex items-center space-x-2 opacity-60">
+            <img src={m.avatar} className="w-4 h-4 rounded-md" />
+            <span className="text-[9px] font-black text-gray-400 uppercase truncate">{m.username}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
 );

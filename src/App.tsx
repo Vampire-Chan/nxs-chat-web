@@ -103,8 +103,21 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showConnPill, setShowConnPill] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [liveStreamers, setLiveStreamers] = useState<IUser[]>([]);
   
   const socketRef = useRef<Socket | null>(null);
+
+  // ... (inside handleAcceptCall)
+  const handleAcceptCall = (type: 'voice' | 'video') => {
+    if (!incomingCall) return;
+    const channel = dms.find(d => d._id === incomingCall.channelId);
+    if (channel) {
+      handleSelectChannel(channel);
+      // Join options: Pass initial video state to voice component
+      setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
+    }
+    setIncomingCall(null);
+  };
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
@@ -490,6 +503,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                   onSelectTag={handleTagSelect} 
                   onRetry={triggerRefresh}
                   isSyncing={isSyncing}
+                  liveStreamers={liveStreamers}
                 />
               ) : (
                 <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>

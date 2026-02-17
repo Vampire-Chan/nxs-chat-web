@@ -1,4 +1,4 @@
-import { Hash, TrendingUp, Users, ArrowUpRight } from 'lucide-react';
+import { Hash, TrendingUp, Users, ArrowUpRight, Radio } from 'lucide-react';
 import type { IPost, IUser } from '../services/api';
 
 interface Props {
@@ -7,9 +7,11 @@ interface Props {
   suggestedUsers: IUser[];
   onSelectTag: (tag: string) => void;
   onSelectUser: (userId: string) => void;
+  liveStreamers?: IUser[];
+  onSelectStream?: (user: IUser) => void;
 }
 
-export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers, onSelectTag, onSelectUser }: Props) => {
+export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers, onSelectTag, onSelectUser, liveStreamers = [], onSelectStream }: Props) => {
   return (
     <div className="hidden lg:flex flex-col bg-discord-channel h-full border-r border-gray-900 w-72">
       {/* Header - Consistent with DMSidebar */}
@@ -24,6 +26,48 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-6 pt-4">
+        {/* LIVE TRANSMISSIONS */}
+        <div className="space-y-1">
+           <div className="px-2 mb-2 flex items-center justify-between">
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live_Transmissions</span>
+              <div className="flex items-center space-x-1.5 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20 animate-pulse">
+                 <div className="w-1 h-1 bg-red-500 rounded-full" />
+                 <span className="text-[7px] font-black text-red-500 uppercase">Live</span>
+              </div>
+           </div>
+           <div className="space-y-0.5">
+              {liveStreamers.map(streamer => (
+                <div 
+                  key={streamer._id}
+                  onClick={() => onSelectStream?.(streamer)}
+                  className="group flex items-center px-2 py-2.5 rounded-xl mx-2 cursor-pointer transition-all bg-vani-blue/5 border border-vani-blue/10 hover:bg-vani-blue/10 hover:border-vani-blue/30"
+                >
+                  <div className="relative mr-3 flex-shrink-0">
+                     <div className="w-10 h-10 rounded-xl overflow-hidden border border-vani-blue/20 p-0.5 ring-2 ring-vani-blue/10">
+                        <img src={streamer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}`} className="w-full h-full object-cover" />
+                     </div>
+                     <div className="absolute -bottom-1 -right-1 bg-red-500 p-1 rounded-lg border-2 border-discord-channel shadow-lg">
+                        <Radio size={8} className="text-white" />
+                     </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                     <div className="font-black text-xs truncate uppercase tracking-tighter text-white">
+                        {streamer.username}
+                     </div>
+                     <div className="text-[8px] text-vani-blue truncate font-mono uppercase tracking-widest">
+                        Broadcasting_Now
+                     </div>
+                  </div>
+                </div>
+              ))}
+              {liveStreamers.length === 0 && (
+                <div className="px-4 py-6 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/5 mx-2">
+                   <div className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Zero Active Streams</div>
+                </div>
+              )}
+           </div>
+        </div>
+
         {/* Trending Tags Section */}
         <div className="space-y-1 px-2">
            <div className="flex items-center space-x-1 mb-2">

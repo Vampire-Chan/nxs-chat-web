@@ -128,12 +128,12 @@ export interface ITransaction {
 
 export interface INotification {
   _id: string;
-  type: 'like' | 'comment' | 'follow' | 'login' | 'system' | 'sync_request';
+  type: 'like' | 'comment' | 'reply' | 'follow' | 'login' | 'mention' | 'system' | 'sync_request';
   content: string;
   sender?: IUser;
   isRead: boolean;
   createdAt: string;
-  metadata?: { postId?: string; deviceName?: string; };
+  metadata?: { postId?: string; channelId?: string; deviceName?: string; };
 }
 
 export const api = {

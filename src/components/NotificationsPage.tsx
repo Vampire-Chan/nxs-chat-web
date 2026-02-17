@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import type { INotification } from '../services/api';
-import { Heart, MessageCircle, UserPlus, ShieldAlert, CheckCircle2, Activity, X } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, ShieldAlert, CheckCircle2, Activity, X, Zap } from 'lucide-react';
 
 export const NotificationsPage = ({ onClose }: { onClose?: () => void }) => {
   const [notifications, setNotifications] = useState<INotification[]>([]);

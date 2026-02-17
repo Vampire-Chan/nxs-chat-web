@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
 import { api } from '../services/api';
-import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, CornerUpRight } from 'lucide-react';
+import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply } from 'lucide-react';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { ProfileMiniCard } from './ProfileMiniCard';

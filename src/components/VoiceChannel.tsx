@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, PhoneOff, Users, Volume2, ShieldCheck, Activity, Video, VideoOff, Monitor, MonitorOff, LayoutGrid } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Users, Activity, Video, VideoOff, Monitor, MonitorOff, LayoutGrid } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import type { IUser } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -52,7 +52,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         const item = peersRef.current.find(p => p.peerID === payload.id);
         item.peer.signal(payload.signal);
       });
-    }).catch(e => addToast("Microphone Access Denied", 'error'));
+    }).catch(() => addToast("Microphone Access Denied", 'error'));
 
     return () => {
       userStream.current?.getTracks().forEach(t => t.stop());
@@ -87,13 +87,6 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         userStream.current?.removeTrack(t);
       });
       setIsVideoOn(false);
-      // Replace track for peers
-      peersRef.current.forEach(({ peer }) => {
-        // SimplePeer handles renegotiation usually, but for simple toggle we might need to just restart stream logic or replaceTrack
-        // For this MVP, we toggle off. A robust impl requires stream replacement.
-        // Assuming SimplePeer replaceTrack support:
-        // peer.replaceTrack(oldTrack, null, userStream.current);
-      });
     } else {
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -114,19 +107,18 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
     if (isScreenSharing) {
       screenStream.current?.getTracks().forEach(t => t.stop());
       setIsScreenSharing(false);
-      // Logic to revert to camera or audio-only
     } else {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         screenStream.current = stream;
         setIsScreenSharing(true);
         if (userVideoRef.current) userVideoRef.current.srcObject = stream;
         
         const screenTrack = stream.getVideoTracks()[0];
-        screenTrack.onended = () => { setIsScreenSharing(false); }; // Handle "Stop Sharing" from browser UI
+        screenTrack.onended = () => { setIsScreenSharing(false); };
 
         peersRef.current.forEach(({ peer }) => {
-          peer.addTrack(screenTrack, userStream.current); // Add as auxiliary track
+          peer.addTrack(screenTrack, userStream.current);
         });
       } catch (e) { addToast("Screen Share Cancelled", 'info'); }
     }
@@ -190,8 +182,8 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       <div className="mt-6 flex justify-center z-20">
          <div className="bg-[#050507]/90 backdrop-blur-xl border border-white/10 p-2 rounded-[32px] flex items-center space-x-3 shadow-2xl">
             <ControlBtn icon={isMuted ? <MicOff size={20} /> : <Mic size={20} />} active={!isMuted} onClick={() => { setIsMuted(!isMuted); toggleMute(); }} variant={isMuted ? 'danger' : 'normal'} />
-            <ControlBtn icon={isVideoOn ? <Video size={20} /> : <VideoOff size={20} />} active={isVideoOn} onClick={toggleVideo} variant={isVideoOn ? 'active' : 'normal'} />
-            <ControlBtn icon={isScreenSharing ? <Monitor size={20} /> : <MonitorOff size={20} />} active={isScreenSharing} onClick={toggleScreenShare} variant={isScreenSharing ? 'active' : 'normal'} />
+            <ControlBtn icon={isVideoOn ? <Video size={20} /> : <VideoOff size={20} />} onClick={toggleVideo} variant={isVideoOn ? 'active' : 'normal'} />
+            <ControlBtn icon={isScreenSharing ? <Monitor size={20} /> : <MonitorOff size={20} />} onClick={toggleScreenShare} variant={isScreenSharing ? 'active' : 'normal'} />
             <div className="w-px h-8 bg-white/10 mx-2" />
             <button onClick={onLeave} className="px-8 py-4 bg-red-500 hover:bg-red-600 text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center space-x-2">
                <PhoneOff size={18} /> <span>Disconnect</span>
@@ -202,7 +194,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   );
 };
 
-const ControlBtn = ({ icon, active, onClick, variant }: any) => {
+const ControlBtn = ({ icon, onClick, variant }: any) => {
   const bg = variant === 'danger' ? 'bg-white/10 text-red-500' : variant === 'active' ? 'bg-vani-blue text-black' : 'bg-white/5 text-gray-400 hover:text-white';
   return (
     <button onClick={onClick} className={`w-14 h-14 rounded-[24px] flex items-center justify-center transition-all hover:scale-110 active:scale-90 ${bg}`}>

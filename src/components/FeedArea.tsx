@@ -362,7 +362,7 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
       </div>
 
       <div className="bg-[#050507] relative overflow-hidden flex items-center justify-center cursor-pointer min-h-[350px] lg:min-h-[500px]" onDoubleClick={!isMe ? onDoubleTap : undefined} onClick={onOpen}>
-         <img src={post.imageUrl} alt="Post" className="w-full object-contain transition-transform duration-1000 group-hover:scale-[1.03]" />
+         <img src={post.imageUrl || ""} alt="Post" className="w-full object-contain transition-transform duration-1000 group-hover:scale-[1.03]" />
          <AnimatePresence>
            {isHearting && (
              <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }} exit={{ scale: 2, opacity: 0 }} className="absolute z-20 pointer-events-none">

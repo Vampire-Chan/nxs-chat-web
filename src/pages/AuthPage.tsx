@@ -153,7 +153,7 @@ export default function AuthPage() {
             <motion.form key="qr" onSubmit={handleVerifyRegistration} className="space-y-8 text-center">
                <h2 className="text-2xl font-black uppercase tracking-tight">{t('auth.security_link')}</h2>
                <div className="p-4 bg-white rounded-[32px] inline-block shadow-2xl">
-                  <img src={qrImage} className="w-48 h-48" />
+                  {qrImage ? <img src={qrImage} className="w-48 h-48" /> : <div className="w-48 h-48 bg-gray-200 animate-pulse rounded-2xl" />}
                </div>
                
                <div className="space-y-4 px-4 text-center">

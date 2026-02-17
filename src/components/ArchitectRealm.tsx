@@ -79,7 +79,7 @@ export const ArchitectRealm = () => {
                  <div className="grid grid-cols-1 gap-4">
                     {broadcasts.filter(b => b.caption.toLowerCase().includes(searchTerm.toLowerCase())).map((b) => (
                       <div key={b._id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between group">
-                         <div className="flex items-center space-x-6"><img src={b.imageUrl} className="w-16 h-16 rounded-2xl object-cover border border-white/5" /><div><div className="text-xs font-black text-white uppercase tracking-tight">{b.caption}</div><div className="text-[9px] font-black text-vani-blue uppercase mt-1">Author: {b.author.username}</div></div></div>
+                         <div className="flex items-center space-x-6"><img src={b.imageUrl || undefined} className="w-16 h-16 rounded-2xl object-cover border border-white/5" /><div><div className="text-xs font-black text-white uppercase tracking-tight">{b.caption}</div><div className="text-[9px] font-black text-vani-blue uppercase mt-1">Author: {b.author.username}</div></div></div>
                          <button onClick={() => api.severBroadcast(b._id).then(loadAll)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
                       </div>
                     ))}

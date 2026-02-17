@@ -170,7 +170,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
               <div className="w-full h-full flex flex-col items-center justify-center bg-discord-dark">
                  <div className="relative">
                     <AnimatePresence>{!isMuted && <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.2, 1], opacity: [0, 0.3, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-[-20px] rounded-full border-2 border-vani-blue/30 pointer-events-none" />}</AnimatePresence>
-                    <img src={currentUser.avatar} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl" />
+                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username || 'anon'}`} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl" />
                     <div className="absolute -bottom-2 -right-2 bg-vani-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-gray-800 shadow-xl">
                        {isMuted ? <MicOff size={14} className="text-white" /> : <Mic size={14} className="text-white" />}
                     </div>

@@ -25,7 +25,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -100,6 +100,9 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [matrixRefreshKey, setMatrixRefreshKey] = useState(0);
   const [activeMedia, setActiveMedia] = useState<{ type: 'image' | 'video' | 'audio', url: string } | null>(null);
   const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showConnPill, setShowConnPill] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
 
@@ -108,6 +111,30 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
   const [sidebarWidth, setSidebarWidth] = useState(savedState.sidebarWidth || 240);
   const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => { setIsOnline(true); setShowConnPill(true); setTimeout(() => setShowConnPill(false), 3000); };
+    const handleOffline = () => { setIsOnline(false); setShowConnPill(true); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // BROWSER NOTIFICATION PERMISSION
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+  }, []);
+
+  const sendLocalNotification = (title: string, body: string, icon?: string) => {
+    if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+      new Notification(title, {
+        body,
+        icon: icon || '/nexus.svg',
+        tag: 'yantravani-sync'
+      });
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -175,7 +202,10 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     const s = io(socketUrl, { 
       auth: { token: token },
-      query: { userId: userId } 
+      query: { userId: userId },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000
     });
 
     socketRef.current = s;
@@ -183,6 +213,12 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     s.on('receive_message', (msg: any) => { 
       if (msg.channel === activeChannel?._id || msg.channel?._id === activeChannel?._id) {
         setMessages(prev => [...prev, msg]); 
+      } else {
+        // Tab is backgrounded or in another channel
+        sendLocalNotification(
+          `New signal from ${msg.sender.username}`,
+          msg.content || "Incoming Visual Data"
+        );
       }
       loadDMs();
       setMatrixRefreshKey(k => k + 1); 
@@ -190,6 +226,10 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     s.on('incoming_call', (data: any) => {
       setIncomingCall(data);
+      sendLocalNotification(
+        `Incoming ${data.type} call`,
+        `${data.sender.username} is establishing a link...`
+      );
     });
     
     s.on('identity_sync_update', async () => {
@@ -213,8 +253,16 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     return () => { s.disconnect(); };
   }, []);
 
-  const loadRealms = async () => { try { const d = await api.getMyRealms(); setRealms(d); } catch(e){} };
-  const loadDMs = async () => { try { const d = await api.getMyDMs(); setDms(d); } catch(e){} };
+  const loadRealms = async () => { 
+    setIsSyncing(true);
+    try { const d = await api.getMyRealms(); setRealms(d); } catch(e){} 
+    finally { setIsSyncing(false); }
+  };
+  const loadDMs = async () => { 
+    setIsSyncing(true);
+    try { const d = await api.getMyDMs(); setDms(d); } catch(e){} 
+    finally { setIsSyncing(false); }
+  };
 
   const handleSelectRealm = async (realm: IRealm | { _id: string }) => {
     setViewingUserId(null); if (isMobile) setIsSidebarOpen(false);
@@ -268,6 +316,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { addToast("Link Init Failed", 'error'); } };
   const handleTagSelect = async (tag: string | null) => { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(tag || undefined); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); };
 
+  const triggerRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      if (viewMode === 'explore') {
+        const d = await api.getGlobalPosts();
+        setPosts(d);
+      } else if (activeChannel) {
+        const ps = await api.getPosts(activeChannel._id);
+        setPosts(ps);
+      }
+      await Promise.all([loadDMs(), loadRealms()]);
+    } catch (e) {
+      addToast("Sync failed", 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'profile';
   const showDmsAsMain = isMobile && viewMode === 'home' && !activeChannel;
   const hideHamburger = (viewMode === 'home' && !activeChannel) || viewMode === 'profile' || viewMode === 'social' || viewMode === 'explore' || viewMode === 'view-profile' || activeChannel?.type === 'feed' || activeChannel?.type === 'reels';
@@ -282,6 +348,15 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       )}
 
       <AnimatePresence>
+        {showConnPill && (
+          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[6000] w-fit pointer-events-none">
+             <div className={`backdrop-blur-2xl border px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 ${isOnline ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
+                <span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? 'Back_Online' : 'Connection_Lost'}</span>
+             </div>
+          </motion.div>
+        )}
+
         {incomingCall && (
           <motion.div 
             initial={{ y: -100, x: '-50%', opacity: 0 }}
@@ -343,7 +418,28 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             >
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isMobile && <div className="h-16 flex items-center justify-between px-4 bg-discord-sidebar border-b border-white/5"><span className="text-[10px] font-black uppercase text-white tracking-widest">{t('common.navigator')}</span><button onClick={() => setIsSidebarOpen(false)}><X size={18} /></button></div>}
-                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} />}
+                {viewMode === 'home' ? (
+                  <DMSidebar 
+                    dms={dms} 
+                    selectedDmId={activeChannel?._id || null} 
+                    onSelectDm={handleSelectChannel} 
+                    user={user} 
+                    onlineUserIds={onlineUserIds} 
+                    onInitGroup={() => setShowGroupDMModal(true)} 
+                    onRetry={loadDMs}
+                    isSyncing={isSyncing}
+                  />
+                ) : (
+                  <ChannelSidebar 
+                    realm={activeRealm} 
+                    channels={activeRealm?.channels || []} 
+                    selectedChannelId={activeChannel?._id || null} 
+                    onSelectChannel={handleSelectChannel} 
+                    user={user!} 
+                    onAddChannel={() => setShowChannelModal(true)} 
+                    onSettings={() => setShowRealmSettings(true)} 
+                  />
+                )}
               </div>
               {!isMobile && <div onMouseDown={startResizing} className="absolute top-0 -right-0.5 w-1 h-full cursor-col-resize z-40 hover:bg-vani-blue/30 transition-colors" />}
             </motion.div>
@@ -384,7 +480,17 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                   }}
                 />
               ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
-                <FeedArea key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} />
+                <FeedArea 
+                  key="feed" 
+                  posts={posts} 
+                  onOpenCreateModal={() => setShowPostModal(true)} 
+                  currentUser={user!} 
+                  channelId={activeChannel?._id || 'global'} 
+                  onViewProfile={handleViewOtherProfile} 
+                  onSelectTag={handleTagSelect} 
+                  onRetry={triggerRefresh}
+                  isSyncing={isSyncing}
+                />
               ) : (
                 <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>
               )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser, IRealm } from '../services/api';
-import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users, Hash, X, Send } from 'lucide-react';
+import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users, Hash, X, Send, WifiOff, RefreshCcw } from 'lucide-react';
 import { ExploreLeftSidebar } from './ExploreLeftSidebar';
 import { ExploreRightSidebar } from './ExploreRightSidebar';
 import { getIdentityName } from '../services/identity';
@@ -24,6 +24,8 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
   const [showHeart, setShowHeart] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState(false);
   
   // Explore States
   const [trendingTags, setTrendingTags] = useState<string[]>([]);
@@ -56,16 +58,25 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
 
   // Refresh mechanism for the sidebar
   const triggerRefresh = async () => {
-    if (isGlobal) {
-      const ps = await api.getGlobalPosts(activeTag || undefined);
-      setPosts(ps);
-      if (selectedPost) {
-        const updated = ps.find(p => p._id === selectedPost._id);
-        if (updated) setSelectedPost(updated);
+    setIsSyncing(true);
+    setSyncError(false);
+    try {
+      if (isGlobal) {
+        const ps = await api.getGlobalPosts(activeTag || undefined);
+        setPosts(ps);
+        if (selectedPost) {
+          const updated = ps.find(p => p._id === selectedPost._id);
+          if (updated) setSelectedPost(updated);
+        }
+      } else {
+        const ps = await api.getPosts(channelId!);
+        setPosts(ps);
       }
-    } else {
-      const ps = await api.getPosts(channelId!);
-      setPosts(ps);
+    } catch (err) {
+      setSyncError(true);
+      addToast("Matrix Sync Interrupted", 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -129,77 +140,99 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
       )}
 
       <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-4 md:p-6 lg:px-12">
-        {activeTag && (
-          <div className="max-w-2xl mx-auto w-full mb-6 flex items-center justify-between bg-vani-blue/10 border border-vani-blue/30 p-4 rounded-2xl animate-in fade-in slide-in-from-top-4">
-             <div className="flex items-center space-x-3">
-                <Hash className="text-vani-blue" size={20} />
-                <span className="text-sm font-black text-white uppercase tracking-widest">Signal_Filter: #{activeTag}</span>
+        {syncError ? (
+          <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+             <div className="w-20 h-20 bg-red-500/10 rounded-[32px] flex items-center justify-center border border-red-500/20">
+                <WifiOff className="text-red-500" size={32} />
              </div>
-             <button onClick={() => handleTagSelect(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={18} /></button>
+             <div className="text-center">
+                <h3 className="text-white font-black uppercase tracking-widest">Link_Severed</h3>
+                <p className="text-gray-500 text-[10px] uppercase font-mono mt-2">Error_Code: 501 // Connection_Loss</p>
+             </div>
+             <button 
+               onClick={triggerRefresh}
+               className="px-8 py-3 bg-white/5 hover:bg-vani-blue hover:text-black text-white rounded-xl font-black uppercase text-[10px] border border-white/10 transition-all flex items-center space-x-3"
+             >
+                <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                <span>Retry Sync</span>
+             </button>
           </div>
+        ) : (
+          <>
+            {activeTag && (
+              <div className="max-w-2xl mx-auto w-full mb-6 flex items-center justify-between bg-vani-blue/10 border border-vani-blue/30 p-4 rounded-2xl animate-in fade-in slide-in-from-top-4">
+                 <div className="flex items-center space-x-3">
+                    <Hash className="text-vani-blue" size={20} />
+                    <span className="text-sm font-black text-white uppercase tracking-widest">Signal_Filter: #{activeTag}</span>
+                 </div>
+                 <button onClick={() => handleTagSelect(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={18} /></button>
+              </div>
+            )}
+
+            {isGlobal && !activeTag && suggestedUsers.length > 0 && (
+              <div className="max-w-2xl mx-auto w-full mb-12">
+                 <div className="flex items-center justify-between mb-4 px-2">
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Suggested_Identities</span>
+                    <button className="text-[9px] font-black text-vani-blue uppercase tracking-widest hover:text-white transition-colors">See_All</button>
+                 </div>
+                 <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-4 -mx-2 px-2 mask-fade-edges">
+                    {suggestedUsers.map((user) => (
+                      <motion.div 
+                        key={user._id}
+                        whileHover={{ y: -5 }}
+                        className="flex-shrink-0 w-32 bg-discord-channel border border-white/5 rounded-3xl p-4 flex flex-col items-center text-center group cursor-pointer hover:border-vani-blue/30 transition-all shadow-xl"
+                      >
+                         <div className="w-16 h-16 rounded-2xl bg-vani-gradient p-0.5 mb-3 shadow-lg group-hover:scale-110 transition-transform">
+                            <div className="w-full h-full rounded-[14px] overflow-hidden bg-discord-dark">
+                               <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+                            </div>
+                         </div>
+                         <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{user.displayName || user.username}</span>
+                         <span className="text-[8px] text-gray-600 font-mono truncate w-full mb-3">@{user.username}</span>
+                         <button 
+                           onClick={(e) => { e.stopPropagation(); handleSyncActionFromUser(user); }}
+                           className="w-full py-1.5 bg-white/5 hover:bg-vani-blue text-white hover:text-black rounded-xl text-[8px] font-black uppercase tracking-widest border border-white/5 hover:border-vani-blue transition-all"
+                         >
+                           Sync
+                         </button>
+                      </motion.div>
+                    ))}
+                 </div>
+              </div>
+            )}
+
+            <div className="max-w-2xl mx-auto w-full mb-10">
+               {canPost && showBar && (
+                 <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
+                    <div className="w-10 h-10 rounded-xl bg-vani-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
+                    <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
+                      {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
+                    </div>
+                    <div className="p-2 text-vani-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-vani-blue">Share</span></div>
+                 </div>
+               )}
+            </div>
+
+            <div className="max-w-2xl mx-auto w-full space-y-12 md:space-y-16 pb-40 lg:pb-20">
+              {posts.map((post) => (
+                <PostCard 
+                  key={post._id} 
+                  post={post} 
+                  currentUser={currentUser} 
+                  onDoubleTap={() => handleDoubleTap(post._id)} 
+                  isHearting={showHeart === post._id} 
+                  onOpen={() => setSelectedPost(post)} 
+                  isGlobal={isGlobal} 
+                  isActive={selectedPost?._id === post._id}
+                  onSelectTag={handleTagSelect}
+                  onViewProfile={onViewProfile}
+                />
+              ))}
+              {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-vani-blue font-black text-xl mb-2 opacity-20 uppercase">No Data Found</div></div>}
+            </div>
+          </>
         )}
-
-        {isGlobal && !activeTag && suggestedUsers.length > 0 && (
-          <div className="max-w-2xl mx-auto w-full mb-12">
-             <div className="flex items-center justify-between mb-4 px-2">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Suggested_Identities</span>
-                <button className="text-[9px] font-black text-vani-blue uppercase tracking-widest hover:text-white transition-colors">See_All</button>
-             </div>
-             <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-4 -mx-2 px-2 mask-fade-edges">
-                {suggestedUsers.map((user) => (
-                  <motion.div 
-                    key={user._id}
-                    whileHover={{ y: -5 }}
-                    className="flex-shrink-0 w-32 bg-discord-channel border border-white/5 rounded-3xl p-4 flex flex-col items-center text-center group cursor-pointer hover:border-vani-blue/30 transition-all shadow-xl"
-                  >
-                     <div className="w-16 h-16 rounded-2xl bg-vani-gradient p-0.5 mb-3 shadow-lg group-hover:scale-110 transition-transform">
-                        <div className="w-full h-full rounded-[14px] overflow-hidden bg-discord-dark">
-                           <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
-                        </div>
-                     </div>
-                     <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{user.displayName || user.username}</span>
-                     <span className="text-[8px] text-gray-600 font-mono truncate w-full mb-3">@{user.username}</span>
-                     <button 
-                       onClick={(e) => { e.stopPropagation(); handleSyncActionFromUser(user); }}
-                       className="w-full py-1.5 bg-white/5 hover:bg-vani-blue text-white hover:text-black rounded-xl text-[8px] font-black uppercase tracking-widest border border-white/5 hover:border-vani-blue transition-all"
-                     >
-                       Sync
-                     </button>
-                  </motion.div>
-                ))}
-             </div>
-          </div>
-        )}
-
-        <div className="max-w-2xl mx-auto w-full mb-10">
-           {canPost && showBar && (
-             <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
-                <div className="w-10 h-10 rounded-xl bg-vani-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
-                <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
-                  {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
-                </div>
-                <div className="p-2 text-vani-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-vani-blue">Share</span></div>
-             </div>
-           )}
-        </div>
-
-        <div className="max-w-2xl mx-auto w-full space-y-12 md:space-y-16 pb-40 lg:pb-20">
-          {posts.map((post) => (
-            <PostCard 
-              key={post._id} 
-              post={post} 
-              currentUser={currentUser} 
-              onDoubleTap={() => handleDoubleTap(post._id)} 
-              isHearting={showHeart === post._id} 
-              onOpen={() => setSelectedPost(post)} 
-              isGlobal={isGlobal} 
-              isActive={selectedPost?._id === post._id}
-              onSelectTag={handleTagSelect}
-              onViewProfile={onViewProfile}
-            />
-          ))}
-          {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-vani-blue font-black text-xl mb-2 opacity-20 uppercase">No Data Found</div></div>}
-        </div>
+      </div>
 
         {/* MODAL OVERLAY: Only on Mobile/Tablet OR if not in Global Matrix (no sidebar) */}
         {selectedPost && (window.innerWidth < 1280 || !isGlobal) && (

@@ -1,4 +1,4 @@
-import { CheckCircle2, Users, BellOff, XCircle } from 'lucide-react';
+import { CheckCircle2, Users, BellOff, XCircle, WifiOff, RefreshCcw } from 'lucide-react';
 import type { IChannel, IUser } from '../services/api';
 import { api } from '../services/api';
 import { useState } from 'react';
@@ -11,46 +11,36 @@ interface Props {
   user: IUser | null;
   onlineUserIds: Set<string>;
   onInitGroup?: () => void;
+  onRetry?: () => void;
+  isSyncing?: boolean;
 }
 
-export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, onInitGroup }: Props) => {
+export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, onInitGroup, onRetry, isSyncing }: Props) => {
   const [menu, setMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
-
-  const handleContextMenu = (e: React.MouseEvent, dmId: string) => {
-    e.preventDefault();
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        { label: 'Sync as Read', icon: <CheckCircle2 size={14} />, onClick: () => api.markChannelRead(dmId).then(() => window.location.reload()) },
-        { label: 'Mark as Unread', icon: <BellOff size={14} />, onClick: () => api.markChannelUnread(dmId).then(() => window.location.reload()) },
-        { label: 'Close Link', icon: <XCircle size={14} />, variant: 'danger' as const, onClick: () => {
-            if(window.confirm("Sever this identity link?")) {
-              api.closeDM(dmId).then(() => window.location.reload());
-            }
-        }}
-      ]
-    });
-  };
-
-  const activeDms = dms
-    .filter(d => d.type === 'dm' || d.type === 'group_dm')
-    .sort((a, b) => new Date((b as any).lastMessageAt || 0).getTime() - new Date((a as any).lastMessageAt || 0).getTime());
-
+  // ... rest of component
+  
+  // (In the return block)
   return (
     <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-gray-900">
-      <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm">
-         <div className="flex flex-col">
-            <span className="font-black text-white uppercase tracking-widest text-[10px]">Neural Links</span>
-            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Secure_Layer_Active</span>
-         </div>
-         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-vani-blue/20 hover:text-vani-blue rounded-xl transition-all border border-white/5 group" title="Initialize Group">
-            <Users size={16} className="group-hover:scale-110 transition-transform" />
-         </button>
-      </div>
-
+      {/* ... header */}
       <div className="p-2 space-y-0.5 overflow-y-auto flex-1 custom-scrollbar">
-        {activeDms.map(dm => {
+        {dms.length === 0 && !navigator.onLine ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 h-full space-y-4">
+             <WifiOff size={24} className="text-gray-700" />
+             <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest text-center">Neural_Link_Lost</p>
+             <button onClick={onRetry} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all">
+                <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
+             </button>
+          </div>
+        ) : (
+          activeDms.map(dm => {
+            // ... existing dm mapping
+          })
+        )}
+      </div>
+    </div>
+  );
+};
           const isGroup = dm.type === 'group_dm';
           // RE-CALIBRATED USER RESOLUTION: Always look in members array first
           const otherUser = !isGroup ? dm.members?.find(m => (m._id || m.id).toString() !== (user?.id || user?._id)?.toString()) : null;

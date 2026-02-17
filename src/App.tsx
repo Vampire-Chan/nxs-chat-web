@@ -25,7 +25,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff, Heart, MessageCircle, Users, Send } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -104,6 +104,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [showConnPill, setShowConnPill] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveStreamers, setLiveStreamers] = useState<IUser[]>([]);
+  const [liveSignal, setLiveSignal] = useState<any>(null);
   
   const socketRef = useRef<Socket | null>(null);
 
@@ -223,11 +224,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     socketRef.current = s;
 
+    s.on('new_notification', (notif: any) => {
+      setLiveSignal(notif);
+      setTimeout(() => setLiveSignal(null), 5000);
+    });
+
     s.on('receive_message', (msg: any) => { 
       if (msg.channel === activeChannel?._id || msg.channel?._id === activeChannel?._id) {
         setMessages(prev => [...prev, msg]); 
       } else {
-        // Tab is backgrounded or in another channel
+        // Show Samsung-style pill for in-app msg
+        setLiveSignal({
+          sender: msg.sender,
+          content: msg.content || "Incoming Transmission...",
+          type: 'message'
+        });
+        setTimeout(() => setLiveSignal(null), 5000);
+
+        // Browser level fallback
         sendLocalNotification(
           `New signal from ${msg.sender.username}`,
           msg.content || "Incoming Visual Data"
@@ -394,6 +408,36 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                    {incomingCall.type === 'video' && (
                      <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>
                    )}
+                </div>
+             </div>
+          </motion.div>
+        )}
+
+        {liveSignal && (
+          <motion.div 
+            initial={{ y: -100, x: '-50%', opacity: 0 }}
+            animate={{ y: 20, x: '-50%', opacity: 1 }}
+            exit={{ y: -100, x: '-50%', opacity: 0 }}
+            className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer"
+            onClick={() => setLiveSignal(null)}
+          >
+             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]">
+                <div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                   <img src={liveSignal.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${liveSignal.sender?.username}`} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                   <span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">
+                      {liveSignal.sender?.username || 'SYSTEM'}
+                   </span>
+                   <span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">
+                      {liveSignal.content}
+                   </span>
+                </div>
+                <div className="shrink-0 ml-2">
+                   {liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}
+                   {liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}
+                   {liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}
+                   {liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}
                 </div>
              </div>
           </motion.div>

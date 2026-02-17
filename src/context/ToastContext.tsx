@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 

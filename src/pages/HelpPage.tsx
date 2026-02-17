@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Book, Server, Globe, Shield, User, HelpCircle, Info, Zap, Terminal, Layout, MessageSquare, Newspaper, Hash } from 'lucide-react';
+import { ArrowLeft, Server, Globe, HelpCircle, Info, Zap, Terminal, Layout, MessageSquare, Newspaper } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../context/LanguageContext';
 

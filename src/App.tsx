@@ -24,7 +24,7 @@ import { LogoutModal } from './components/LogoutModal';
 import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
-import { AnimatePresence, motion, PanInfo } from 'framer-motion';
+import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { Menu, X, Search as SearchIcon, MessageSquare } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
@@ -136,7 +136,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     };
   }, [resize, stopResizing]);
 
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (!isMobile) return;
     const threshold = 50;
     if (info.offset.x > threshold && !isSidebarOpen) setIsSidebarOpen(true);

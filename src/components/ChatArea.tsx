@@ -342,7 +342,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
            const displayName = getDisplayName(msg.sender);
            const roleColor = msg.sender ? getRoleColor(msg.sender) : '#666666';
            const isEditing = editingMessageId === msg._id;
-           const hasReactions = msg.reactions && Object.values(msg.reactions).some(u => u.length > 0);
+           const hasReactions = msg.reactions && Object.values(msg.reactions).some((u: any) => u.length > 0);
 
            return (
              <div key={msg._id || i} className="relative group/msg-outer">
@@ -373,7 +373,6 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                  activeRealm={activeRealm}
                  onReact={handleReact}
                  onStartEdit={handleStartEdit}
-                 onSever={handleSeverMessage}
                  onContext={onMessageContextMenu}
                  onLongPressStart={handleLongPressStart}
                  onLongPressEnd={handleLongPressEnd}
@@ -462,7 +461,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   );
 };
 
-const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onSever, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge }: any) => {
+const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge }: any) => {
   const x = useMotionValue(0);
   const swipeThreshold = 60;
   const opacity = useTransform(x, [0, swipeThreshold], [0, 1]);
@@ -492,7 +491,7 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
       {!isDeleted && !isEditing && (
         <div className="absolute -top-4 right-0 opacity-0 group-hover/msg:opacity-100 transition-all z-20 flex items-center bg-[#0a0a0c] border border-white/10 rounded-xl shadow-xl overflow-hidden p-0.5 pointer-events-auto">
            <button 
-             onClick={(e) => { e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); onReact(msg._id, ':matrix:'); }} 
+             onClick={(e) => { e.stopPropagation(); onReact(msg._id, ':matrix:'); }} 
              className="p-1.5 hover:bg-white/5 text-gray-400 hover:text-vani-blue transition-colors"
            >
              <Smile size={14} />
@@ -567,7 +566,7 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
            {/* REACTION CHIPS (OVERLAY STYLE) */}
            {!isEditing && !isDeleted && hasReactions && (
              <div className="flex flex-wrap gap-1 mt-1 absolute -bottom-4 left-2 z-10 pointer-events-auto">
-               {msg.reactions && Object.entries(msg.reactions).map(([emoji, users]) => users.length > 0 && (
+               {msg.reactions && Object.entries(msg.reactions).map(([emoji, users]: [string, any]) => users.length > 0 && (
                  <motion.div 
                    initial={{ scale: 0.8, opacity: 0 }} 
                    animate={{ scale: 1, opacity: 1 }}

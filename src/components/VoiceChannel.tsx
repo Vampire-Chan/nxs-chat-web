@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
-import { Mic, MicOff, PhoneOff, Users, Activity, Video, VideoOff, Monitor, MonitorOff, LayoutGrid, Minimize2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Users, Activity, Video, VideoOff, Monitor, MonitorOff, LayoutGrid, Minimize2, ZoomIn, ZoomOut, Settings, Camera, Volume2, X } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import Peer from 'simple-peer';
 import type { IUser } from '../services/api';
@@ -23,18 +23,96 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   const [layoutMode, setLayoutGrid] = useState<'grid' | 'focus'>('grid');
   const [micIntensity, setMicIntensity] = useState(0);
   
+  // HARDWARE STATES
+  const [showHardwareModal, setShowHardwareModal] = useState(false);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMic, setSelectedMic] = useState<string>('');
+  const [selectedCamera, setSelectedCamera] = useState<string>('');
+  const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
+
   const peersRef = useRef<any[]>([]);
   const userStream = useRef<MediaStream | null>(null);
   const userVideoRef = useRef<HTMLVideoElement>(null);
   const screenStream = useRef<MediaStream | null>(null);
   const localAudioCtx = useRef<AudioContext | null>(null);
 
+  const fetchDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputs(devices.filter(d => d.kind === 'audioinput'));
+      setVideoInputs(devices.filter(d => d.kind === 'videoinput'));
+      setAudioOutputs(devices.filter(d => d.kind === 'audiooutput'));
+    } catch (e) { console.error("Device enumeration failed", e); }
+  }, []);
+
+  const switchMic = async (deviceId: string) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } });
+      const newTrack = stream.getAudioTracks()[0];
+      const oldTrack = userStream.current?.getAudioTracks()[0];
+      
+      if (oldTrack && userStream.current) {
+        userStream.current.removeTrack(oldTrack);
+        oldTrack.stop();
+        userStream.current.addTrack(newTrack);
+        
+        peersRef.current.forEach(({ peer }) => {
+          peer.replaceTrack(oldTrack, newTrack, userStream.current);
+        });
+        setSelectedMic(deviceId);
+      }
+    } catch (e) { addToast("Mic Calibration Failed", 'error'); }
+  };
+
+  const switchCamera = async (deviceId: string) => {
+    if (!isVideoOn) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
+      const newTrack = stream.getVideoTracks()[0];
+      const oldTrack = userStream.current?.getVideoTracks()[0];
+      
+      if (oldTrack && userStream.current) {
+        userStream.current.removeTrack(oldTrack);
+        oldTrack.stop();
+        userStream.current.addTrack(newTrack);
+        
+        if (userVideoRef.current) userVideoRef.current.srcObject = userStream.current;
+        
+        peersRef.current.forEach(({ peer }) => {
+          peer.replaceTrack(oldTrack, newTrack, userStream.current);
+        });
+        setSelectedCamera(deviceId);
+      }
+    } catch (e) { addToast("Camera Calibration Failed", 'error'); }
+  };
+
+  const switchSpeaker = async (deviceId: string) => {
+    // Note: setSinkId is not supported in all browsers (mostly Chromium)
+    const elements = document.querySelectorAll('video, audio');
+    elements.forEach((el: any) => {
+      if (el.setSinkId) {
+        el.setSinkId(deviceId).catch((err: any) => console.error(err));
+      }
+    });
+    setSelectedSpeaker(deviceId);
+    addToast("Audio Output Routed", 'success');
+  };
+
   const initMedia = useCallback(async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: !!initialVideo });
       userStream.current = s;
       if (userVideoRef.current) userVideoRef.current.srcObject = s;
+      
+      await fetchDevices();
+      const audioTrack = s.getAudioTracks()[0];
+      const videoTrack = s.getVideoTracks()[0];
+      if (audioTrack) setSelectedMic(audioTrack.getSettings().deviceId || '');
+      if (videoTrack) setSelectedCamera(videoTrack.getSettings().deviceId || '');
 
+      // MIC INTENSITY TRACKING
       try {
         const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
         const ctx = new AudioCtx();
@@ -254,10 +332,71 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
             <ControlBtn icon={isMuted ? <MicOff size={20} /> : <Mic size={20} />} active={!isMuted} onClick={() => handleControlClick(toggleMute)} variant={isMuted ? 'danger' : 'normal'} />
             <ControlBtn icon={isVideoOn ? <Video size={20} /> : <VideoOff size={20} />} active={isVideoOn} onClick={() => handleControlClick(toggleVideo)} variant={isVideoOn ? 'active' : 'normal'} />
             <ControlBtn icon={isScreenSharing ? <Monitor size={20} /> : <MonitorOff size={20} />} active={isScreenSharing} onClick={() => handleControlClick(toggleScreenShare)} variant={isScreenSharing ? 'active' : 'normal'} />
+            <ControlBtn icon={<Settings size={20} />} onClick={() => { fetchDevices(); setShowHardwareModal(true); }} variant="normal" />
             <div className="w-px h-8 bg-white/10 mx-2" />
             <button onClick={onLeave} className="px-8 py-4 bg-red-500/80 hover:bg-red-600 text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center space-x-2"><PhoneOff size={18} /> <span>Sever Link</span></button>
          </div>
       </div>
+
+      <AnimatePresence>
+        {showHardwareModal && (
+          <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl" onClick={() => setShowHardwareModal(false)}>
+             <motion.div 
+               initial={{ scale: 0.9, opacity: 0 }} 
+               animate={{ scale: 1, opacity: 1 }} 
+               exit={{ scale: 0.9, opacity: 0 }}
+               onClick={(e) => e.stopPropagation()}
+               className="bg-[#0a0a0c] border border-white/5 w-full max-w-md rounded-[48px] p-8 lg:p-10 shadow-2xl"
+             >
+                <div className="flex items-center justify-between mb-8">
+                   <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-3"><Settings className="text-vani-blue" size={28} /> Hardware_CFG</h2>
+                   <button onClick={() => setShowHardwareModal(false)} className="p-2 bg-white/5 rounded-xl text-gray-500 hover:text-white"><X size={20} /></button>
+                </div>
+
+                <div className="space-y-8">
+                   {/* MICROPHONE */}
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Mic size={14} className="text-vani-blue" /> Input_Node (Mic)</label>
+                      <select 
+                        value={selectedMic}
+                        onChange={(e) => switchMic(e.target.value)}
+                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                      >
+                         {audioInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}`}</option>)}
+                      </select>
+                   </div>
+
+                   {/* CAMERA */}
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Camera size={14} className="text-pink-400" /> Visual_Sensor (Cam)</label>
+                      <select 
+                        value={selectedCamera}
+                        onChange={(e) => switchCamera(e.target.value)}
+                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                      >
+                         {videoInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 5)}`}</option>)}
+                      </select>
+                   </div>
+
+                   {/* SPEAKER */}
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Volume2 size={14} className="text-green-400" /> Output_Link (Speaker)</label>
+                      <select 
+                        value={selectedSpeaker}
+                        onChange={(e) => switchSpeaker(e.target.value)}
+                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                      >
+                         <option value="">System Default</option>
+                         {audioOutputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Speaker ${d.deviceId.slice(0, 5)}`}</option>)}
+                      </select>
+                   </div>
+                </div>
+
+                <button onClick={() => setShowHardwareModal(false)} className="w-full mt-10 bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase tracking-widest text-xs shadow-2xl">Finalize Calibration</button>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

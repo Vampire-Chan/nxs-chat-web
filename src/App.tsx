@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
+import axios from 'axios';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { ToastProvider, useToast } from './context/ToastContext';
-import { api } from './services/api';
+import { api, API_URL } from './services/api';
 import type { IRealm, IChannel, IMessage, IPost, IUser } from './services/api';
 import { TopNavbar as CoreDock } from './components/RealmSidebar';
 import { ChannelSidebar } from './components/ChannelSidebar';
@@ -19,6 +20,7 @@ import { SearchModal } from './components/SearchModal';
 import { LaunchScreen } from './components/LaunchScreen';
 import { SocialCorner } from './components/SocialCorner';
 import { CreateRealmModal, CreatePostModal, CreateChannelModal, CreateGroupDMModal, RealmSettingsModal, GroupSettingsModal } from './components/Modals';
+import { PostViewerModal } from './components/PostViewerModal';
 import { UserSettingsModal as IdentitySettingsModal } from './components/UserSettingsModal';
 import { LogoutModal } from './components/LogoutModal';
 import { ArchitectRealm } from './components/ArchitectRealm';
@@ -68,11 +70,16 @@ function AppContent() {
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/guidelines" element={<GuidelinesPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/app" /> : <AuthPage />} />
+      
+      {/* LEGACY REDIRECTS */}
+      <Route path="/join/:code" element={<Navigate to="/app/join/:code" replace />} />
 
       {/* APP ROUTES (PROTECTED) */}
       <Route path="/app" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/id/:username" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/join/:code" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
+      <Route path="/app/post/:postId" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
+      <Route path="/app/msg/:channelId/:msgId" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
@@ -82,7 +89,7 @@ function AppContent() {
 function Dashboard({ user, updateUserState }: DashboardProps) {
   const { t } = useLanguage();
   const { addToast } = useToast();
-  const { username, code } = useParams();
+  const { username, code, postId, channelId, msgId } = useParams();
   const navigate = useNavigate();
   const savedState = JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}');
 
@@ -90,6 +97,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [socialTab, setSocialTab] = useState<'friends' | 'following' | 'followers' | 'invasions'>('friends');
   const [socialTargetId, setSocialTargetId] = useState<string | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [realms, setRealms] = useState<IRealm[]>([]);
   const [dms, setDms] = useState<IChannel[]>([]);
   const [activeRealm, setActiveRealm] = useState<IRealm | null>(savedState.activeRealm || null);
@@ -113,6 +121,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
   const [sidebarWidth, setSidebarWidth] = useState(savedState.sidebarWidth || 240);
   const [isResizing, setIsResizing] = useState(false);
+  const [kineticTransitions, setKineticTransitions] = useState<boolean>(savedState.kineticTransitions !== undefined ? savedState.kineticTransitions : true);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); setShowConnPill(true); setTimeout(() => setShowConnPill(false), 3000); };
@@ -175,11 +184,25 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   useEffect(() => {
     const handleLinkEntry = async () => {
-      if (username) { try { const res = await api.getUserByHandle(username); handleViewOtherProfile(res.id); navigate('/', { replace: true }); } catch (e) {} }
-      if (code) { try { const r = await api.joinRealmWithInvite(code); await loadRealms(); handleSelectRealm(r); navigate('/', { replace: true }); } catch (e) {} }
+      if (username) { try { const res = await api.getUserByHandle(username); handleViewOtherProfile(res.id); navigate('/app', { replace: true }); } catch (e) {} }
+      if (code) { try { const r = await api.joinRealmWithInvite(code); await loadRealms(); handleSelectRealm(r); navigate('/app', { replace: true }); } catch (e) {} }
+      if (postId) { setSelectedPostId(postId); navigate('/app', { replace: true }); }
+      if (channelId && msgId) { 
+        try {
+          const res = await axios.get(`${API_URL}/channels/${channelId}`);
+          handleSelectChannel(res.data);
+          setTimeout(() => {
+            const el = document.getElementById(`msg-${msgId}`);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el?.classList.add('bg-vani-blue/20');
+            setTimeout(() => el?.classList.remove('bg-vani-blue/20'), 3000);
+          }, 1000);
+          navigate('/app', { replace: true });
+        } catch (e) {}
+      }
     };
     handleLinkEntry();
-  }, [username, code]);
+  }, [username, code, postId, channelId, msgId]);
 
   useEffect(() => {
     let context = 'Yantravani';
@@ -218,8 +241,11 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     });
 
     s.on('receive_message', (msg: any) => { 
-      if (msg.channel === activeChannel?._id || msg.channel?._id === activeChannel?._id) {
+      const msgChannelId = msg.channel?._id || msg.channel;
+      if (msgChannelId === activeChannel?._id) {
         setMessages(prev => [...prev, msg]); 
+        // Auto-mark as read if already in channel
+        api.markNotificationsReadByChannel(msgChannelId);
       } else {
         // Show Samsung-style pill for in-app msg
         setLiveSignal({
@@ -241,10 +267,25 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     s.on('incoming_call', (data: any) => {
       setIncomingCall(data);
+      // AUTO TIMEOUT: 1 MINUTE
+      setTimeout(() => {
+        setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev));
+      }, 60000);
+
       sendLocalNotification(
         `Incoming ${data.type} call`,
         `${data.sender.username} is establishing a link...`
       );
+    });
+
+    s.on('call_rejected', ({ channelId }: any) => {
+      setLiveSignal({
+        sender: { username: 'SYSTEM' },
+        content: 'Identity Link Rejected',
+        type: 'error'
+      });
+      setTimeout(() => setLiveSignal(null), 5000);
+      setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev);
     });
     
     s.on('identity_sync_update', async () => {
@@ -307,10 +348,18 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const handleAcceptCall = (type: 'voice' | 'video') => {
     if (!incomingCall) return;
-    const channel = dms.find(d => d._id === incomingCall.channelId);
+    let channel = dms.find(d => d._id === incomingCall.channelId);
+    if (!channel) {
+      for (const r of realms) {
+        const found = r.channels?.find(c => c._id === incomingCall.channelId);
+        if (found) { channel = found; break; }
+      }
+    }
     if (channel) {
       handleSelectChannel(channel);
       setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
+      // Clear notification for this call
+      api.markNotificationsReadByChannel(channel._id);
     }
     setIncomingCall(null);
   };
@@ -392,7 +441,10 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                    </div>
                 </div>
                 <div className="flex items-center space-x-2 shrink-0">
-                   <button onClick={() => setIncomingCall(null)} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button>
+                   <button onClick={() => { 
+                     socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId });
+                     setIncomingCall(null); 
+                   }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button>
                    <button onClick={() => handleAcceptCall('voice')} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>
                    {incomingCall.type === 'video' && (
                      <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>
@@ -499,48 +551,57 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             className="flex-1 flex flex-col overflow-hidden"
             onPanEnd={handleDragEnd}
           >
-            <AnimatePresence mode="wait">
-              {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
-                <ChatArea 
-                  key="chat" 
-                  channelName={activeChannel.name || 'Link'} 
-                  messages={messages} 
-                  onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} 
-                  currentUser={user} 
-                  channelId={activeChannel._id} 
-                  onViewOtherProfile={handleViewOtherProfile} 
-                  channelType={activeChannel.type} 
-                  activeRealm={activeRealm} 
-                  activeChannel={activeChannel} 
-                  socket={socketRef.current} 
-                  onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
-                  onGroupSettings={() => setShowGroupSettings(true)} 
-                  onOpenMedia={(type, url) => setActiveMedia({ type, url })}
-                  onStartCall={() => {
-                    socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
-                    setActiveChannel({ ...activeChannel, type: 'voice' });
-                  }}
-                  onStartVideo={() => {
-                    socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
-                    setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any);
-                  }}
-                />
-              ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
-                <FeedArea 
-                  key="feed" 
-                  posts={posts} 
-                  onOpenCreateModal={() => setShowPostModal(true)} 
-                  currentUser={user!} 
-                  channelId={activeChannel?._id || 'global'} 
-                  onViewProfile={handleViewOtherProfile} 
-                  onSelectTag={handleTagSelect} 
-                  onRetry={triggerRefresh}
-                  isSyncing={isSyncing}
-                  liveStreamers={liveStreamers}
-                />
-              ) : (
-                <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>
-              )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId}
+                initial={kineticTransitions ? { opacity: 0, x: 20, filter: 'blur(10px)' } : { opacity: 1 }}
+                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                exit={kineticTransitions ? { opacity: 0, x: -20, filter: 'blur(10px)' } : { opacity: 1 }}
+                transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
+                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
+                  <ChatArea 
+                    key="chat" 
+                    channelName={activeChannel.name || 'Link'} 
+                    messages={messages} 
+                    onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} 
+                    currentUser={user} 
+                    channelId={activeChannel._id} 
+                    onViewOtherProfile={handleViewOtherProfile} 
+                    channelType={activeChannel.type} 
+                    activeRealm={activeRealm} 
+                    activeChannel={activeChannel} 
+                    socket={socketRef.current} 
+                    onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
+                    onGroupSettings={() => setShowGroupSettings(true)} 
+                    onOpenMedia={(type, url) => setActiveMedia({ type, url })}
+                    onStartCall={() => {
+                      socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
+                      setActiveChannel({ ...activeChannel, type: 'voice' });
+                    }}
+                    onStartVideo={() => {
+                      socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
+                      setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any);
+                    }}
+                  />
+                ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
+                  <FeedArea 
+                    key="feed" 
+                    posts={posts} 
+                    onOpenCreateModal={() => setShowPostModal(true)} 
+                    currentUser={user!} 
+                    channelId={activeChannel?._id || 'global'} 
+                    onViewProfile={handleViewOtherProfile} 
+                    onSelectTag={handleTagSelect} 
+                    onRetry={triggerRefresh}
+                    isSyncing={isSyncing}
+                    liveStreamers={liveStreamers}
+                  />
+                ) : (
+                  <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>
+                )}
+              </motion.div>
             </AnimatePresence>
           </motion.div>
         </main>
@@ -556,6 +617,16 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           </div>
         )}
         {activeMedia && <MediaPlayer type={activeMedia.type} url={activeMedia.url} onClose={() => setActiveMedia(null)} />}
+        {selectedPostId && (
+          <div className="fixed inset-0 z-[4000] flex items-center justify-center">
+             <PostViewerModal 
+               post={posts.find(p => p._id === selectedPostId) || { _id: selectedPostId, caption: 'Loading...', author: { username: '...' }, likes: [], comments: [] } as any} 
+               onClose={() => setSelectedPostId(null)} 
+               currentUser={user} 
+               onUpdate={() => triggerRefresh()} 
+             />
+          </div>
+        )}
         {showGroupSettings && activeChannel && <GroupSettingsModal group={activeChannel} onClose={() => setShowGroupSettings(false)} onUpdate={() => loadDMs()} currentUser={user!} />}
         {showLogoutModal && <LogoutModal onClose={() => setShowLogoutModal(false)} />}
       </AnimatePresence>
@@ -564,7 +635,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} onComplete={async () => { if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } else { const d = await api.getGlobalPosts(); setPosts(d); } addToast("Transmission Sent", 'success'); }} channelId={activeChannel?._id || 'global'} currentUser={user!} />}
       {showChannelModal && <CreateChannelModal onClose={() => setShowChannelModal(false)} onSubmit={async (n: string, t: string) => { if (!activeRealm) return; try { await api.createChannel(activeRealm._id, n, t); const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); setShowChannelModal(false); handleSelectChannel(d.channels[d.channels.length-1]); addToast("Sector Opened", 'success'); } catch(e){ addToast("Sector Failed", 'error'); } }} />}
       {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast("Group Initialized", 'success'); } catch(e){ addToast("Group Failed", 'error'); } }} currentUser={user!} />}
-      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast("Calibration Saved", 'success'); } catch(e){ addToast("Save Failed", 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} />}
+      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast("Calibration Saved", 'success'); } catch(e){ addToast("Save Failed", 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
       {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(`Joined ${r.name}`, 'success'); } catch (e) { addToast("Join Failed", 'error'); } }} currentUser={user!} />}
     </div>

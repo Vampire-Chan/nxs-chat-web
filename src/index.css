@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-discord-dark: var(--vani-bg);
-  --color-discord-sidebar: var(--sidebar-bg);
-  --color-discord-channel: var(--sidebar-bg);
+  --color-discord-dark: #0a0a0c;
+  --color-discord-sidebar: #111214;
+  --color-discord-channel: #111214;
   --color-vani-blue: #00d2ff;
   --color-vani-accent: #ff0055;
   --background-image-vani-gradient: linear-gradient(135deg, #ff0055 0%, #00d2ff 100%);
@@ -32,6 +32,21 @@ body {
   line-height: var(--vani-line-height);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  color-scheme: dark;
+}
+
+/* Style native browser pickers */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(48%) sepia(79%) static(2476%) hue-rotate(160deg) brightness(118%) contrast(119%); /* Vani Blue Filter */
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 /* Custom Scrollbar for Matrix feel */

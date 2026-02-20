@@ -1,9 +1,28 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    global: 'window',
+    'process.env': {}
+  },
+  resolve: {
+    alias: {
+      util: path.resolve(__dirname, './src/util-polyfill.ts'),
+      buffer: 'buffer',
+      events: 'events',
+      process: 'process/browser',
+    },
+  },
+  optimizeDeps: {
+    include: ['buffer', 'process', 'events', 'util'],
+  },
   plugins: [
     react(),
     VitePWA({

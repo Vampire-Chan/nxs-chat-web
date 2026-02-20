@@ -82,7 +82,7 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
         { label: t('common.invite'), icon: <UserPlus size={14} />, onClick: async () => {
             try {
               const { code } = await api.createRealmInvite(realmId);
-              const url = `${window.location.origin}/join/${code}`;
+              const url = `${window.location.origin}/app/join/${code}`;
               navigator.clipboard.writeText(url);
               alert("Invite link copied.");
             } catch(e) { alert("Fail"); }
@@ -140,26 +140,36 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
   };
 
   return (
-    <div className={`${sizeClass} bg-discord-sidebar flex items-center ${borderClass} border-gray-900 z-[100] shadow-xl`} onClick={() => setShowNotifs(false)}>
+    <motion.div 
+      initial={position === 'top' ? { y: -100 } : position === 'bottom' ? { y: 100 } : position === 'left' ? { x: -100 } : { x: 100 }}
+      animate={{ y: 0, x: 0 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`${sizeClass} bg-discord-sidebar flex items-center ${borderClass} border-gray-900 z-[100] shadow-xl`} 
+      onClick={() => setShowNotifs(false)}
+    >
       <div className={`flex flex-1 ${isVertical ? 'flex-col overflow-y-auto no-scrollbar' : 'flex-row overflow-x-auto no-scrollbar'} items-center scroll-smooth relative`}>
         <div className={`flex ${isVertical ? 'flex-col space-y-3' : 'flex-row space-x-3 items-center'}`}>
-          <div className="relative group">
-             <div onClick={onProfile} className={`w-10 h-10 rounded-[18px] overflow-hidden border-2 transition-all cursor-pointer ${selectedRealmId === 'profile' ? 'border-vani-accent scale-110 rounded-xl' : 'border-transparent hover:border-vani-blue hover:rounded-xl'}`}>
+          <motion.div 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="relative group"
+          >
+             <div onClick={onProfile} className={`w-10 h-10 rounded-[18px] overflow-hidden border-2 transition-all cursor-pointer ${selectedRealmId === 'profile' ? 'border-vani-accent scale-110 rounded-xl shadow-[0_0_15px_rgba(255,60,60,0.3)]' : 'border-transparent hover:border-vani-blue hover:rounded-xl'}`}>
                 <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
              </div>
-             {selectedRealmId === 'profile' && <div className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-accent rounded-full`} />}
-          </div>
+             {selectedRealmId === 'profile' && <motion.div layoutId="dock-indicator" className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-accent rounded-full`} />}
+          </motion.div>
           <div className="relative">
-             <DockIcon icon={<Home size={22} />} active={selectedRealmId === 'home'} onClick={() => onSelect({ _id: 'home' })} />
+             <DockIcon icon={<Home size={22} />} active={selectedRealmId === 'home'} onClick={() => onSelect({ _id: 'home' })} isVertical={isVertical} />
              {unreadDmCount > 0 && (
                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-discord-sidebar shadow-lg animate-pulse">
                   {unreadDmCount > 99 ? '99+' : unreadDmCount}
                </div>
              )}
           </div>
-          <DockIcon icon={<Compass size={22} />} active={selectedRealmId === 'explore'} onClick={() => onSelect({ _id: 'explore' })} />
-          <DockIcon icon={<Users size={20} />} active={selectedRealmId === 'social'} onClick={onSocial} />
-          {user.isAdmin && <DockIcon icon={<Shield size={20} className="text-vani-blue" />} active={selectedRealmId === 'architect'} onClick={() => onSelect({ _id: 'architect' })} />}
+          <DockIcon icon={<Compass size={22} />} active={selectedRealmId === 'explore'} onClick={() => onSelect({ _id: 'explore' })} isVertical={isVertical} />
+          <DockIcon icon={<Users size={20} />} active={selectedRealmId === 'social'} onClick={onSocial} isVertical={isVertical} />
+          {user.isAdmin && <DockIcon icon={<Shield size={20} className="text-vani-blue" />} active={selectedRealmId === 'architect'} onClick={() => onSelect({ _id: 'architect' })} isVertical={isVertical} />}
         </div>
 
         <div className={`${isVertical ? 'w-8 h-[1px] my-4' : 'w-[1px] h-8 mx-4'} bg-gray-800 flex-shrink-0`} />
@@ -167,14 +177,28 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
         {/* SCROLLABLE REALMS LIST */}
         <div className={`flex ${isVertical ? 'flex-col space-y-3' : 'flex-row space-x-3'} py-2`}>
           {realms.map(realm => (
-            <div key={realm._id} onClick={() => onSelect(realm)} onContextMenu={(e) => handleContextMenu(e, 'realm', realm._id)} className="relative group cursor-pointer flex-shrink-0">
-              <div className={`w-10 h-10 rounded-xl transition-all duration-300 flex items-center justify-center overflow-hidden border ${selectedRealmId === realm._id ? 'bg-vani-gradient border-white/20 shadow-lg scale-110' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`}>
+            <motion.div 
+              key={realm._id} 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onSelect(realm)} 
+              onContextMenu={(e) => handleContextMenu(e, 'realm', realm._id)} 
+              className="relative group cursor-pointer flex-shrink-0"
+            >
+              <div className={`w-10 h-10 rounded-xl transition-all duration-300 flex items-center justify-center overflow-hidden border ${selectedRealmId === realm._id ? 'bg-vani-gradient border-white/20 shadow-[0_0_15px_rgba(0,210,255,0.3)] scale-110' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`}>
                 {realm.icon ? <img src={realm.icon} alt="r" className="w-full h-full object-cover" /> : <span className="font-black text-xs text-white uppercase">{realm.name[0]}</span>}
               </div>
-              {selectedRealmId === realm._id && <div className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-gradient rounded-full`} />}
-            </div>
+              {selectedRealmId === realm._id && <motion.div layoutId="dock-indicator" className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-gradient rounded-full`} />}
+            </motion.div>
           ))}
-          <button onClick={onCreate} className="w-10 h-10 rounded-xl bg-gray-800 border border-dashed border-gray-700 flex items-center justify-center text-gray-500 hover:border-vani-blue hover:text-vani-blue transition-all flex-shrink-0"><Plus size={20} /></button>
+          <motion.button 
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onCreate} 
+            className="w-10 h-10 rounded-xl bg-gray-800 border border-dashed border-gray-700 flex items-center justify-center text-gray-500 hover:border-vani-blue hover:text-vani-blue transition-all flex-shrink-0"
+          >
+            <Plus size={20} />
+          </motion.button>
         </div>
 
         <div className={`${isVertical ? 'w-8 h-[1px] my-4' : 'w-[1px] h-8 mx-4'} bg-gray-800 flex-shrink-0`} />
@@ -218,7 +242,22 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
                        )}
                     </div>
                     <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
-                       {unreadNotifications.map(n => <div key={n._id} className="p-4 border-b border-white/5 flex items-start space-x-3 hover:bg-white/[0.02] transition-colors"><div className="flex-1 text-[11px] text-gray-400"> <span className="font-black text-white">{n.sender?.username || 'System'}</span> {n.content}</div></div>)}
+                       {unreadNotifications.map(n => (
+                         <div 
+                           key={n._id} 
+                           onClick={async (e) => {
+                             e.stopPropagation();
+                             await api.markNotificationReadById(n._id);
+                             fetchMatrixStatus();
+                           }}
+                           className="p-4 border-b border-white/5 flex items-start space-x-3 hover:bg-white/[0.05] transition-colors cursor-pointer group"
+                         >
+                           <div className="flex-1 text-[11px] text-gray-400 group-hover:text-gray-200 transition-colors"> 
+                             <span className="font-black text-white">{n.sender?.username || 'System'}</span> {n.content}
+                           </div>
+                           <div className="w-1.5 h-1.5 bg-vani-blue rounded-full mt-1.5 shrink-0" />
+                         </div>
+                       ))}
                        {unreadNotifications.length === 0 && <div className="p-12 text-center text-[10px] text-gray-600 uppercase font-black tracking-[0.2em]">{t('notifications.empty')}</div>}
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); setShowNotifs(false); onSeeAllNotifications?.(); }} className="w-full p-3 bg-white/[0.02] text-center text-[9px] font-black text-gray-500 hover:text-white hover:bg-vani-blue/10 cursor-pointer border-t border-white/5 transition-all">{t('common.expand_logs')}</button>
@@ -241,10 +280,18 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
       </div>
       
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
-    </div>
+    </motion.div>
   );
 };
 
-const DockIcon = ({ icon, active, onClick }: any) => (
-  <div onClick={onClick} className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all ${active ? 'bg-vani-gradient text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{icon}</div>
+const DockIcon = ({ icon, active, onClick, isVertical }: any) => (
+  <motion.div 
+    whileHover={{ scale: 1.1 }}
+    whileTap={{ scale: 0.95 }}
+    onClick={onClick} 
+    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all relative ${active ? 'bg-vani-gradient text-white shadow-[0_0_15px_rgba(0,210,255,0.3)]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+  >
+    {icon}
+    {active && <motion.div layoutId="dock-indicator" className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-gradient rounded-full`} />}
+  </motion.div>
 );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, MessageCircle, Send, Trash2, Edit3, Share2, MoreVertical } from 'lucide-react';
 import type { IPost, IUser } from '../services/api';
@@ -21,6 +21,12 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
   const [likeCount, setLikeCount] = useState(post.likes.length);
   const [replyingTo, setReplyingTo] = useState<{ id: string, username: string, userId?: string } | null>(null);
   const [showCommentsMobile, setShowCommentsMobile] = useState(false);
+
+  useEffect(() => {
+    if (post._id && currentUser) {
+      api.markNotificationsReadByPost(post._id).catch(() => {});
+    }
+  }, [post._id, currentUser]);
 
   const renderCaption = (text: string) => {
     if (!text) return null;

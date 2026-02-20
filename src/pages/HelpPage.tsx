@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Server, Globe, HelpCircle, Info, Zap, Terminal, Layout, MessageSquare, Newspaper } from 'lucide-react';
+import { ArrowLeft, Server, Globe, HelpCircle, Info, Zap, Terminal, Layout, MessageSquare, Newspaper, User, Shield, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -90,6 +90,24 @@ export default function HelpPage() {
             {activeTab === 'howto' && (
               <div className="space-y-20">
                 <section className="space-y-12">
+                  <div className="flex items-center space-x-4 border-b border-white/5 pb-6">
+                    <Terminal className="text-vani-blue" size={24} />
+                    <h2 className="text-2xl font-black uppercase tracking-tighter">{t('howto.reg_title')}</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <StepItem number="01" title="Access Portal" desc={t('howto.reg_step1')} />
+                    <StepItem number="02" title="Choose Handle" desc={t('howto.reg_step2')} />
+                    <StepItem number="03" title="Profile Setup" desc={t('howto.reg_step3')} />
+                    <StepItem number="04" title="Verify Link" desc={t('howto.reg_step4')} />
+                    <StepItem number="05" title="Initialize" desc={t('howto.reg_step5')} />
+                  </div>
+                </section>
+
+                <section className="space-y-12">
+                  <div className="flex items-center space-x-4 border-b border-white/5 pb-6">
+                    <Zap className="text-vani-blue" size={24} />
+                    <h2 className="text-2xl font-black uppercase tracking-tighter">Quick Start Protocols</h2>
+                  </div>
                   <StepItem number="01" title={t('howto.step1_title')} desc={t('howto.step1_desc')} />
                   <StepItem number="02" title={t('howto.step2_title')} desc={t('howto.step2_desc')} />
                   <StepItem number="03" title={t('howto.step3_title')} desc={t('howto.step3_desc')} />
@@ -202,13 +220,33 @@ export default function HelpPage() {
             )}
 
             {activeTab === 'terms' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <TermCard term={t('term.realm')} def={t('term.realm_def')} />
-                <TermCard term={t('term.sector')} def={t('term.sector_def')} />
-                <TermCard term={t('term.matrix')} def={t('term.matrix_def')} />
-                <TermCard term={t('term.node')} def={t('term.node_def')} />
-                <TermCard term={t('term.architect')} def={t('term.architect_def')} />
-                <TermCard term={t('term.ghost_mode')} def={t('term.ghost_mode_def')} />
+              <div className="space-y-16">
+                <section className="p-10 bg-vani-gradient/5 rounded-[40px] border border-white/5">
+                  <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 flex items-center space-x-4">
+                    <Globe className="text-vani-blue" size={24} />
+                    <span>{t('term.mapping_title')}</span>
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <TermMappingItem label={t('term.map_realm')} icon={<Server size={14} />} />
+                    <TermMappingItem label={t('term.map_sector')} icon={<Layout size={14} />} />
+                    <TermMappingItem label={t('term.map_transmission')} icon={<Newspaper size={14} />} />
+                    <TermMappingItem label={t('term.map_signal')} icon={<MessageSquare size={14} />} />
+                    <TermMappingItem label={t('term.map_sync')} icon={<Zap size={14} />} />
+                    <TermMappingItem label={t('term.map_parallel')} icon={<Users size={14} />} />
+                    <TermMappingItem label={t('term.map_node')} icon={<User size={14} />} />
+                    <TermMappingItem label={t('term.map_matrix')} icon={<Globe size={14} />} />
+                    <TermMappingItem label={t('term.map_architect')} icon={<Shield size={14} />} />
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <TermCard term={t('term.realm')} def={t('term.realm_def')} />
+                  <TermCard term={t('term.sector')} def={t('term.sector_def')} />
+                  <TermCard term={t('term.matrix')} def={t('term.matrix_def')} />
+                  <TermCard term={t('term.node')} def={t('term.node_def')} />
+                  <TermCard term={t('term.architect')} def={t('term.architect_def')} />
+                  <TermCard term={t('term.ghost_mode')} def={t('term.ghost_mode_def')} />
+                </div>
               </div>
             )}
           </motion.div>
@@ -222,6 +260,13 @@ export default function HelpPage() {
     </div>
   );
 }
+
+const TermMappingItem = ({ label, icon }: { label: string, icon: any }) => (
+  <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
+    <div className="text-vani-blue group-hover:scale-110 transition-transform">{icon}</div>
+    <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">{label}</span>
+  </div>
+);
 
 const HelpCard = ({ icon, title, desc }: any) => (
   <div className="p-8 bg-white/5 rounded-3xl border border-white/5 hover:border-vani-blue/30 transition-all group">

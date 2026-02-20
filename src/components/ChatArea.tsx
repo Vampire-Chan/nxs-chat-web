@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
 import { api } from '../services/api';
-import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply } from 'lucide-react';
+import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, Calendar, Clock } from 'lucide-react';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ProfileMiniCard } from './ProfileMiniCard';
 import { NeuralSuggester } from './NeuralSuggester';
+import { NeuralDatePicker, NeuralTimePicker } from './NeuralPicker';
 import { useToast } from '../context/ToastContext';
 
 const AudioPlayer = ({ url }: { url: string }) => {
@@ -51,6 +55,7 @@ interface Props {
 }
 
 export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo }: Props) => {
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
@@ -69,6 +74,12 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const [suggestion, setSuggestion] = useState<{ query: string, type: 'mention' | 'tag', index: number } | null>(null);
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string, position: { x: number, y: number } } | null>(null);
   
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   const [previewFile, setPreviewFile] = useState<{ file: File, type: string, previewUrl: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [previewCaption, setPreviewCaption] = useState('');
@@ -86,7 +97,10 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
-    if (channelId && currentUser) api.markChannelRead(channelId).then(() => onRefreshMatrix?.()).catch(() => {});
+    if (channelId && currentUser) {
+      api.markChannelRead(channelId).then(() => onRefreshMatrix?.()).catch(() => {});
+      api.markNotificationsReadByChannel(channelId).then(() => onRefreshMatrix?.()).catch(() => {});
+    }
   }, [channelId, messages.length]);
 
   useEffect(() => {
@@ -198,6 +212,33 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
     } catch (e) { addToast("Calibration Failed", 'error'); }
   };
 
+  const handleScheduleMessage = async () => {
+    if (!input.trim() || !scheduledDate || !scheduledTime) return;
+    try {
+      const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`);
+      const now = new Date();
+      
+      // TEMPORAL GUARD: Check if the time is in the past
+      if (scheduledFor <= now) {
+        return addToast("Temporal Lock: Cannot dispatch to the past.", 'error');
+      }
+
+      await api.scheduleMessage({
+        channelId,
+        content: input,
+        scheduledFor,
+        parentMessageId: replyingTo?._id
+      });
+      setInput('');
+      setReplyingTo(null);
+      setShowScheduleModal(false);
+      addToast("Signal scheduled for future dispatch", 'success');
+    } catch (e: any) { 
+      const errorMsg = e.response?.data?.message || "Scheduling protocol failed";
+      addToast(errorMsg, 'error'); 
+    }
+  };
+
   const onMessageContextMenu = (e: React.MouseEvent, msgId: string, isMe: boolean) => {
     e.preventDefault(); setMsgContextMenu({ x: e.clientX, y: e.clientY, msgId, isMe });
   };
@@ -224,19 +265,51 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   };
 
   const renderContent = (text: string) => {
-    const parts = text.split(/(\s+)/);
     return (
-      <span className="leading-snug">
-        {parts.map((part, i) => {
-           const trimmed = part.trim();
-           if (trimmed && CUSTOM_EMOJI_MAP[trimmed]) { 
-             const EmojiComp = CUSTOM_EMOJI_MAP[trimmed]; 
-             return <span key={i} className="inline-flex items-center translate-y-[2px] mx-0.5"><EmojiComp /></span>; 
-           }
-           if (trimmed && trimmed.startsWith('@')) return <span key={i} className="text-vani-blue font-black">{part}</span>;
-           return <span key={i}>{part}</span>;
-        })}
-      </span>
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+          a: ({ href, children }) => {
+            const isInternal = href?.startsWith('/') || href?.startsWith(window.location.origin);
+            if (isInternal && href) {
+              return (
+                <a 
+                  href={href} 
+                  onClick={(e) => { e.preventDefault(); navigate(href.replace(window.location.origin, '')); }} 
+                  className="text-vani-blue hover:underline font-bold transition-all cursor-pointer"
+                >
+                  {children}
+                </a>
+              );
+            }
+            return <a href={href} target="_blank" rel="noopener noreferrer" className="text-vani-blue hover:underline font-bold transition-all">{children}</a>;
+          },
+          strong: ({ children }) => <strong className="font-black text-white">{children}</strong>,
+          em: ({ children }) => <em className="italic opacity-90">{children}</em>,
+          code: ({ children }) => <code className="bg-black/40 px-1.5 py-0.5 rounded-lg border border-white/5 font-mono text-[12px] text-pink-400">{children}</code>,
+          del: ({ children }) => <del className="opacity-50 line-through">{children}</del>,
+          text: ({ children }) => {
+            const textContent = String(children);
+            const parts = textContent.split(/(\s+)/);
+            return (
+              <>
+                {parts.map((part: string, i: number) => {
+                  const trimmed = part.trim();
+                  if (trimmed && CUSTOM_EMOJI_MAP[trimmed]) { 
+                    const EmojiComp = CUSTOM_EMOJI_MAP[trimmed]; 
+                    return <span key={i} className="inline-flex items-center translate-y-[2px] mx-0.5 shrink-0"><EmojiComp /></span>; 
+                  }
+                  if (trimmed && trimmed.startsWith('@')) return <span key={i} className="text-vani-blue font-black">{part}</span>;
+                  return <span key={i}>{part}</span>;
+                })}
+              </>
+            );
+          }
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     );
   };
 
@@ -332,7 +405,13 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
       <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-discord-sidebar/20 backdrop-blur-md z-10">
          <div className="flex items-center space-x-3">
-            <span className="text-vani-blue font-black text-xl">{channelType === 'dm' ? '@' : channelType === 'group_dm' ? '' : '#'}</span>
+            <motion.div 
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ repeat: Infinity, duration: 3 }}
+              className="text-vani-blue font-black text-xl"
+            >
+              {channelType === 'dm' ? '@' : channelType === 'group_dm' ? '' : '#'}
+            </motion.div>
             <span className="font-black text-white uppercase tracking-tighter text-sm">{(channelType === 'group_dm' ? activeChannel?.name : channelName?.replace(/^@/, '')) || 'Unknown_Link'}</span>
             {channelType === 'group_dm' && <button onClick={onGroupSettings} className="p-1.5 text-gray-500 hover:text-white transition-all bg-white/5 rounded-lg ml-2"><Settings size={14} /></button>}
          </div>
@@ -340,20 +419,24 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
          {/* CALL ICONS: Only for Private/Group DMs */}
          {(channelType === 'dm' || channelType === 'group_dm') && (
            <div className="flex items-center space-x-4">
-              <button 
+              <motion.button 
+                whileHover={{ scale: 1.1, color: '#00d2ff' }}
+                whileTap={{ scale: 0.9 }}
                 onClick={onStartCall}
-                className="p-2 text-gray-500 hover:text-vani-blue transition-colors" 
+                className="p-2 text-gray-500 transition-colors" 
                 title="Voice Call"
               >
                 <Phone size={20} />
-              </button>
-              <button 
+              </motion.button>
+              <motion.button 
+                whileHover={{ scale: 1.1, color: '#ff3c3c' }}
+                whileTap={{ scale: 0.9 }}
                 onClick={onStartVideo}
-                className="p-2 text-gray-500 hover:text-vani-accent transition-colors" 
+                className="p-2 text-gray-500 transition-colors" 
                 title="Video Call"
               >
                 <Video size={20} />
-              </button>
+              </motion.button>
            </div>
          )}
       </div>
@@ -434,6 +517,66 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><X size={14} /></button>
             </motion.div>
           )}
+
+          {showScheduleModal && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, y: 20, scale: 0.95 }} 
+              className="absolute bottom-full mb-4 left-0 right-0 bg-[#0a0a0c]/95 backdrop-blur-2xl border border-vani-blue/30 p-6 rounded-[32px] shadow-[0_20px_60px_rgba(0,210,255,0.2)] z-[60]"
+              onClick={(e) => e.stopPropagation()}
+            >
+               <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                     <div className="p-2 bg-vani-blue/10 rounded-xl text-vani-blue"><Clock size={18} /></div>
+                     <span className="text-xs font-black text-white uppercase tracking-widest">Neural_Schedule_Dispatch</span>
+                  </div>
+                  <button onClick={() => setShowScheduleModal(false)} className="text-gray-500 hover:text-white"><X size={18} /></button>
+               </div>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="space-y-2">
+                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Calendar size={10} className="text-vani-blue" /> Dispatch_Date</label>
+                     <div 
+                       onClick={() => setShowDatePicker(true)}
+                       className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none cursor-pointer hover:border-vani-blue/30 transition-all flex items-center justify-between"
+                     >
+                        <span className={scheduledDate ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledDate || 'Select Date'}</span>
+                        <Calendar size={16} className="text-gray-600" />
+                     </div>
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Clock size={10} className="text-vani-blue" /> Dispatch_Time</label>
+                     <div 
+                       onClick={() => setShowTimePicker(true)}
+                       className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none cursor-pointer hover:border-vani-blue/30 transition-all flex items-center justify-between"
+                     >
+                        <span className={scheduledTime ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledTime || 'Set Time'}</span>
+                        <Clock size={16} className="text-gray-600" />
+                     </div>
+                  </div>
+               </div>
+
+               <AnimatePresence>
+                  {showDatePicker && <NeuralDatePicker value={scheduledDate} onChange={setScheduledDate} onClose={() => setShowDatePicker(false)} />}
+                  {showTimePicker && <NeuralTimePicker value={scheduledTime} onChange={setScheduledTime} onClose={() => setShowTimePicker(false)} />}
+               </AnimatePresence>
+
+               <div className="mb-6 p-4 bg-vani-blue/5 border border-vani-blue/10 rounded-xl">
+                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+                     Temporal Dispatch Logic: Signals will be held in the Vani Buffer until the selected chronology. Ensure your node remains synced with the network.
+                  </p>
+               </div>
+
+               <button 
+                 onClick={handleScheduleMessage}
+                 disabled={!scheduledDate || !scheduledTime || !input.trim()}
+                 className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl disabled:opacity-30 disabled:grayscale transition-all"
+               >
+                  Finalize Schedule Protocol
+               </button>
+            </motion.div>
+          )}
           {suggestion && <NeuralSuggester query={suggestion.query} type={suggestion.type} onSelect={handleSelectSuggestion} position={{ top: 0, left: 60 }} />}
           {showMediaMenu && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 left-6 bg-[#0a0a0c] border border-white/5 p-2 rounded-3xl shadow-2xl z-50 flex space-x-2"><MediaBtn icon={<ImageIcon size={18} />} label="Image" onClick={() => imageInputRef.current?.click()} color="text-blue-500" /><MediaBtn icon={<Camera size={18} />} label="Camera" onClick={() => cameraInputRef.current?.click()} color="text-green-500" /><MediaBtn icon={<FileIcon size={18} />} label="File" onClick={() => fileInputRef.current?.click()} color="text-yellow-500" /><MediaBtn icon={<Mic size={18} />} label="Audio" onClick={startRecording} color="text-red-500" /></motion.div>}
           {isRecording && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-4 bottom-4 bg-[#0a0a0c] border border-red-500/30 p-4 rounded-[32px] shadow-2xl z-50 flex items-center justify-between"><div className="flex items-center space-x-4"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="font-mono text-white font-black">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Recording...</span></div><div className="flex items-center space-x-3"><button onClick={() => stopRecording(false)} className="p-3 text-gray-500 hover:text-white transition-all"><X size={20} /></button><button onClick={() => stopRecording(true)} className="w-12 h-12 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Send size={20} /></button></div></motion.div>}
@@ -444,8 +587,19 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
         <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
         <input type="file" ref={cameraInputRef} hidden accept="image/*" capture="environment" onChange={(e) => handleFileUpload(e, 'image')} />
         {canPost ? (
-          <div className={`bg-discord-sidebar p-1.5 flex items-center space-x-2 border transition-all shadow-2xl border-gray-800 min-h-[56px] ${replyingTo ? 'rounded-b-[32px]' : 'rounded-[32px]'}`}>
-             <button onClick={(e) => { e.stopPropagation(); setShowMediaMenu(!showMediaMenu); }} className={`w-10 h-10 rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-vani-blue hover:text-white transition-all ml-1 shrink-0 ${showMediaMenu ? 'bg-vani-blue text-white rotate-45' : ''}`}><Plus size={18} /></button>
+          <motion.div 
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className={`bg-discord-sidebar p-1.5 flex items-center space-x-2 border transition-all shadow-2xl ${input.trim() ? 'border-vani-blue/30 shadow-[0_0_20px_rgba(0,210,255,0.1)]' : 'border-gray-800'} min-h-[56px] ${replyingTo ? 'rounded-b-[32px]' : 'rounded-[32px]'}`}
+          >
+             <motion.button 
+               whileHover={{ scale: 1.1, rotate: 90 }}
+               whileTap={{ scale: 0.9 }}
+               onClick={(e) => { e.stopPropagation(); setShowMediaMenu(!showMediaMenu); }} 
+               className={`w-10 h-10 rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-vani-blue hover:text-white transition-all ml-1 shrink-0 ${showMediaMenu ? 'bg-vani-blue text-white rotate-45' : ''}`}
+             >
+               <Plus size={18} />
+             </motion.button>
              
              <textarea 
                placeholder={`Secure Transmission...`} 
@@ -471,15 +625,25 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              />
 
              <div className="flex items-center space-x-1 pr-2 shrink-0">
-                {!isMobile && <div onClick={(e) => { e.stopPropagation(); setShowCustomPicker(!showCustomPicker); }} className="w-9 h-9 flex items-center justify-center cursor-pointer text-gray-500 hover:text-vani-accent transition"><Sparkles size={18} /></div>}
-                <button 
+                {!isMobile && <motion.div whileHover={{ scale: 1.2, rotate: 10 }} whileTap={{ scale: 0.8 }} onClick={(e) => { e.stopPropagation(); setShowCustomPicker(!showCustomPicker); }} className="w-9 h-9 flex items-center justify-center cursor-pointer text-gray-500 hover:text-vani-accent transition"><Sparkles size={18} /></motion.div>}
+                <motion.button 
+                  whileHover={{ scale: 1.1, color: '#00d2ff' }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => { e.stopPropagation(); setShowScheduleModal(!showScheduleModal); }}
+                  className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${showScheduleModal ? 'text-vani-blue bg-vani-blue/10' : 'text-gray-500 hover:text-white'}`}
+                >
+                   <Calendar size={18} />
+                </motion.button>
+                <motion.button 
+                  whileHover={input.trim() ? { scale: 1.1 } : {}}
+                  whileTap={input.trim() ? { scale: 0.9 } : {}}
                   onClick={() => { if (input.trim()) { onSendMessage(input, replyingTo?._id); setInput(''); setReplyingTo(null); const el = document.querySelector('textarea'); if (el) el.style.height = 'auto'; } }}
                   className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${input.trim() ? 'bg-vani-gradient text-white shadow-lg' : 'text-gray-600 grayscale'}`}
                 >
                    <Send size={16} />
-                </button>
+                </motion.button>
              </div>
-          </div>
+          </motion.div>
         ) : (
           <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">Read-Only Protocol Active</span></div>
         )}
@@ -498,14 +662,15 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
   return (
     <motion.div 
       id={`msg-${msg._id}`}
-      initial={{ opacity: 0, x: -10 }} 
-      animate={{ opacity: 1, x: 0 }} 
+      initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+      animate={{ opacity: 1, scale: 1, y: 0 }} 
+      transition={{ type: 'spring', damping: 20, stiffness: 200 }}
       drag="x"
       dragConstraints={{ left: 0, right: swipeThreshold + 20 }}
       dragElastic={0.2}
-      style={{ x, marginTop: isSequence ? 'calc(var(--vani-spacing) * 0.1)' : 'var(--vani-spacing)', marginBottom: hasReactions ? '1rem' : '0' }}
+      style={{ x, marginTop: isSequence ? '2px' : '12px' }}
       onDragEnd={(_, info) => { if (info.offset.x > swipeThreshold) { onReply(); x.set(0); } else { x.set(0); } }}
-      className={`flex space-x-4 group/msg ${isDeleted ? 'opacity-50' : ''} relative transition-colors duration-500 rounded-xl p-1`} 
+      className={`flex space-x-4 group/msg ${isDeleted ? 'opacity-50' : ''} relative transition-colors duration-500 rounded-xl px-2 py-0.5`} 
       onContextMenu={!isDeleted ? (e) => onContext(e, msg._id, !!isMe) : undefined} 
       onTouchStart={!isDeleted ? (e) => onLongPressStart(msg._id, !!isMe, e) : undefined} 
       onTouchEnd={onLongPressEnd}

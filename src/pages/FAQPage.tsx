@@ -54,6 +54,25 @@ export default function FAQPage() {
               a={t('faq.a_broadcast')} 
             />
           </FAQSection>
+
+          <FAQSection title={t('faq.sec_flow')} icon={<Zap className="text-vani-blue" size={24} />}>
+            <FAQItem 
+              q={t('faq.flow_1_q')} 
+              a={t('faq.flow_1_a')} 
+            />
+            <FAQItem 
+              q={t('faq.flow_2_q')} 
+              a={t('faq.flow_2_a')} 
+            />
+            <FAQItem 
+              q={t('faq.flow_3_q')} 
+              a={t('faq.flow_3_a')} 
+            />
+            <FAQItem 
+              q={t('faq.flow_4_q')} 
+              a={t('faq.flow_4_a')} 
+            />
+          </FAQSection>
         </div>
 
         <footer className="mt-32 p-10 bg-white/5 rounded-[40px] border border-white/5 text-center">

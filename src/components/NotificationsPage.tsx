@@ -64,7 +64,13 @@ export const NotificationsPage = ({ onClose }: { onClose?: () => void }) => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
                 key={n._id} 
-                className={`p-4 lg:p-6 rounded-[24px] lg:rounded-3xl border transition-all ${!n.isRead ? 'bg-vani-blue/5 border-vani-blue/20 shadow-lg shadow-blue-500/5' : 'bg-discord-channel border-gray-800 opacity-60 hover:opacity-100'}`}
+                onClick={async () => {
+                  if (!n.isRead) {
+                    await api.markNotificationReadById(n._id);
+                    setNotifications(prev => prev.map(item => item._id === n._id ? { ...item, isRead: true } : item));
+                  }
+                }}
+                className={`p-4 lg:p-6 rounded-[24px] lg:rounded-3xl border transition-all cursor-pointer ${!n.isRead ? 'bg-vani-blue/5 border-vani-blue/20 shadow-lg shadow-blue-500/5' : 'bg-discord-channel border-gray-800 opacity-60 hover:opacity-100'}`}
               >
                  <div className="flex items-start space-x-4 lg:space-x-6">
                     <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center flex-shrink-0 ${n.type === 'like' ? 'bg-red-500/10 text-red-500' : n.type === 'comment' ? 'bg-blue-500/10 text-blue-500' : n.type === 'login' ? 'bg-yellow-500/10 text-yellow-500' : n.type === 'sync_request' ? 'bg-vani-blue/10 text-vani-blue' : n.type === 'mention' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'}`}>

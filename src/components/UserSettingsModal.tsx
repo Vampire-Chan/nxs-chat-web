@@ -11,9 +11,11 @@ interface Props {
   onSave: (formData: FormData) => Promise<void>;
   dockPosition: 'top' | 'bottom' | 'left' | 'right';
   setDockPosition: (pos: 'top' | 'bottom' | 'left' | 'right') => void;
+  kineticTransitions?: boolean;
+  setKineticTransitions?: (val: boolean) => void;
 }
 
-export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDockPosition }: Props) => {
+export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDockPosition, kineticTransitions, setKineticTransitions }: Props) => {
   const { language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'privacy' | 'interface' | 'archive' | 'sovereignty'>('profile');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(true);
@@ -35,7 +37,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const [creationUI, setCreationUI] = useState(user.creationUI || 'auto');
   
   // Security States
-  const [recoveryKeys, setRecoveryKeys] = useState(user.recoveryKeys || []);
+  const [recoveryKeys, setRecoveryKeys] = useState<{ code: string, isUsed: boolean }[]>(user.recoveryKeys || []);
   const [showKeys, setShowKeys] = useState(false);
   
   const [loading, setLoading] = useState(false);
@@ -43,7 +45,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = async () => {
+  const handleSave = async (customKeys?: any[]) => {
     setLoading(true);
     const fd = new FormData();
     fd.append('displayName', displayName);
@@ -51,6 +53,10 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
     fd.append('isPrivate', String(isPrivate));
     fd.append('showAge', String(showAge));
     fd.append('creationUI', creationUI);
+    // If we're saving newly generated keys, they won't be in the DB yet
+    if (customKeys) {
+      fd.append('recoveryKeys', JSON.stringify(customKeys));
+    }
     if (avatarBlob) fd.append('avatar', avatarBlob, 'avatar.jpg');
     if (bannerBlob) fd.append('banner', bannerBlob, 'banner.jpg');
     
@@ -73,6 +79,10 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
       const res = await api.generateRecoveryKeys();
       setRecoveryKeys(res.keys);
       setShowKeys(true);
+      // SYNC IMMEDIATELY TO PERSIST
+      const fd = new FormData();
+      fd.append('recoveryKeys', JSON.stringify(res.keys));
+      await onSave(fd);
     } catch (e) { alert("Key Generation Failed"); }
   };
 
@@ -158,7 +168,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4">Neural_Bio (Encryption Logs)</label>
                            <textarea className="w-full bg-[#050507] border border-white/5 p-5 rounded-3xl text-white outline-none focus:border-vani-blue/50 font-medium h-40 resize-none shadow-inner" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Initialize bio data..." />
                         </div>
-                        <button onClick={handleSave} disabled={loading} className="bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50">
+                        <button onClick={() => handleSave()} disabled={loading} className="bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50">
                            <Save size={20} /> {loading ? 'Saving...' : 'Update Matrix Node'}
                         </button>
                      </div>
@@ -185,6 +195,19 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                                 <div className="text-[8px] font-medium opacity-60 uppercase">{opt.desc}</div>
                              </div>
                            ))}
+                        </div>
+                     </div>
+
+                     {/* Kinetic Transitions */}
+                     <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
+                        <div className="flex items-center justify-between">
+                           <div>
+                              <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Zap size={20} className="text-vani-accent" /> Kinetic Transitions</div>
+                              <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">Enable GPU-accelerated page transitions. Disable for maximum performance during gaming.</p>
+                           </div>
+                           <button onClick={() => setKineticTransitions?.(!kineticTransitions)} className={`w-14 h-8 rounded-full relative transition-all ${kineticTransitions ? 'bg-vani-blue' : 'bg-gray-800'}`}>
+                              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${kineticTransitions ? 'left-7' : 'left-1'}`} />
+                           </button>
                         </div>
                      </div>
 
@@ -218,7 +241,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         </div>
                      </div>
 
-                     <button onClick={handleSave} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">Apply Interface Calibration</button>
+                     <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">Apply Interface Calibration</button>
                   </motion.div>
                 )}
 
@@ -237,13 +260,18 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         </div>
 
                         {recoveryKeys.length > 0 && showKeys && (
-                          <div className="grid grid-cols-2 gap-2 p-4 bg-black/40 rounded-2xl border border-white/5 font-mono text-[10px]">
-                             {recoveryKeys.map((k, i) => (
-                               <div key={i} className={`p-2 border border-white/5 rounded-lg flex justify-between ${k.isUsed ? 'opacity-30 line-through' : 'text-vani-blue'}`}>
-                                  <span>{k.code}</span>
-                                  {!k.isUsed && <div className="w-1 h-1 bg-vani-blue rounded-full animate-pulse" />}
-                               </div>
-                             ))}
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2 p-4 bg-black/40 rounded-2xl border border-white/5 font-mono text-[10px]">
+                               {recoveryKeys.map((k, i) => (
+                                 <div key={i} className={`p-2 border border-white/5 rounded-lg flex justify-between ${k.isUsed ? 'opacity-30 line-through text-gray-500' : 'text-vani-blue'}`}>
+                                    <span>{k.code}</span>
+                                    {!k.isUsed && <div className="w-1 h-1 bg-vani-blue rounded-full animate-pulse" />}
+                                 </div>
+                               ))}
+                            </div>
+                            <div className="bg-vani-blue/5 border border-vani-blue/20 p-4 rounded-xl text-[9px] text-vani-blue font-bold uppercase tracking-widest leading-relaxed">
+                               Note: These codes allow one-time bypass of the TOTP challenge. Use them if you lose access to your authenticator. Each code is invalidated after a single successful dispatch.
+                            </div>
                           </div>
                         )}
 
@@ -279,7 +307,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                            </button>
                         </div>
                      </div>
-                     <button onClick={handleSave} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">Apply Privacy Shields</button>
+                     <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">Apply Privacy Shields</button>
                   </motion.div>
                 )}
 

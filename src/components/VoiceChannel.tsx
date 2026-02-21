@@ -102,14 +102,20 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
 
   const initMedia = useCallback(async () => {
     try {
+      console.log("🎙️ Initializing Media Capture...");
       const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: !!initialVideo });
       userStream.current = s;
+      console.log("✅ Stream Captured:", s.id, "Tracks:", s.getTracks().length);
+      
       if (userVideoRef.current) userVideoRef.current.srcObject = s;
       
       await fetchDevices();
       const audioTrack = s.getAudioTracks()[0];
       const videoTrack = s.getVideoTracks()[0];
-      if (audioTrack) setSelectedMic(audioTrack.getSettings().deviceId || '');
+      if (audioTrack) {
+        console.log("🎤 Audio Track Active:", audioTrack.label);
+        setSelectedMic(audioTrack.getSettings().deviceId || '');
+      }
       if (videoTrack) setSelectedCamera(videoTrack.getSettings().deviceId || '');
 
       // MIC INTENSITY TRACKING
@@ -123,7 +129,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         source.connect(analyser);
         const data = new Uint8Array(analyser.frequencyBinCount);
         const updateIntensity = () => {
-          if (userStream.current) {
+          if (userStream.current && userStream.current.active) {
             analyser.getByteFrequencyData(data);
             const volume = data.reduce((a, b) => a + b, 0) / data.length;
             setMicIntensity(Math.min(volume * 2, 100));
@@ -131,20 +137,22 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
           }
         };
         updateIntensity();
-      } catch (e) {}
+      } catch (e) { console.warn("Intensity tracking initialization failed", e); }
       
-      socket.emit('join_voice', { 
-        roomID: channelId, 
-        user: { username: currentUser.username, avatar: currentUser.avatar, id: currentUser.id || currentUser._id } 
-      });
+      if (socket) {
+        console.log("📡 Emitting join_voice for room:", channelId);
+        socket.emit('join_voice', { 
+          roomID: channelId, 
+          user: { username: currentUser.username, avatar: currentUser.avatar, id: currentUser.id || currentUser._id } 
+        });
+      }
 
       socket.off('all_users');
       socket.on('all_users', (users: any[]) => {
+        console.log("👥 Active users in voice room:", users.length);
         const p: any[] = [];
         users.forEach(uData => {
-          // GUARD: Don't create duplicate peers
           if (peersRef.current.find(p => p.peerID === uData.socketId)) return;
-
           const peer = createPeer(uData.socketId, socket.id || '', s);
           const peerObj = { peerID: uData.socketId, peer, user: uData.user, status: 'connecting' };
           peersRef.current.push(peerObj);
@@ -155,12 +163,11 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
 
       socket.off('user_joined');
       socket.on('user_joined', (payload: any) => {
+        console.log("👤 User joining:", payload.user?.username);
         const item = peersRef.current.find(p => p.peerID === payload.callerID);
         if (item) {
-          // Existing peer: Process candidate/renegotiation signal
           item.peer.signal(payload.signal);
         } else {
-          // New peer: Create connection
           const peer = addPeer(payload.signal, payload.callerID, s);
           const peerObj = { peerID: payload.callerID, peer, user: payload.user, status: 'connecting' };
           peersRef.current.push(peerObj);
@@ -189,7 +196,6 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         peersRef.current = peersRef.current.filter(p => p.peerID !== userId);
         setPeers(prev => prev.filter(p => p.peerID !== userId));
 
-        // AUTO-DISCONNECT: If no peers are left, terminate the link for the last person
         if (peersRef.current.length === 0) {
           addToast("Identity Node De-synchronized. Terminating link.", 'info');
           setTimeout(() => {
@@ -197,10 +203,11 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
           }, 2000);
         }
       });
-    } catch (err) {
-      addToast("Media Access Denied", 'error');
+    } catch (err: any) {
+      console.error("❌ Media Access Error:", err);
+      addToast(`Media Access Denied: ${err.message}`, 'error');
     }
-  }, [channelId, initialVideo, socket, addToast, currentUser]);
+  }, [channelId, initialVideo, socket, addToast, currentUser, onLeave]);
 
   useEffect(() => {
     initMedia();
@@ -430,22 +437,51 @@ const RemoteNode = ({ peer, isFocus, user, status }: any) => {
   const [zoom, setZoom] = useState(1);
   const scale = useMotionValue(1); const x = useMotionValue(0); const y = useMotionValue(0);
 
-  useEffect(() => {
-    peer.on('stream', (stream: MediaStream) => {
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      const checkTracks = () => { const vTrack = stream.getVideoTracks()[0]; setHasVideo(!!vTrack && vTrack.enabled); };
-      checkTracks();
-      try {
-        const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
-        const audioContext = new AudioCtx();
-        const source = audioContext.createMediaStreamSource(stream);
-        const analyser = audioContext.createAnalyser(); analyser.fftSize = 256;
-        source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
-        const check = () => { if (!peer.destroyed) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); requestAnimationFrame(check); } };
-        check();
-      } catch { }
-    });
+  const attachStream = useCallback((stream: MediaStream) => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      // Force play in case of browser restrictions
+      videoRef.current.play().catch(e => console.warn("Auto-play blocked:", e));
+    }
+    const checkTracks = () => { 
+      const vTrack = stream.getVideoTracks()[0]; 
+      setHasVideo(!!vTrack && vTrack.enabled); 
+    };
+    checkTracks();
+    
+    // Listen for track changes
+    stream.onaddtrack = checkTracks;
+    stream.onremovetrack = checkTracks;
+
+    try {
+      const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
+      const audioContext = new AudioCtx();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser(); analyser.fftSize = 256;
+      source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
+      const check = () => { if (!peer.destroyed) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); requestAnimationFrame(check); } };
+      check();
+    } catch { }
   }, [peer]);
+
+  useEffect(() => {
+    // If stream already exists (common in fast signaling)
+    if (peer.streams && peer.streams[0]) {
+      attachStream(peer.streams[0]);
+    }
+
+    peer.on('stream', (stream: MediaStream) => {
+      console.log("🌊 Remote stream received from:", user?.username);
+      attachStream(stream);
+    });
+
+    // Handle track additions/removals specifically for simple-peer
+    peer.on('track', (track: MediaStreamTrack, stream: MediaStream) => {
+      console.log("🎵 Remote track added:", track.kind);
+      attachStream(stream);
+    });
+
+  }, [peer, user, attachStream]);
 
   const resetZoom = useCallback(() => { setZoom(1); scale.set(1); x.set(0); y.set(0); }, [scale, x, y]);
   const handleScroll = (e: React.WheelEvent) => { if (!hasVideo) return; const delta = e.deltaY * -0.001; const newZoom = Math.min(Math.max(zoom + delta, 1), 5); setZoom(newZoom); scale.set(newZoom); };
@@ -466,10 +502,16 @@ const RemoteNode = ({ peer, isFocus, user, status }: any) => {
   return (
     <div className={`relative group bg-gray-900 rounded-[32px] overflow-hidden border-2 transition-all shadow-2xl ${isFocus ? 'flex-[3]' : 'flex-1'} ${talking ? 'border-vani-blue shadow-[0_0_30px_rgba(0,210,255,0.2)]' : 'border-white/5'} ${hasVideo ? 'cursor-grab active:cursor-grabbing' : ''}`} onWheel={handleScroll}>
        <motion.div className="w-full h-full" style={{ scale, x, y }} drag={zoom > 1} dragConstraints={{ left: -500 * (zoom-1), right: 500 * (zoom-1), top: -300 * (zoom-1), bottom: 300 * (zoom-1) }}>
-          <video ref={videoRef} autoPlay playsInline className={`w-full h-full object-contain bg-black ${hasVideo ? 'block' : 'hidden'}`} />
+          {/* NEVER HIDE VIDEO ELEMENT: It carries the audio. Use opacity instead. */}
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            className={`w-full h-full object-contain bg-black transition-opacity duration-500 ${hasVideo ? 'opacity-100' : 'opacity-0'}`} 
+          />
        </motion.div>
        {!hasVideo && (
-         <div className="absolute inset-0 flex flex-col items-center justify-center bg-discord-dark">
+         <div className="absolute inset-0 flex flex-col items-center justify-center bg-discord-dark pointer-events-none">
             <div className="relative">
                <AnimatePresence>{talking && <motion.div animate={{ scale: [1, 1 + (micIntensity / 100), 1], opacity: [0.2, 0.5, 0.2], borderWidth: [2, 4, 2] }} transition={{ repeat: Infinity, duration: 0.5 }} className="absolute inset-[-25px] rounded-full border-vani-accent/40 pointer-events-none" style={{ borderColor: `rgba(255, 60, 60, ${micIntensity / 100})` }} />}</AnimatePresence>
                <img src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'node'}`} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl transition-transform duration-75" style={{ transform: `scale(${1 + (micIntensity / 500)})` }} />

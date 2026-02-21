@@ -11,6 +11,8 @@ import { ProfileMiniCard } from './ProfileMiniCard';
 import { NeuralSuggester } from './NeuralSuggester';
 import { NeuralDatePicker, NeuralTimePicker } from './NeuralPicker';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
+import { ArchitectRealm } from './ArchitectRealm';
 
 const AudioPlayer = ({ url }: { url: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,13 +54,17 @@ interface Props {
   onOpenMedia?: (type: 'image' | 'video' | 'audio', url: string) => void;
   onStartCall?: () => void;
   onStartVideo?: () => void;
+  oversightMode?: boolean;
+  setOversightMode?: (val: boolean) => void;
 }
 
-export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo }: Props) => {
+export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo, oversightMode = true, setOversightMode }: Props) => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
+  
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -80,6 +86,10 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportingMsgId, setReportingMsgId] = useState<string | null>(null);
+
   const [previewFile, setPreviewFile] = useState<{ file: File, type: string, previewUrl: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [previewCaption, setPreviewCaption] = useState('');
@@ -95,6 +105,21 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
   useEffect(() => { setMessages(initialMessages); }, [initialMessages]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const handleReport = async () => {
+    if (!reportReason.trim() || !reportingMsgId) return;
+    try {
+      await api.submitReport({
+        targetType: 'message',
+        targetId: reportingMsgId,
+        reason: reportReason
+      });
+      setShowReportModal(false);
+      setReportingMsgId(null);
+      setReportReason('');
+      addToast("Anomaly Logged.", 'success');
+    } catch (e) { addToast("Sync Failed.", 'error'); }
+  };
 
   useEffect(() => {
     if (channelId && currentUser) {
@@ -141,7 +166,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       setUploadProgress(0);
       await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
       setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
-      addToast("Transmission Success", 'success');
+      addToast(t('chat.transmission_success'), 'success');
     } catch (err: any) { addToast(`Matrix Sync Failed: ${err.message}`, 'error'); setUploadProgress(null); }
   };
 
@@ -159,13 +184,13 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           setUploadProgress(0);
           await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
           setUploadProgress(null);
-          addToast("Audio Note Synced", 'success');
+          addToast(t('chat.audio_note'), 'success');
         } catch (e: any) { addToast("Audio Sync Failed", 'error'); setUploadProgress(null); }
         stream.getTracks().forEach(t => t.stop());
       };
       recorder.start(); setRecording(recorder); setIsRecording(true); setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
-    } catch (err: any) { addToast(`Access Denied: ${err.message}`, 'error'); }
+    } catch (err: any) { addToast(t('chat.access_denied'), 'error'); }
   };
 
   const stopRecording = (shouldSend: boolean) => {
@@ -196,7 +221,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   };
 
   const handleSeverMessage = async (id: string) => {
-    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); addToast("Transmission Severed", 'success'); } catch (e) { addToast("Severance failed", 'error'); }
+    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); addToast(t('chat.sever_transmission'), 'success'); } catch (e) { addToast("Severance failed", 'error'); }
   };
 
   const handleStartEdit = (msg: IMessage) => {
@@ -208,7 +233,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
     try {
       await api.editMessage(editingMessageId, editInput);
       setEditingMessageId(null); setEditInput('');
-      addToast("Recalibrated", 'success');
+      addToast(t('common.edit'), 'success');
     } catch (e) { addToast("Calibration Failed", 'error'); }
   };
 
@@ -334,15 +359,55 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
   const isOwner = currentUser && activeRealm?.owner === (currentUser.id || currentUser._id);
   const canPost = channelType !== 'announcement' || isOwner;
+  const isSystem = (activeRealm as any)?.isSystem || activeRealm?.name === "Architect_Nexus";
+
+  // --- SPECIALIZED MODERATION OVERRIDE ---
+  if (isSystem && activeChannel?.type?.startsWith('mod_') && oversightMode) {
+    const modType = activeChannel.type.split('_')[1]; 
+    return (
+      <div className="flex-1 flex flex-col bg-discord-dark h-full overflow-hidden">
+         <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-discord-sidebar/20 backdrop-blur-md shrink-0">
+            <div className="flex items-center">
+               <ShieldCheck size={20} className="text-vani-blue mr-3" />
+               <span className="font-black text-white uppercase tracking-tighter text-sm">{activeChannel.name} // Oversight_Protocol</span>
+            </div>
+            <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+               <button onClick={() => setOversightMode?.(true)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${oversightMode ? 'bg-vani-blue text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>Oversight</button>
+               <button onClick={() => setOversightMode?.(false)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${!oversightMode ? 'bg-vani-gradient text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>Signals</button>
+            </div>
+         </div>
+         <div className="flex-1 overflow-hidden">
+            <ArchitectRealm 
+              embeddedMode={true} 
+              initialTab={modType === 'stats' ? 'dashboard' : modType === 'reports' ? 'reports' : modType === 'posts' ? 'broadcasts' : modType === 'users' ? 'identities' : modType === 'messages' ? 'messages' : 'dashboard'} 
+            />
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-discord-dark h-full relative" onClick={() => { setShowCustomPicker(false); setReactionPicker(null); setShowMediaMenu(false); setMsgContextMenu(null); }}>
       <AnimatePresence>
+        {/* Header Toggle for Signal Mode when inside a Mod channel */}
+        {isSystem && activeChannel?.type?.startsWith('mod_') && !oversightMode && (
+          <div className="absolute top-0 left-0 right-0 h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#0a0a0c]/80 backdrop-blur-md z-[60]">
+             <div className="flex items-center">
+                <Zap size={20} className="text-vani-accent mr-3" />
+                <span className="font-black text-white uppercase tracking-tighter text-sm">{activeChannel.name} // Signal_Tracker</span>
+             </div>
+             <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                <button onClick={() => setOversightMode?.(true)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${oversightMode ? 'bg-vani-blue text-black' : 'text-gray-500 hover:text-white'}`}>Oversight</button>
+                <button onClick={() => setOversightMode?.(false)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${!oversightMode ? 'bg-vani-gradient text-white' : 'text-gray-500 hover:text-white'}`}>Signals</button>
+             </div>
+          </div>
+        )}
+
         {previewFile && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
              <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#0a0a0c] w-full max-w-2xl rounded-[40px] border border-white/5 overflow-hidden flex flex-col shadow-2xl">
                 <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                   <div className="flex items-center space-x-3"><div className="w-8 h-8 bg-vani-blue/10 rounded-lg flex items-center justify-center text-vani-blue"><ImageIcon size={18} /></div><span className="text-xs font-black text-white uppercase tracking-widest">Media_Preview</span></div>
+                   <div className="flex items-center space-x-3"><div className="w-8 h-8 bg-vani-blue/10 rounded-lg flex items-center justify-center text-vani-blue"><ImageIcon size={18} /></div><span className="text-xs font-black text-white uppercase tracking-widest">{t('chat.media_preview')}</span></div>
                    <button onClick={() => setPreviewFile(null)} className="text-gray-500 hover:text-white"><X size={20} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
@@ -350,7 +415,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                    <div className="w-full mt-8"><div className="bg-white/5 p-4 rounded-2xl border border-white/5"><label className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Encryption_Caption</label><input type="text" placeholder="Add a transmission note..." className="bg-transparent w-full outline-none text-white text-sm" value={previewCaption} onChange={(e)=>setPreviewCaption(e.target.value)} /></div></div>
                 </div>
                 <div className="p-6 border-t border-white/5 bg-black/40">
-                   {uploadProgress !== null ? <div className="space-y-3"><div className="flex justify-between text-[10px] font-black uppercase text-vani-blue"><span>Uploading...</span><span>{uploadProgress}%</span></div><div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-gradient" initial={{width:0}} animate={{width:`${uploadProgress}%`}} /></div></div> : <div className="flex space-x-4"><button onClick={()=>setPreviewFile(null)} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-500 font-black uppercase text-[10px]">Cancel</button><button onClick={confirmUpload} className="flex-[2] py-4 rounded-2xl bg-vani-gradient text-white font-black uppercase text-[10px] shadow-2xl flex items-center justify-center space-x-3"><Send size={16} /><span>Confirm Sync</span></button></div>}
+                   {uploadProgress !== null ? <div className="space-y-3"><div className="flex justify-between text-[10px] font-black uppercase text-vani-blue"><span>{t('chat.uploading')}</span><span>{uploadProgress}%</span></div><div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-gradient" initial={{width:0}} animate={{width:`${uploadProgress}%`}} /></div></div> : <div className="flex space-x-4"><button onClick={()=>setPreviewFile(null)} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-500 font-black uppercase text-[10px]">{t('common.cancel')}</button><button onClick={confirmUpload} className="flex-[2] py-4 rounded-2xl bg-vani-gradient text-white font-black uppercase text-[10px] shadow-2xl flex items-center justify-center space-x-3"><Send size={16} /><span>{t('chat.confirm_sync')}</span></button></div>}
                 </div>
              </motion.div>
           </motion.div>
@@ -379,15 +444,15 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              </div>
 
              <div className="space-y-1">
-                <ContextItem label="Reply Transmission" icon={<Reply size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) { setReplyingTo(m); setMsgContextMenu(null); } }} />
+                <ContextItem label={t('chat.reply_transmission')} icon={<Reply size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) { setReplyingTo(m); setMsgContextMenu(null); } }} />
                 {msgContextMenu.isMe && (
                   <>
-                    <ContextItem label="Edit Transmission" icon={<Edit3 size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) handleStartEdit(m); }} />
-                    <ContextItem label="Sever Transmission" icon={<Trash2 size={14} />} variant="danger" onClick={() => handleSeverMessage(msgContextMenu.msgId)} />
+                    <ContextItem label={t('chat.edit_transmission')} icon={<Edit3 size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m) handleStartEdit(m); }} />
+                    <ContextItem label={t('chat.sever_transmission')} icon={<Trash2 size={14} />} variant="danger" onClick={() => handleSeverMessage(msgContextMenu.msgId)} />
                   </>
                 )}
-                <ContextItem label="Forward Link" icon={<Forward size={14} />} onClick={() => addToast("Forward Stub", 'info')} />
-                <ContextItem label="Report Violation" icon={<AlertTriangle size={14} />} variant="danger" onClick={() => addToast("Oversight notified.", 'info')} />
+                <ContextItem label={t('chat.forward_link')} icon={<Forward size={14} />} onClick={() => addToast("Forward Stub", 'info')} />
+                <ContextItem label={t('chat.report_violation')} icon={<AlertTriangle size={14} />} variant="danger" onClick={() => { setReportingMsgId(msgContextMenu.msgId); setShowReportModal(true); setMsgContextMenu(null); }} />
              </div>
           </motion.div>
         )}
@@ -400,6 +465,27 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           >
              {Object.keys(CUSTOM_EMOJI_MAP).map(code => { const Icon = CUSTOM_EMOJI_MAP[code]; return <div key={code} onClick={() => handleReact(reactionPicker.messageId, code)} className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-all"><Icon /></div> })}
           </motion.div>
+        )}
+
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black/90 z-[5000] flex items-center justify-center p-4 backdrop-blur-md">
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-red-500/20 p-8 shadow-2xl">
+                <div className="flex items-center space-x-3 mb-6">
+                   <div className="p-2 bg-red-500/10 rounded-xl text-red-500"><AlertTriangle size={20} /></div>
+                   <h2 className="text-xl font-black text-white uppercase tracking-tighter">Report_Anomaly</h2>
+                </div>
+                <div className="space-y-6">
+                   <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">Anomalous Signal Reason</label>
+                      <textarea className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-sm outline-none focus:border-red-500/50 resize-none h-32" placeholder="Describe the violation..." value={reportReason} onChange={(e) => setReportReason(e.target.value)} />
+                   </div>
+                   <div className="flex gap-3">
+                      <button onClick={handleReport} className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-500/20">Log Anomaly</button>
+                      <button onClick={() => { setShowReportModal(false); setReportingMsgId(null); }} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Abort</button>
+                   </div>
+                </div>
+             </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -496,6 +582,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                  renderContent={renderContent}
                  renderMedia={renderMedia}
                  renderBadge={renderBadge}
+                 t={t}
                />
              </div>
            );
@@ -510,7 +597,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                <div className="flex items-center space-x-3 overflow-hidden">
                   <Reply size={14} className="text-vani-blue shrink-0" />
                   <div className="text-[10px] text-gray-400 truncate">
-                    Replying to <span className="font-black text-white uppercase">{replyingTo.sender?.username}</span>
+                    {t('chat.replying_to')} <span className="font-black text-white uppercase">{replyingTo.sender?.username}</span>
                     <p className="opacity-50 italic truncate">{replyingTo.content || 'Visual_Data'}</p>
                   </div>
                </div>
@@ -529,29 +616,29 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center space-x-3">
                      <div className="p-2 bg-vani-blue/10 rounded-xl text-vani-blue"><Clock size={18} /></div>
-                     <span className="text-xs font-black text-white uppercase tracking-widest">Neural_Schedule_Dispatch</span>
+                     <span className="text-xs font-black text-white uppercase tracking-widest">{t('chat.schedule_title')}</span>
                   </div>
                   <button onClick={() => setShowScheduleModal(false)} className="text-gray-500 hover:text-white"><X size={18} /></button>
                </div>
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div className="space-y-2">
-                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Calendar size={10} className="text-vani-blue" /> Dispatch_Date</label>
+                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Calendar size={10} className="text-vani-blue" /> {t('chat.dispatch_date')}</label>
                      <div 
                        onClick={() => setShowDatePicker(true)}
                        className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none cursor-pointer hover:border-vani-blue/30 transition-all flex items-center justify-between"
                      >
-                        <span className={scheduledDate ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledDate || 'Select Date'}</span>
+                        <span className={scheduledDate ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledDate || t('common.navigator')}</span>
                         <Calendar size={16} className="text-gray-600" />
                      </div>
                   </div>
                   <div className="space-y-2">
-                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Clock size={10} className="text-vani-blue" /> Dispatch_Time</label>
+                     <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Clock size={10} className="text-vani-blue" /> {t('chat.dispatch_time')}</label>
                      <div 
                        onClick={() => setShowTimePicker(true)}
                        className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none cursor-pointer hover:border-vani-blue/30 transition-all flex items-center justify-between"
                      >
-                        <span className={scheduledTime ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledTime || 'Set Time'}</span>
+                        <span className={scheduledTime ? 'text-sm font-bold' : 'text-xs text-gray-600 font-black uppercase'}>{scheduledTime || t('common.navigator')}</span>
                         <Clock size={16} className="text-gray-600" />
                      </div>
                   </div>
@@ -564,7 +651,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
                <div className="mb-6 p-4 bg-vani-blue/5 border border-vani-blue/10 rounded-xl">
                   <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
-                     Temporal Dispatch Logic: Signals will be held in the Vani Buffer until the selected chronology. Ensure your node remains synced with the network.
+                     {t('chat.schedule_desc')}
                   </p>
                </div>
 
@@ -573,13 +660,13 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                  disabled={!scheduledDate || !scheduledTime || !input.trim()}
                  className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl disabled:opacity-30 disabled:grayscale transition-all"
                >
-                  Finalize Schedule Protocol
+                  {t('chat.finalize_schedule')}
                </button>
             </motion.div>
           )}
           {suggestion && <NeuralSuggester query={suggestion.query} type={suggestion.type} onSelect={handleSelectSuggestion} position={{ top: 0, left: 60 }} />}
           {showMediaMenu && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 left-6 bg-[#0a0a0c] border border-white/5 p-2 rounded-3xl shadow-2xl z-50 flex space-x-2"><MediaBtn icon={<ImageIcon size={18} />} label="Image" onClick={() => imageInputRef.current?.click()} color="text-blue-500" /><MediaBtn icon={<Camera size={18} />} label="Camera" onClick={() => cameraInputRef.current?.click()} color="text-green-500" /><MediaBtn icon={<FileIcon size={18} />} label="File" onClick={() => fileInputRef.current?.click()} color="text-yellow-500" /><MediaBtn icon={<Mic size={18} />} label="Audio" onClick={startRecording} color="text-red-500" /></motion.div>}
-          {isRecording && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-4 bottom-4 bg-[#0a0a0c] border border-red-500/30 p-4 rounded-[32px] shadow-2xl z-50 flex items-center justify-between"><div className="flex items-center space-x-4"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="font-mono text-white font-black">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Recording...</span></div><div className="flex items-center space-x-3"><button onClick={() => stopRecording(false)} className="p-3 text-gray-500 hover:text-white transition-all"><X size={20} /></button><button onClick={() => stopRecording(true)} className="w-12 h-12 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Send size={20} /></button></div></motion.div>}
+          {isRecording && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-4 bottom-4 bg-[#0a0a0c] border border-red-500/30 p-4 rounded-[32px] shadow-2xl z-50 flex items-center justify-between"><div className="flex items-center space-x-4"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="font-mono text-white font-black">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('chat.recording')}</span></div><div className="flex items-center space-x-3"><button onClick={() => stopRecording(false)} className="p-3 text-gray-500 hover:text-white transition-all"><X size={20} /></button><button onClick={() => stopRecording(true)} className="w-12 h-12 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Send size={20} /></button></div></motion.div>}
           {showCustomPicker && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 right-6 bg-[#0a0a0c] border border-white/5 p-4 rounded-[32px] shadow-2xl grid grid-cols-3 gap-4 z-50">{Object.keys(CUSTOM_EMOJI_MAP).map(code => { const Icon = CUSTOM_EMOJI_MAP[code]; return <div key={code} onClick={() => setInput(prev => prev + ' ' + code + ' ')} className="p-3 bg-white/5 rounded-2xl hover:bg-vani-blue/20 cursor-pointer transition-all flex items-center justify-center"><Icon /></div> })}</motion.div>}
           {uploadProgress !== null && !previewFile && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-vani-blue/10 backdrop-blur-md border border-vani-blue/30 px-6 py-3 rounded-2xl shadow-2xl z-[60] flex items-center space-x-4 min-w-[240px]"><div className="w-2 h-2 bg-vani-blue rounded-full animate-ping" /><div className="flex-1"><div className="flex justify-between items-center mb-1"><span className="text-[8px] font-black text-white uppercase tracking-widest">Neural_Syncing...</span><span className="text-[10px] font-mono text-vani-blue">{uploadProgress}%</span></div><div className="h-1 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-blue" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} /></div></div></motion.div>}
         </AnimatePresence>
@@ -602,7 +689,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              </motion.button>
              
              <textarea 
-               placeholder={`Secure Transmission...`} 
+               placeholder={t('chat.placeholder')} 
                className="bg-transparent flex-1 focus:outline-none text-gray-200 placeholder-gray-600 py-2.5 text-sm font-medium resize-none max-h-32 min-h-[24px] leading-tight custom-scrollbar" 
                rows={1}
                value={input} 
@@ -645,7 +732,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              </div>
           </motion.div>
         ) : (
-          <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">Read-Only Protocol Active</span></div>
+          <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">{t('chat.announcement_only')}</span></div>
         )}
       </div>
       {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); addToast("Sync Request Buffered", 'success'); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
@@ -653,7 +740,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   );
 };
 
-const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge }: any) => {
+const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge, t }: any) => {
   const x = useMotionValue(0);
   const swipeThreshold = 60;
   const opacity = useTransform(x, [0, swipeThreshold], [0, 1]);
@@ -739,13 +826,13 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
                     if (e.key === 'Escape') setEditingMessageId(null); 
                   }} 
                 />
-                <div className="text-[8px] font-black uppercase text-gray-500">SHIFT+ENTER for new line • ESC to cancel • ENTER to save</div>
+                <div className="text-[8px] font-black uppercase text-gray-500">{t('chat.edit_hint')}</div>
              </div>
            ) : (
              <>
                {isDeleted ? (
                  <div className="italic text-[10px] text-gray-600 uppercase tracking-widest py-1 flex items-center gap-2">
-                   <Lock size={10} /> Transmission_Purged_By_Author
+                   <Lock size={10} /> {t('chat.deleted')}
                  </div>
                ) : (
                  <>

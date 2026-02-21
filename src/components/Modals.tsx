@@ -4,9 +4,11 @@ import { X, Users, Check, Zap, Hash, Shield, Globe, Settings, UserPlus, Trash2, 
 import { api } from '../services/api';
 import type { IUser, IRealm, IChannel } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm, onClose: () => void, onUpdate: () => void }) => {
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'members'>('overview');
   const [name, setName] = useState(realm.name);
   const [vanity, setVanity] = useState(realm.vanityHandle || '');
@@ -85,6 +87,27 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
                    <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue font-bold" value={name} onChange={(e) => setName(e.target.value)} />
                    <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-vani-blue font-black opacity-50">/join/</span><input className="w-full bg-[#050507] border border-gray-800 p-4 pl-14 rounded-2xl text-white outline-none focus:border-vani-blue font-mono text-sm" value={vanity} onChange={(e) => setVanity(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))} /></div>
                    <button onClick={handleSaveOverview} className="bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"><Save size={16} /> Finalize Recalibration</button>
+                   
+                   {realm.owner === (user?.id || user?._id) && !realm.isSystem && (
+                     <div className="border-t border-white/5 pt-6 mt-4">
+                        <div className="bg-red-500/5 border border-red-500/20 p-6 rounded-[24px] flex items-center justify-between">
+                           <div>
+                              <div className="text-sm font-black text-red-500 uppercase tracking-tight">Sovereignty Purge</div>
+                              <p className="text-[10px] text-gray-500 font-medium mt-1 max-w-xs">Permanently delete this realm and all its data. This action is irreversible.</p>
+                           </div>
+                           <button 
+                             onClick={async () => {
+                               if(confirm("CRITICAL: Confirm realm deletion?")) {
+                                 try { await api.deleteRealm(realm._id); window.location.reload(); } catch(e) { addToast("Purge failed", 'error'); }
+                               }
+                             }} 
+                             className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all"
+                           >
+                              Delete Realm
+                           </button>
+                        </div>
+                     </div>
+                   )}
                 </div>
                 <input type="file" ref={iconRef} hidden onChange={(e) => { const f = e.target.files?.[0]; if(f){ setIconBlob(f); setIconPreview(URL.createObjectURL(f)); } }} />
                 <input type="file" ref={bannerRef} hidden onChange={(e) => { const f = e.target.files?.[0]; if(f){ setBannerBlob(f); setBannerPreview(URL.createObjectURL(f)); } }} />

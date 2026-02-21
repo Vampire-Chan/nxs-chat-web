@@ -169,14 +169,25 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
           </div>
           <DockIcon icon={<Compass size={22} />} active={selectedRealmId === 'explore'} onClick={() => onSelect({ _id: 'explore' })} isVertical={isVertical} />
           <DockIcon icon={<Users size={20} />} active={selectedRealmId === 'social'} onClick={onSocial} isVertical={isVertical} />
-          {user.isAdmin && <DockIcon icon={<Shield size={20} className="text-vani-blue" />} active={selectedRealmId === 'architect'} onClick={() => onSelect({ _id: 'architect' })} isVertical={isVertical} />}
+          {user.isAdmin && (
+            <DockIcon 
+              icon={<Shield size={20} className="text-vani-blue" />} 
+              active={selectedRealmId === 'architect' || realms.some(r => r._id === selectedRealmId && (r as any).isSystem)} 
+              onClick={() => {
+                const systemRealm = realms.find(r => (r as any).isSystem);
+                if (systemRealm) onSelect(systemRealm);
+                else onSelect({ _id: 'architect' });
+              }} 
+              isVertical={isVertical} 
+            />
+          )}
         </div>
 
         <div className={`${isVertical ? 'w-8 h-[1px] my-4' : 'w-[1px] h-8 mx-4'} bg-gray-800 flex-shrink-0`} />
 
-        {/* SCROLLABLE REALMS LIST */}
+        {/* SCROLLABLE REALMS LIST (Non-System Only) */}
         <div className={`flex ${isVertical ? 'flex-col space-y-3' : 'flex-row space-x-3'} py-2`}>
-          {realms.map(realm => (
+          {realms.filter(r => !(r as any).isSystem).map(realm => (
             <motion.div 
               key={realm._id} 
               whileHover={{ scale: 1.1 }}

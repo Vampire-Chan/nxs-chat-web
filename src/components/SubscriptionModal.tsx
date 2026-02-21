@@ -19,7 +19,7 @@ export const SubscriptionModal = ({ onClose, currentUser }: Props) => {
       await api.submitPayment({
         method,
         transactionId: txnId,
-        amount: '1000' // Example: 1000 INR or Equivalent
+        amount: 1000 // Example: 1000 INR
       });
       setSubmitted(true);
     } catch (e: any) { alert(e.response?.data?.message || "Transmission failed"); }

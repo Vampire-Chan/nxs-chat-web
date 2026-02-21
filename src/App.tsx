@@ -46,6 +46,8 @@ function App() {
 }
 
 function AppContent() {
+  const { t } = useLanguage();
+  const { addToast } = useToast();
   const { isAuthenticated, user, login } = useAuth();
   const [bootProgress, setBootProgress] = useState(0);
   const [isBooting, setIsBooting] = useState(true);
@@ -59,11 +61,31 @@ function AppContent() {
     startBootSequence();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const checkRegion = async () => {
+      try {
+        if (sessionStorage.getItem('lang_suggestion_shown')) return;
+        const res = await fetch('https://ipinfo.io/json');
+        if (!res.ok) return;
+        const data = await res.json();
+        const complexRegions = ['Punjab', 'Jammu and Kashmir', 'Himachal Pradesh', 'Uttarakhand', 'Bihar', 'Uttar Pradesh', 'Maharashtra', 'Karnataka', 'Andhra Pradesh', 'Telangana'];
+        if (data.country === 'IN' && complexRegions.includes(data.region)) {
+          setTimeout(() => {
+            if (addToast) {
+              addToast(t('ui.node_calib'), 'info');
+              sessionStorage.setItem('lang_suggestion_shown', 'true');
+            }
+          }, 2000);
+        }
+      } catch (e) { console.warn("Region check suppressed", e); }
+    };
+    checkRegion();
+  }, [t, addToast]);
+
   if (isBooting) return <LaunchScreen progress={bootProgress} />;
 
   return (
     <Routes>
-      {/* PUBLIC ROUTES */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="/faq" element={<FAQPage />} />
@@ -71,16 +93,18 @@ function AppContent() {
       <Route path="/guidelines" element={<GuidelinesPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/app" /> : <AuthPage />} />
       
-      {/* LEGACY REDIRECTS */}
-      <Route path="/join/:code" element={<Navigate to="/app/join/:code" replace />} />
-
-      {/* APP ROUTES (PROTECTED) */}
+      {/* GLOBAL PREFIXED APP ROUTES */}
       <Route path="/app" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/id/:username" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/join/:code" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/post/:postId" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       <Route path="/app/msg/:channelId/:msgId" element={isAuthenticated ? <Dashboard user={user!} updateUserState={login} /> : <Navigate to="/login" />} />
       
+      {/* LEGACY REDIRECTS (Fallback to /app) */}
+      <Route path="/join/:code" element={<Navigate to="/app/join/:code" replace />} />
+      <Route path="/id/:username" element={<Navigate to="/app/id/:username" replace />} />
+      <Route path="/post/:postId" element={<Navigate to="/app/post/:postId" replace />} />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
@@ -122,28 +146,22 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [sidebarWidth, setSidebarWidth] = useState(savedState.sidebarWidth || 240);
   const [isResizing, setIsResizing] = useState(false);
   const [kineticTransitions, setKineticTransitions] = useState<boolean>(savedState.kineticTransitions !== undefined ? savedState.kineticTransitions : true);
+  
+  // GLOBAL OVERSIGHT TOGGLE
+  const [oversightMode, setOversightMode] = useState(true);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); setShowConnPill(true); setTimeout(() => setShowConnPill(false), 3000); };
     const handleOffline = () => { setIsOnline(false); setShowConnPill(true); };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // BROWSER NOTIFICATION PERMISSION
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-
+    if ("Notification" in window && Notification.permission === "default") { Notification.requestPermission(); }
     return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, []);
 
   const sendLocalNotification = (title: string, body: string, icon?: string) => {
     if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-      new Notification(title, {
-        body,
-        icon: icon || '/nexus.svg',
-        tag: 'yantravani-sync'
-      });
+      new Notification(title, { body, icon: icon || '/nexus.svg', tag: 'yantravani-sync' });
     }
   };
 
@@ -169,10 +187,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   useEffect(() => {
     window.addEventListener('mousemove', resize);
     window.addEventListener('mouseup', stopResizing);
-    return () => {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
-    };
+    return () => { window.removeEventListener('mousemove', resize); window.removeEventListener('mouseup', stopResizing); };
   }, [resize, stopResizing]);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -212,7 +227,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     else if (viewMode === 'architect') context = t('ui.architect_realm');
     else if (viewMode === 'social') context = t('ui.social_matrix');
     else if (activeRealm) context = activeChannel ? `#${activeChannel.name}` : activeRealm.name;
-    
     document.title = `${context} - Yantravani`;
   }, [viewMode, activeRealm, activeChannel, t]);
 
@@ -220,119 +234,67 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     const userId = user?.id || user?._id;
     const token = localStorage.getItem('token');
     if (!user || !userId || !token) return;
-
     const hostname = window.location.hostname;
     const isLocal = hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.');
     const socketUrl = import.meta.env.VITE_API_URL || (isLocal ? `http://${hostname}:5000` : '');
-
-    const s = io(socketUrl, { 
-      auth: { token: token },
-      query: { userId: userId },
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000
-    });
-
+    const s = io(socketUrl, { auth: { token }, query: { userId }, reconnection: true });
     socketRef.current = s;
-
-    s.on('new_notification', (notif: any) => {
-      setLiveSignal(notif);
-      setTimeout(() => setLiveSignal(null), 5000);
-    });
-
+    s.on('new_notification', (notif: any) => { setLiveSignal(notif); setTimeout(() => setLiveSignal(null), 5000); });
     s.on('receive_message', (msg: any) => { 
       const msgChannelId = msg.channel?._id || msg.channel;
-      if (msgChannelId === activeChannel?._id) {
-        setMessages(prev => [...prev, msg]); 
-        // Auto-mark as read if already in channel
-        api.markNotificationsReadByChannel(msgChannelId);
-      } else {
-        // Show Samsung-style pill for in-app msg
-        setLiveSignal({
-          sender: msg.sender,
-          content: msg.content || "Incoming Transmission...",
-          type: 'message'
-        });
-        setTimeout(() => setLiveSignal(null), 5000);
-
-        // Browser level fallback
-        sendLocalNotification(
-          `New signal from ${msg.sender.username}`,
-          msg.content || "Incoming Visual Data"
-        );
-      }
-      loadDMs();
-      setMatrixRefreshKey(k => k + 1); 
+      if (msgChannelId === activeChannel?._id) { setMessages(prev => [...prev, msg]); api.markNotificationsReadByChannel(msgChannelId); } 
+      else { setLiveSignal({ sender: msg.sender, content: msg.content || "Incoming Transmission...", type: 'message' }); setTimeout(() => setLiveSignal(null), 5000); sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || "Incoming Visual Data"); }
+      loadDMs(); setMatrixRefreshKey(k => k + 1); 
     });
-
-    s.on('incoming_call', (data: any) => {
-      setIncomingCall(data);
-      // AUTO TIMEOUT: 1 MINUTE
-      setTimeout(() => {
-        setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev));
-      }, 60000);
-
-      sendLocalNotification(
-        `Incoming ${data.type} call`,
-        `${data.sender.username} is establishing a link...`
-      );
-    });
-
-    s.on('call_rejected', ({ channelId }: any) => {
-      setLiveSignal({
-        sender: { username: 'SYSTEM' },
-        content: 'Identity Link Rejected',
-        type: 'error'
-      });
-      setTimeout(() => setLiveSignal(null), 5000);
-      setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev);
-    });
-    
-    s.on('identity_sync_update', async () => {
-      try {
-        const u = await api.getUserProfile(user?.id || user?._id || '');
-        updateUserState(localStorage.getItem('token') || '', u);
-        loadDMs();
-        loadRealms();
-        setMatrixRefreshKey(k => k + 1);
-      } catch (e) {}
-    });
-
+    s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification(`Incoming ${data.type} call`, `${data.sender.username} is establishing a link...`); });
+    s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: 'Identity Link Rejected', type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });
+    s.on('identity_sync_update', async () => { try { const u = await api.getUserProfile(user?.id || user?._id || ''); updateUserState(localStorage.getItem('token') || '', u); loadDMs(); loadRealms(); setMatrixRefreshKey(k => k + 1); } catch (e) {} });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
     s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });
     s.on('channel_metadata_update', (updated: IChannel) => { setDms(prev => prev.map(d => d._id === updated._id ? updated : d)); if (activeChannel?._id === updated._id) setActiveChannel(updated); });
     s.on('active_streams', (streamers: IUser[]) => { setLiveStreamers(streamers); });
-
     loadRealms(); loadDMs();
     if (activeChannel) handleSelectChannel(activeChannel);
     if (viewMode === 'explore') api.getGlobalPosts().then(setPosts).catch(console.error);
     return () => { s.disconnect(); };
   }, []);
 
-  const loadRealms = async () => { 
-    setIsSyncing(true);
-    try { const d = await api.getMyRealms(); setRealms(d); } catch(e){} 
-    finally { setIsSyncing(false); }
-  };
-  const loadDMs = async () => { 
-    setIsSyncing(true);
-    try { const d = await api.getMyDMs(); setDms(d); } catch(e){} 
-    finally { setIsSyncing(false); }
-  };
+  const loadRealms = async () => { setIsSyncing(true); try { const d = await api.getMyRealms(); setRealms(d); } catch(e){} finally { setIsSyncing(false); } };
+  const loadDMs = async () => { setIsSyncing(true); try { const d = await api.getMyDMs(); setDms(d); } catch(e){} finally { setIsSyncing(false); } };
 
   const handleSelectRealm = async (realm: IRealm | { _id: string }) => {
     setViewingUserId(null); if (isMobile) setIsSidebarOpen(false);
-    
     if (realm._id === 'home') { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); loadDMs(); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'home', activeRealm: null, activeChannel: null })); return; }
     if (realm._id === 'explore') { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); return; }
     if (realm._id === 'profile') { setViewMode('profile'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'profile', activeRealm: null, activeChannel: null })); return; }
     if (realm._id === 'architect') { setViewMode('architect'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'architect', activeRealm: null, activeChannel: null })); return; }
-    if (realm._id === 'social') { setViewMode('social'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'social', activeRealm: null, activeChannel: null })); return; }
-
-    setViewMode('realm'); setActiveChannel(null);
-    try { const d = await api.getRealmDetails(realm._id); setActiveRealm(d); const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement'); if (firstChannel) handleSelectChannel(firstChannel); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'realm', activeRealm: d })); } catch(e) { addToast("Failed to access node.", 'error'); }
-  };
+        if (realm._id === 'social') { setViewMode('social'); setActiveRealm(null); setActiveChannel(null); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'social', activeRealm: null, activeChannel: null })); return; }
+        
+        // Check if it's the System Realm (Architect Nexus)
+        const isSystem = (realm as any).isSystem;
+        if (isSystem) {
+          setViewMode('architect');
+          setActiveChannel(null);
+          try {
+            const d = await api.getRealmDetails(realm._id);
+            setActiveRealm(d);
+            const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement' || c.type.startsWith('mod_'));
+            if (firstChannel) handleSelectChannel(firstChannel);
+            localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'architect', activeRealm: d }));
+          } catch (e) { addToast(t('settings.access_failed'), 'error'); }
+          return;
+        }
+    
+        setViewMode(realm._id); setActiveChannel(null);
+        try {
+          const d = await api.getRealmDetails(realm._id);
+          setActiveRealm(d);
+          const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement' || c.type.startsWith('mod_'));
+          if (firstChannel) handleSelectChannel(firstChannel);
+          localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: realm._id, activeRealm: d }));
+        } catch (e) { addToast(t('settings.access_failed'), 'error'); }
+      };
 
   const handleSelectChannel = async (channel: IChannel) => {
     if (isMobile) setIsSidebarOpen(false);
@@ -342,25 +304,21 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     const channelWithFixedName = { ...channel, name: displayName };
     setActiveChannel(channelWithFixedName); socketRef.current?.emit('join_channel', channel._id);
     localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), activeChannel: channelWithFixedName }));
-    if (channel.type === 'text' || channel.type === 'dm' || channel.type === 'group_dm') { const msgs = await api.getMessages(channel._id); setMessages(msgs); setMatrixRefreshKey(k => k + 1); }
+    if (['text', 'dm', 'group_dm', 'mod_messages', 'mod_reports', 'mod_users', 'mod_stats'].includes(channel.type)) { 
+      try {
+        const msgs = await api.getMessages(channel._id); 
+        setMessages(msgs); 
+        setMatrixRefreshKey(k => k + 1); 
+      } catch(e) { setMessages([]); }
+    }
     else { const ps = await api.getPosts(channel._id); setPosts(ps); }
   };
 
   const handleAcceptCall = (type: 'voice' | 'video') => {
     if (!incomingCall) return;
     let channel = dms.find(d => d._id === incomingCall.channelId);
-    if (!channel) {
-      for (const r of realms) {
-        const found = r.channels?.find(c => c._id === incomingCall.channelId);
-        if (found) { channel = found; break; }
-      }
-    }
-    if (channel) {
-      handleSelectChannel(channel);
-      setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
-      // Clear notification for this call
-      api.markNotificationsReadByChannel(channel._id);
-    }
+    if (!channel) { for (const r of realms) { const found = r.channels?.find(c => c._id === incomingCall.channelId); if (found) { channel = found; break; } } }
+    if (channel) { handleSelectChannel(channel); setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any); api.markNotificationsReadByChannel(channel._id); }
     setIncomingCall(null);
   };
 
@@ -377,27 +335,15 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const handleViewOtherProfile = (id: string) => { setViewingUserId(id); setViewMode('view-profile'); setActiveRealm(null); setActiveChannel(null); if (isMobile) setIsSidebarOpen(false); };
   const handleViewSocials = (tab: any, userId: string) => { setSocialTab(tab); setSocialTargetId(userId); setViewMode('social'); setActiveRealm(null); setActiveChannel(null); };
-  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); addToast(isFollowing ? "Link Severed" : "Identity Synced", 'success'); } catch(e:any){ addToast(e.response?.data?.message || "Sync error.", 'error'); } };
-  const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { addToast("Link Init Failed", 'error'); } };
+  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); addToast(isFollowing ? t('settings.link_severed') : t('settings.identity_synced'), 'success'); } catch(e:any){ addToast(e.response?.data?.message || "Sync error.", 'error'); } };
+  const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { addToast(t('settings.link_init_failed'), 'error'); } };
+  
+  const handleLeaveRealm = async (id: string) => { if (!window.confirm("Sever link?")) return; try { await api.leaveRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast("Link Severed", 'success'); } catch (e) { addToast("Severance failed", 'error'); } };
+  const handleDeleteRealm = async (id: string) => { if (!window.confirm("Collapse realm entirely?")) return; try { await api.deleteRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast("Sovereignty Purge Complete", 'success'); } catch (e) { addToast("Purge failed", 'error'); } };
+
   const handleTagSelect = async (tag: string | null) => { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(tag || undefined); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); };
 
-  const triggerRefresh = async () => {
-    setIsSyncing(true);
-    try {
-      if (viewMode === 'explore') {
-        const d = await api.getGlobalPosts();
-        setPosts(d);
-      } else if (activeChannel) {
-        const ps = await api.getPosts(activeChannel._id);
-        setPosts(ps);
-      }
-      await Promise.all([loadDMs(), loadRealms()]);
-    } catch (e) {
-      addToast("Sync failed", 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const triggerRefresh = async () => { setIsSyncing(true); try { if (viewMode === 'explore') { const d = await api.getGlobalPosts(); setPosts(d); } else if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } await Promise.all([loadDMs(), loadRealms()]); } catch (e) { addToast(t('settings.sync_failed'), 'error'); } finally { setIsSyncing(false); } };
 
   const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'profile';
   const showDmsAsMain = isMobile && viewMode === 'home' && !activeChannel;
@@ -407,7 +353,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     <div className={`flex h-screen bg-discord-dark text-gray-100 font-sans overflow-hidden select-none ${isMobile ? 'flex-col-reverse' : (dockPosition === 'top' ? 'flex-col' : dockPosition === 'bottom' ? 'flex-col-reverse' : dockPosition === 'left' ? 'flex-row' : 'flex-row-reverse')}`}>
       {isMobile && (
         <div className="h-14 bg-discord-sidebar border-b border-white/5 flex items-center justify-between px-4 z-50">
-           <div className="flex items-center space-x-3">{!hideHamburger && <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-400 hover:text-white transition-all"><Menu size={20} /></button>}<span className="text-[10px] font-black uppercase tracking-[0.2em] text-vani-blue">{activeChannel ? `${activeChannel.type === 'dm' ? '@' : '#'}${activeChannel.name}` : (viewMode === 'home' ? t('nav.home') : (activeRealm?.name || viewMode))}</span></div>
+           <div className="flex items-center space-x-3">{!hideHamburger && <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-400 hover:text-white transition-all"><Menu size={20} /></button>}<span className="text-[10px] font-black uppercase tracking-[0.2em] text-vani-blue">{activeChannel ? `${['dm','group_dm'].includes(activeChannel.type) ? '@' : '#'}${activeChannel.name}` : (viewMode === 'home' ? t('nav.home') : (activeRealm?.name || viewMode))}</span></div>
            <button onClick={() => setShowSearchModal(true)} className="p-2 text-gray-400 hover:text-white transition-all"><SearchIcon size={18} /></button>
         </div>
       )}
@@ -415,188 +361,66 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       <AnimatePresence>
         {showConnPill && (
           <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[6000] w-fit pointer-events-none">
-             <div className={`backdrop-blur-2xl border px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 ${isOnline ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-                <span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? 'Back_Online' : 'Connection_Lost'}</span>
-             </div>
+             <div className={`backdrop-blur-2xl border px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 ${isOnline ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>{isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}<span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? t('ui.back_online') : t('ui.connection_lost')}</span></div>
           </motion.div>
         )}
-
         {incomingCall && (
-          <motion.div 
-            initial={{ y: -100, x: '-50%', opacity: 0 }}
-            animate={{ y: 20, x: '-50%', opacity: 1 }}
-            exit={{ y: -100, x: '-50%', opacity: 0 }}
-            className="fixed top-0 left-1/2 z-[5000] w-[90%] max-w-sm pointer-events-auto"
-          >
-             <div className="bg-[#0a0a0c]/90 backdrop-blur-2xl border border-vani-blue/30 rounded-[32px] p-4 shadow-[0_20px_60px_rgba(0,210,255,0.2)] flex items-center justify-between">
-                <div className="flex items-center space-x-4 min-w-0">
-                   <div className="relative shrink-0">
-                      <div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" />
-                      <img src={incomingCall.sender.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${incomingCall.sender.username}`} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" />
-                   </div>
-                   <div className="min-w-0">
-                      <h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4>
-                      <p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest leading-none mt-1">Incoming_{incomingCall.type}_Signal</p>
-                   </div>
-                </div>
-                <div className="flex items-center space-x-2 shrink-0">
-                   <button onClick={() => { 
-                     socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId });
-                     setIncomingCall(null); 
-                   }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button>
-                   <button onClick={() => handleAcceptCall('voice')} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>
-                   {incomingCall.type === 'video' && (
-                     <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>
-                   )}
-                </div>
+          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5000] w-[90%] max-w-sm pointer-events-auto">
+             <div className="bg-[#0a0a0c]/90 backdrop-blur-2xl border border-vani-blue/30 rounded-[32px] p-4 shadow-2xl flex items-center justify-between">
+                <div className="flex items-center space-x-4 min-w-0"><div className="relative shrink-0"><div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" /><img src={incomingCall.sender.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${incomingCall.sender.username}`} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" /></div><div className="min-w-0"><h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4><p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mt-1">Incoming_Signal</p></div></div>
+                <div className="flex items-center space-x-2 shrink-0"><button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button><button onClick={() => handleAcceptCall('voice')} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>{incomingCall.type === 'video' && <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>}</div>
              </div>
           </motion.div>
         )}
-
         {liveSignal && (
-          <motion.div 
-            initial={{ y: -100, x: '-50%', opacity: 0 }}
-            animate={{ y: 20, x: '-50%', opacity: 1 }}
-            exit={{ y: -100, x: '-50%', opacity: 0 }}
-            className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer"
-            onClick={() => setLiveSignal(null)}
-          >
-             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]">
-                <div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0">
-                   <img src={liveSignal.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${liveSignal.sender?.username}`} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                   <span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">
-                      {liveSignal.sender?.username || 'SYSTEM'}
-                   </span>
-                   <span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">
-                      {liveSignal.content}
-                   </span>
-                </div>
-                <div className="shrink-0 ml-2">
-                   {liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}
-                   {liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}
-                   {liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}
-                   {liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}
-                </div>
-             </div>
+          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer" onClick={() => setLiveSignal(null)}>
+             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]"><div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0"><img src={liveSignal.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${liveSignal.sender?.username}`} className="w-full h-full object-cover" /></div><div className="flex flex-col min-w-0"><span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">{liveSignal.sender?.username || 'SYSTEM'}</span><span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">{liveSignal.content}</span></div><div className="shrink-0 ml-2">{liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}{liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}{liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}{liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}</div></div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <CoreDock 
-        realms={realms} 
-        selectedRealmId={viewMode} 
-        onSelect={handleSelectRealm} 
-        onCreate={() => setShowRealmModal(true)} 
-        user={user} 
-        onSettings={() => setShowIdentitySettings(true)} 
-        onProfile={() => setViewMode('profile')} 
-        onSeeAllNotifications={() => setShowNotifications(true)} 
-        onLogout={() => setShowLogoutModal(true)} 
-        onSearch={() => setShowSearchModal(true)} 
-        onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} 
-        position={isMobile ? 'bottom' : dockPosition} 
-        refreshTrigger={matrixRefreshKey} 
-        isSearchOpen={showSearchModal}
-        isSettingsOpen={showIdentitySettings}
-        isCreateOpen={showRealmModal || showPostModal || showChannelModal || showGroupDMModal}
+        realms={realms} selectedRealmId={viewMode} onSelect={handleSelectRealm} onCreate={() => setShowRealmModal(true)} user={user} onSettings={() => setShowIdentitySettings(true)} onProfile={() => setViewMode('profile')} onSeeAllNotifications={() => setShowNotifications(true)} onLogout={() => setShowLogoutModal(true)} onSearch={() => setShowSearchModal(true)} onLeaveRealm={handleLeaveRealm} onDeleteRealm={handleDeleteRealm} onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} position={isMobile ? 'bottom' : dockPosition} refreshTrigger={matrixRefreshKey} isSearchOpen={showSearchModal} isSettingsOpen={showIdentitySettings} isCreateOpen={showRealmModal || showPostModal || showChannelModal || showGroupDMModal}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
         <AnimatePresence>
           {isSidebarOpen && showSidebar && !showDmsAsMain && (
-            <motion.div 
-              initial={isMobile ? { x: '-100%' } : { width: 0 }} 
-              animate={isMobile ? { x: 0 } : { width: sidebarWidth }} 
-              exit={isMobile ? { x: '-100%' } : { width: 0 }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`flex-shrink-0 flex relative z-40 bg-discord-channel ${isMobile ? 'absolute inset-0 w-[85%] shadow-2xl' : 'border-r border-gray-900'}`}
-            >
+            <motion.div initial={isMobile ? { x: '-100%' } : { width: 0 }} animate={isMobile ? { x: 0 } : { width: sidebarWidth }} exit={isMobile ? { x: '-100%' } : { width: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`flex-shrink-0 flex relative z-40 bg-discord-channel ${isMobile ? 'absolute inset-0 w-[85%] shadow-2xl' : 'border-r border-gray-900'}`}>
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isMobile && <div className="h-16 flex items-center justify-between px-4 bg-discord-sidebar border-b border-white/5"><span className="text-[10px] font-black uppercase text-white tracking-widest">{t('common.navigator')}</span><button onClick={() => setIsSidebarOpen(false)}><X size={18} /></button></div>}
-                {viewMode === 'home' ? (
-                  <DMSidebar 
-                    dms={dms} 
-                    selectedDmId={activeChannel?._id || null} 
-                    onSelectDm={handleSelectChannel} 
-                    user={user} 
-                    onlineUserIds={onlineUserIds} 
-                    onInitGroup={() => setShowGroupDMModal(true)} 
-                    onRetry={loadDMs}
-                    isSyncing={isSyncing}
-                  />
-                ) : (
-                  <ChannelSidebar 
-                    realm={activeRealm} 
-                    channels={activeRealm?.channels || []} 
-                    selectedChannelId={activeChannel?._id || null} 
-                    onSelectChannel={handleSelectChannel} 
-                    user={user!} 
-                    onAddChannel={() => setShowChannelModal(true)} 
-                    onSettings={() => setShowRealmSettings(true)} 
-                  />
-                )}
+                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRetry={loadDMs} isSyncing={isSyncing} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} oversightMode={oversightMode} setOversightMode={setOversightMode} />}
               </div>
               {!isMobile && <div onMouseDown={startResizing} className="absolute top-0 -right-0.5 w-1 h-full cursor-col-resize z-40 hover:bg-vani-blue/30 transition-colors" />}
             </motion.div>
           )}
         </AnimatePresence>
-
         {isMobile && isSidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30" />}
-
         <main className="flex-1 overflow-hidden relative flex flex-col bg-discord-dark">
-          <motion.div 
-            className="flex-1 flex flex-col overflow-hidden"
-            onPanEnd={handleDragEnd}
-          >
+          <motion.div className="flex-1 flex flex-col overflow-hidden" onPanEnd={handleDragEnd}>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId}
-                initial={kineticTransitions ? { opacity: 0, x: 20, filter: 'blur(10px)' } : { opacity: 1 }}
-                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                exit={kineticTransitions ? { opacity: 0, x: -20, filter: 'blur(10px)' } : { opacity: 1 }}
-                transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }}
-                className="flex-1 flex flex-col overflow-hidden"
-              >
-                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? <OtherProfileView key="other" userId={viewingUserId} onStartDM={handleStartDM} currentUser={user!} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm') ? (
+              <motion.div key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId} initial={kineticTransitions ? { opacity: 0, x: 20, filter: 'blur(10px)' } : { opacity: 1 }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={kineticTransitions ? { opacity: 0, x: -20, filter: 'blur(10px)' } : { opacity: 1 }} transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }} className="flex-1 flex flex-col overflow-hidden">
+                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" oversightMode={oversightMode} setOversightMode={setOversightMode} /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? (
+                  <OtherProfileView 
+                    key="other" 
+                    userId={viewingUserId} 
+                    onStartDM={handleStartDM} 
+                    currentUser={user!} 
+                    onFollow={handleFollowUser} 
+                    onViewSocials={handleViewSocials} 
+                    onSelectTag={handleTagSelect} 
+                    onViewProfile={handleViewOtherProfile} 
+                    isOwnProfile={viewingUserId === (user?.id || user?._id)}
+                    onEdit={() => setShowIdentitySettings(true)}
+                  />
+                ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
-                    key="chat" 
-                    channelName={activeChannel.name || 'Link'} 
-                    messages={messages} 
-                    onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} 
-                    currentUser={user} 
-                    channelId={activeChannel._id} 
-                    onViewOtherProfile={handleViewOtherProfile} 
-                    channelType={activeChannel.type} 
-                    activeRealm={activeRealm} 
-                    activeChannel={activeChannel} 
-                    socket={socketRef.current} 
-                    onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
-                    onGroupSettings={() => setShowGroupSettings(true)} 
-                    onOpenMedia={(type, url) => setActiveMedia({ type, url })}
-                    onStartCall={() => {
-                      socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
-                      setActiveChannel({ ...activeChannel, type: 'voice' });
-                    }}
-                    onStartVideo={() => {
-                      socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar });
-                      setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any);
-                    }}
+                    key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} onStartCall={() => { socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar }); setActiveChannel({ ...activeChannel, type: 'voice' }); }} onStartVideo={() => { socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar }); setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any); }}
+                    oversightMode={oversightMode} setOversightMode={setOversightMode}
                   />
                 ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
                   <FeedArea 
-                    key="feed" 
-                    posts={posts} 
-                    onOpenCreateModal={() => setShowPostModal(true)} 
-                    currentUser={user!} 
-                    channelId={activeChannel?._id || 'global'} 
-                    onViewProfile={handleViewOtherProfile} 
-                    onSelectTag={handleTagSelect} 
-                    onRetry={triggerRefresh}
-                    isSyncing={isSyncing}
-                    liveStreamers={liveStreamers}
+                    key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} onRetry={triggerRefresh} isSyncing={isSyncing} liveStreamers={liveStreamers}
                   />
                 ) : (
                   <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>
@@ -611,46 +435,37 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         {showNotifications && (
           <div className="fixed inset-0 z-[3000] flex items-center justify-center p-0 lg:p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowNotifications(false)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-             <motion.div initial={{ scale: 0.9, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 50 }} className="relative w-full h-full lg:h-auto lg:max-w-xl lg:max-h-[80vh] bg-[#0a0a0c] border border-white/5 lg:rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
-                <NotificationsPage onClose={() => setShowNotifications(false)} />
-             </motion.div>
+             <motion.div initial={{ scale: 0.9, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 50 }} className="relative w-full h-full lg:h-auto lg:max-w-xl lg:max-h-[80vh] bg-[#0a0a0c] border border-white/5 lg:rounded-[40px] shadow-2xl overflow-hidden flex flex-col"><NotificationsPage onClose={() => setShowNotifications(false)} /></motion.div>
           </div>
         )}
         {activeMedia && <MediaPlayer type={activeMedia.type} url={activeMedia.url} onClose={() => setActiveMedia(null)} />}
-        {selectedPostId && (
-          <div className="fixed inset-0 z-[4000] flex items-center justify-center">
-             <PostViewerModal 
-               post={posts.find(p => p._id === selectedPostId) || { _id: selectedPostId, caption: 'Loading...', author: { username: '...' }, likes: [], comments: [] } as any} 
-               onClose={() => setSelectedPostId(null)} 
-               currentUser={user} 
-               onUpdate={() => triggerRefresh()} 
-             />
-          </div>
-        )}
+        {selectedPostId && <div className="fixed inset-0 z-[4000] flex items-center justify-center"><PostViewerModal post={posts.find(p => p._id === selectedPostId) || { _id: selectedPostId, caption: 'Loading...', author: { username: '...' }, likes: [], comments: [] } as any} onClose={() => setSelectedPostId(null)} currentUser={user} onUpdate={() => triggerRefresh()} /></div>}
         {showGroupSettings && activeChannel && <GroupSettingsModal group={activeChannel} onClose={() => setShowGroupSettings(false)} onUpdate={() => loadDMs()} currentUser={user!} />}
         {showLogoutModal && <LogoutModal onClose={() => setShowLogoutModal(false)} />}
       </AnimatePresence>
 
-      {showRealmModal && <CreateRealmModal onClose={() => setShowRealmModal(false)} onSubmit={async (n: string) => { try { await api.createRealm(n); setShowRealmModal(false); loadRealms(); addToast("Node Established", 'success'); } catch(e){ addToast("Creation Failed", 'error'); } }} />}
-      {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} onComplete={async () => { if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } else { const d = await api.getGlobalPosts(); setPosts(d); } addToast("Transmission Sent", 'success'); }} channelId={activeChannel?._id || 'global'} currentUser={user!} />}
-      {showChannelModal && <CreateChannelModal onClose={() => setShowChannelModal(false)} onSubmit={async (n: string, t: string) => { if (!activeRealm) return; try { await api.createChannel(activeRealm._id, n, t); const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); setShowChannelModal(false); handleSelectChannel(d.channels[d.channels.length-1]); addToast("Sector Opened", 'success'); } catch(e){ addToast("Sector Failed", 'error'); } }} />}
-      {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast("Group Initialized", 'success'); } catch(e){ addToast("Group Failed", 'error'); } }} currentUser={user!} />}
-      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast("Calibration Saved", 'success'); } catch(e){ addToast("Save Failed", 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
+      {showRealmModal && <CreateRealmModal onClose={() => setShowRealmModal(false)} onSubmit={async (n: string) => { try { await api.createRealm(n); setShowRealmModal(false); loadRealms(); addToast(t('settings.node_established'), 'success'); } catch(e){ addToast(t('settings.creation_failed'), 'error'); } }} />}
+      {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} onComplete={async () => { if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } else { const d = await api.getGlobalPosts(); setPosts(d); } addToast(t('chat.transmission_success'), 'success'); }} channelId={activeChannel?._id || 'global'} currentUser={user!} />}
+      {showChannelModal && <CreateChannelModal onClose={() => setShowChannelModal(false)} onSubmit={async (n: string, t_type: string) => { if (!activeRealm) return; try { await api.createChannel(activeRealm._id, n, t_type); const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); setShowChannelModal(false); handleSelectChannel(d.channels[d.channels.length-1]); addToast(t('settings.sector_opened'), 'success'); } catch(e){ addToast(t('settings.sector_failed'), 'error'); } }} />}
+      {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast(t('settings.group_initialized'), 'success'); } catch(e){ addToast(t('settings.group_failed'), 'error'); } }} currentUser={user!} />}
+      {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast(t('settings.calibration_saved'), 'success'); } catch(e){ addToast(t('settings.save_failed'), 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
-      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(`Joined ${r.name}`, 'success'); } catch (e) { addToast("Join Failed", 'error'); } }} currentUser={user!} />}
+      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(`Joined ${r.name}`, 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
     </div>
   );
 }
 
-const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials, onSelectTag, onViewProfile }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void, onSelectTag?: (tag: string) => void, onViewProfile?: (userId: string) => void }) => {
+const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials, onSelectTag, onViewProfile, isOwnProfile = false, onEdit }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void, onSelectTag?: (tag: string) => void, onViewProfile?: (userId: string) => void, isOwnProfile?: boolean, onEdit?: () => void }) => {
   const { t } = useLanguage();
   const [targetUser, setTargetUser] = useState<IUser | null>(null);
   useEffect(() => { api.getUserProfile(userId).then(setTargetUser); }, [userId]);
   if (!targetUser) return <div className="flex-1 flex items-center justify-center font-black uppercase text-vani-blue animate-pulse">{t('common.scanning')}</div>;
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-discord-dark">
-       <div className="flex-1 overflow-y-auto custom-scrollbar"><ProfileNode user={targetUser} isOwnProfile={false} currentUser={currentUser} onFollow={onFollow} onViewSocials={onViewSocials} onSelectTag={onSelectTag} onViewProfile={onViewProfile} /></div>
-       <div className="p-6 border-t border-white/5 bg-discord-sidebar/30 flex justify-center backdrop-blur-md"><button onClick={() => onStartDM(userId)} className="w-full max-w-sm bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center space-x-4"><MessageSquare size={20} /><span>{t('common.init_link')}</span></button></div>
+       <div className="flex-1 overflow-y-auto custom-scrollbar"><ProfileNode user={targetUser} isOwnProfile={isOwnProfile} onEdit={onEdit} currentUser={currentUser} onFollow={onFollow} onViewSocials={onViewSocials} onSelectTag={onSelectTag} onViewProfile={onViewProfile} /></div>
+       {!isOwnProfile && (
+         <div className="p-6 border-t border-white/5 bg-discord-sidebar/30 flex justify-center backdrop-blur-md"><button onClick={() => onStartDM(userId)} className="w-full max-w-sm bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center space-x-4"><MessageSquare size={20} /><span>{t('common.init_link')}</span></button></div>
+       )}
     </div>
   );
 };

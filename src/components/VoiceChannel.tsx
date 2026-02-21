@@ -155,13 +155,17 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
 
       socket.off('user_joined');
       socket.on('user_joined', (payload: any) => {
-        // GUARD: Don't create duplicate peers
-        if (peersRef.current.find(p => p.peerID === payload.callerID)) return;
-
-        const peer = addPeer(payload.signal, payload.callerID, s);
-        const peerObj = { peerID: payload.callerID, peer, user: payload.user, status: 'connecting' };
-        peersRef.current.push(peerObj);
-        setPeers(prev => [...prev, peerObj]);
+        const item = peersRef.current.find(p => p.peerID === payload.callerID);
+        if (item) {
+          // Existing peer: Process candidate/renegotiation signal
+          item.peer.signal(payload.signal);
+        } else {
+          // New peer: Create connection
+          const peer = addPeer(payload.signal, payload.callerID, s);
+          const peerObj = { peerID: payload.callerID, peer, user: payload.user, status: 'connecting' };
+          peersRef.current.push(peerObj);
+          setPeers(prev => [...prev, peerObj]);
+        }
       });
 
       socket.off('receiving_returned_signal');
@@ -208,13 +212,26 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
 
       userStream.current?.getTracks().forEach(t => t.stop());
       screenStream.current?.getTracks().forEach(t => t.stop());
-      socket.emit('leave_voice', { channelId });
-      socket.off('all_users'); socket.off('user_joined'); socket.off('receiving_returned_signal'); socket.off('user_left_voice');
+      
+      if (socket) {
+        socket.emit('leave_voice', { channelId });
+        socket.off('all_users'); 
+        socket.off('user_joined'); 
+        socket.off('receiving_returned_signal'); 
+        socket.off('user_left_voice');
+      }
     };
   }, [initMedia, channelId, socket]);
 
+  const rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ]
+  };
+
   function createPeer(u: string, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: true, trickle: false, stream: s });
+    const p = new Peer({ initiator: true, stream: s, config: rtcConfig });
     p.on('signal', (signal: any) => socket.emit('sending_signal', { 
       userToSignal: u, callerID: c, signal,
       user: { username: currentUser.username, avatar: currentUser.avatar, id: currentUser.id || currentUser._id }
@@ -233,7 +250,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   }
 
   function addPeer(i: any, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: false, trickle: false, stream: s });
+    const p = new Peer({ initiator: false, stream: s, config: rtcConfig });
     p.on('signal', (signal: any) => socket.emit('returning_signal', { signal, callerID: c }));
     
     p.on('connect', () => {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, MessageCircle, Send, Trash2, Edit3, Share2, MoreVertical } from 'lucide-react';
+import { X, Heart, MessageCircle, Send, Trash2, Edit3, Share2, AlertTriangle } from 'lucide-react';
 import type { IPost, IUser } from '../services/api';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface Props {
   post: IPost;
@@ -14,8 +15,11 @@ interface Props {
 }
 
 export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelectTag, onViewProfile }: Props) => {
+  const { addToast } = useToast();
   const [comment, setComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
   const [editCaption, setEditCaption] = useState(post.caption);
   const [isLiked, setIsLiked] = useState(post.likes.includes(currentUser?.id || currentUser?._id || ''));
   const [likeCount, setLikeCount] = useState(post.likes.length);
@@ -27,6 +31,19 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
       api.markNotificationsReadByPost(post._id).catch(() => {});
     }
   }, [post._id, currentUser]);
+
+  const handleReport = async () => {
+    if (!reportReason.trim()) return;
+    try {
+      await api.submitReport({
+        targetType: 'post',
+        targetId: post._id,
+        reason: reportReason
+      });
+      setShowReportModal(false);
+      addToast("Anomaly Logged with the Architect.", 'success');
+    } catch (e) { addToast("Transmission failed.", 'error'); }
+  };
 
   const renderCaption = (text: string) => {
     if (!text) return null;
@@ -119,7 +136,7 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
                       <button onClick={handleDelete} className="p-2 bg-black/20 backdrop-blur-md rounded-full text-red-400/80"><Trash2 size={20} /></button>
                    </div>
                  )}
-                 <button className="p-2 bg-black/20 backdrop-blur-md rounded-full text-white/80"><MoreVertical size={24} /></button>
+                 <button onClick={() => setShowReportModal(true)} className="p-2 bg-black/20 backdrop-blur-md rounded-full text-red-500/80"><AlertTriangle size={24} /></button>
               </div>
            </div>
 
@@ -256,7 +273,7 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
                      <div className="flex items-center space-x-6">
                         <button onClick={handleLike} className={`transition-all hover:scale-110 ${isLiked ? 'text-vani-accent' : 'text-gray-500'}`}><Heart size={24} fill={isLiked ? 'currentColor' : 'none'} /></button>
                         <button className="text-gray-500 hover:text-vani-blue transition-all"><MessageCircle size={24} /></button>
-                        <button className="text-gray-500 hover:text-white transition-all"><Send size={24} /></button>
+                        <button onClick={() => setShowReportModal(true)} className="text-gray-500 hover:text-red-500 transition-all"><AlertTriangle size={24} /></button>
                      </div>
                      {isOwner && <div className="flex space-x-2"><button onClick={() => setIsEditing(true)} className="p-2 text-gray-600 hover:text-white transition-colors"><Edit3 size={18} /></button><button onClick={handleDelete} className="p-2 text-gray-600 hover:text-red-500 transition-colors"><Trash2 size={18} /></button></div>}
                   </div>
@@ -280,6 +297,29 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
                </div>
             </motion.div>
           )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+           {showReportModal && (
+             <div className="fixed inset-0 bg-black/90 z-[5000] flex items-center justify-center p-4 backdrop-blur-md">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-red-500/20 p-8 shadow-2xl">
+                   <div className="flex items-center space-x-3 mb-6">
+                      <div className="p-2 bg-red-500/10 rounded-xl text-red-500"><AlertTriangle size={20} /></div>
+                      <h2 className="text-xl font-black text-white uppercase tracking-tighter">Report_Anomaly</h2>
+                   </div>
+                   <div className="space-y-6">
+                      <div className="space-y-2">
+                         <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">Anomalous Activity Reason</label>
+                         <textarea className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-sm outline-none focus:border-red-500/50 resize-none h-32" placeholder="Describe the anomaly..." value={reportReason} onChange={(e) => setReportReason(e.target.value)} />
+                      </div>
+                      <div className="flex gap-3">
+                         <button onClick={handleReport} className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-500/20">Log Anomaly</button>
+                         <button onClick={() => setShowReportModal(false)} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Abort</button>
+                      </div>
+                   </div>
+                </motion.div>
+             </div>
+           )}
         </AnimatePresence>
       </motion.div>
     </div>

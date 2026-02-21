@@ -3,6 +3,7 @@ import type { IChannel, IUser } from '../services/api';
 import { api } from '../services/api';
 import { useState } from 'react';
 import { ContextMenu } from './ContextMenu';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   dms: IChannel[];
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, onInitGroup, onRetry, isSyncing }: Props) => {
+  const { t } = useLanguage();
   const [menu, setMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent, dmId: string) => {
@@ -24,10 +26,10 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: 'Sync as Read', icon: <CheckCircle2 size={14} />, onClick: () => api.markChannelRead(dmId).then(() => window.location.reload()) },
-        { label: 'Mark as Unread', icon: <BellOff size={14} />, onClick: () => api.markChannelUnread(dmId).then(() => window.location.reload()) },
-        { label: 'Close Link', icon: <XCircle size={14} />, variant: 'danger' as const, onClick: () => {
-            if(window.confirm("Sever this identity link?")) {
+        { label: t('ui.sync_read'), icon: <CheckCircle2 size={14} />, onClick: () => api.markChannelRead(dmId).then(() => window.location.reload()) },
+        { label: t('ui.mark_unread'), icon: <BellOff size={14} />, onClick: () => api.markChannelUnread(dmId).then(() => window.location.reload()) },
+        { label: t('ui.close_link'), icon: <XCircle size={14} />, variant: 'danger' as const, onClick: () => {
+            if(window.confirm(t('logout.confirm'))) {
               api.closeDM(dmId).then(() => window.location.reload());
             }
         }}
@@ -43,10 +45,10 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
     <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-gray-900">
       <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm">
          <div className="flex flex-col">
-            <span className="font-black text-white uppercase tracking-widest text-[10px]">Neural Links</span>
-            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Secure_Layer_Active</span>
+            <span className="font-black text-white uppercase tracking-widest text-[10px]">{t('ui.neural_links')}</span>
+            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('ui.neural_links_desc')}</span>
          </div>
-         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-vani-blue/20 hover:text-vani-blue rounded-xl transition-all border border-white/5 group" title="Initialize Group">
+         <button onClick={onInitGroup} className="p-2.5 bg-white/5 hover:bg-vani-blue/20 hover:text-vani-blue rounded-xl transition-all border border-white/5 group" title={t('common.invite')}>
             <Users size={16} className="group-hover:scale-110 transition-transform" />
          </button>
       </div>
@@ -70,16 +72,16 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
             const isUnread = !myLastSeen || new Date((dm as any).lastMessageAt) > new Date(myLastSeen);
 
             const getStatusDisplay = () => {
-              if (isGroup) return `${dm.members?.length} Nodes`;
-              if (isUnread && selectedDmId !== dm._id) return 'NEW_TRANSMISSION';
-              if (!isOnline) return 'OFFLINE';
+              if (isGroup) return `${dm.members?.length} ${t('ui.nodes')}`;
+              if (isUnread && selectedDmId !== dm._id) return t('ui.new_transmission');
+              if (!isOnline) return t('ui.offline');
               
               if (otherUser?.customStatus) return otherUser.customStatus;
               
               switch (otherUser?.status) {
-                case 'dnd': return 'BUSY';
-                case 'idle': return 'AWAY';
-                default: return 'ONLINE';
+                case 'dnd': return t('ui.busy');
+                case 'idle': return t('ui.away');
+                default: return t('ui.online');
               }
             };
 

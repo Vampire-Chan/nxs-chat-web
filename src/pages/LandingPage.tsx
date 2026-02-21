@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Shield, Globe, Users, ArrowRight, MessageSquare, Sparkles, Server, Settings } from 'lucide-react';
+import { Zap, Shield, Globe, Users, ArrowRight, MessageSquare, Sparkles, Server, Settings, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -30,10 +30,49 @@ export default function LandingPage() {
           <button onClick={() => navigate('/faq')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.knowledge')}</button>
           <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.legal')}</button>
           
-          <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/5">
+          <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/5 relative group/lang">
             {['en', 'hi', 'ne'].map(l => (
-              <button key={l} onClick={() => setLanguage(l as any)} className={`px-2 py-1 rounded-md transition-all ${language === l ? 'bg-vani-blue text-black' : 'hover:text-white'}`}>{l}</button>
+              <button 
+                key={l} 
+                onClick={() => setLanguage(l as any)} 
+                className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase ${language === l ? 'bg-vani-blue text-black shadow-[0_0_10px_rgba(0,210,255,0.3)]' : 'hover:text-white'}`}
+              >
+                {l}
+              </button>
             ))}
+            
+            {/* DROPDOWN FOR OTHER LANGUAGES */}
+            <div className="relative group">
+               <button className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase flex items-center gap-1 ${!['en', 'hi', 'ne'].includes(language) ? 'bg-vani-blue text-black' : 'hover:text-white'}`}>
+                  {['en', 'hi', 'ne'].includes(language) ? <Globe size={12} /> : language}
+                  <ChevronDown size={10} />
+               </button>
+               
+               <div className="absolute top-full right-0 mt-2 w-32 bg-[#0a0a0c] border border-white/10 rounded-xl shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all z-[100] overflow-hidden">
+                  {[
+                    { id: 'en-simple', label: 'Simple EN' },
+                    { id: 'mr', label: 'Marathi' },
+                    { id: 'pa', label: 'Punjabi' },
+                    { id: 'bho', label: 'Bhojpuri' },
+                    { id: 'te', label: 'Telugu' },
+                    { id: 'kn', label: 'Kannada' },
+                    { id: 'ur', label: 'Urdu' },
+                    { id: 'phd', label: 'Pahadi' },
+                    { id: 'ks', label: 'Kashmiri' },
+                    { id: 'doi', label: 'Dogri' },
+                    { id: 'ghw', label: 'Garhwali' },
+                    { id: 'kum', label: 'Kumaoni' }
+                  ].map(l => (
+                    <button 
+                      key={l.id} 
+                      onClick={() => setLanguage(l.id as any)} 
+                      className={`w-full text-left px-4 py-2.5 text-[8px] font-black uppercase hover:bg-white/5 transition-colors ${language === l.id ? 'text-vani-blue bg-vani-blue/5' : 'text-gray-500'}`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+               </div>
+            </div>
           </div>
         </div>
         <button 

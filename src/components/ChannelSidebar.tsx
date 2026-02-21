@@ -1,4 +1,4 @@
-import { Plus, Hash, Volume2, Image as ImageIcon, Megaphone, Settings, ChevronDown } from 'lucide-react';
+import { Plus, Hash, Volume2, Image as ImageIcon, Megaphone, Settings, ChevronDown, Shield } from 'lucide-react';
 import type { IRealm, IChannel, IUser } from '../services/api';
 import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,6 +11,8 @@ interface Props {
   user: IUser;
   onAddChannel: () => void;
   onSettings?: () => void;
+  oversightMode?: boolean;
+  setOversightMode?: (val: boolean) => void;
 }
 
 export const ChannelSidebar = ({ 
@@ -20,19 +22,40 @@ export const ChannelSidebar = ({
   onSelectChannel, 
   user, 
   onAddChannel, 
-  onSettings 
+  onSettings,
+  oversightMode,
+  setOversightMode
 }: Props) => {
   const { t } = useLanguage();
-  const [expanded, setExpanded] = useState({ announcements: true, chat: true, voice: true, media: true });
-  const toggle = (key: keyof typeof expanded) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ announcements: true, chat: true, voice: true, media: true, mod: true, talk: true });
+  const toggle = (key: string) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const isSystem = (realm as any)?.isSystem || realm?.name === "Architect_Nexus";
+
+  // --- SYSTEM REALM CATEGORIES ---
+  const modChannels = channels.filter(c => c.type.startsWith('mod_'));
+  const modTalkChannels = channels.filter(c => c.type === 'text' && isSystem);
+  
+  // --- STANDARD CATEGORIES ---
   const announcements = channels.filter(c => c.type === 'announcement');
-  const chatChannels = channels.filter(c => c.type === 'text');
+  const chatChannels = channels.filter(c => c.type === 'text' && !isSystem);
   const voiceChannels = channels.filter(c => c.type === 'voice');
   const mediaChannels = channels.filter(c => c.type === 'feed' || c.type === 'reels');
 
   return (
     <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-white/5">
+      {/* SYSTEM MODE TOGGLE */}
+      {isSystem && (
+        <div className="p-4 bg-black/20 border-b border-white/5">
+           <button 
+             onClick={() => setOversightMode?.(!oversightMode)}
+             className={`w-full py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all flex items-center justify-center gap-2 ${oversightMode ? 'bg-vani-blue text-black shadow-lg shadow-blue-500/20' : 'bg-white/5 text-gray-500 hover:text-white'}`}
+           >
+              <Shield size={14} /> {oversightMode ? 'Oversight Active' : 'Enter Oversight'}
+           </button>
+        </div>
+      )}
+
       <div onClick={onSettings} className="relative h-24 flex flex-col justify-end p-4 border-b border-white/5 shadow-sm group cursor-pointer overflow-hidden transition-all">
          {realm?.banner && (
            <div className="absolute inset-0 z-0">
@@ -53,24 +76,49 @@ export const ChannelSidebar = ({
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-6 pt-4">
-         {announcements.length > 0 && (
+         {/* SYSTEM MODERATION CATEGORY */}
+         {isSystem && modChannels.length > 0 && (
            <div className="space-y-1">
-              <CornerHeader label={t('help.realms')} onToggle={() => toggle('announcements')} />
+              <CornerHeader label="COMMAND CENTER" onToggle={() => toggle('mod')} />
+              {expanded.mod && modChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Shield size={14} className="text-vani-blue" />} />)}
+           </div>
+         )}
+
+         {isSystem && modTalkChannels.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label="MODERATOR TALKS" onToggle={() => toggle('talk')} />
+              {expanded.talk && modTalkChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Hash size={16} />} />)}
+           </div>
+         )}
+
+         {/* STANDARD CHANNELS (ONLY SHOWN FOR NON-SYSTEM OR AS FALLBACK) */}
+         {!isSystem && announcements.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label={t('channels.announcements')} onToggle={() => toggle('announcements')} />
               {expanded.announcements && announcements.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Megaphone size={14} className="text-vani-accent" />} />)}
            </div>
          )}
-         <div className="space-y-1">
-            <CornerHeader label={t('nav.social')} onToggle={() => toggle('chat')} onAdd={onAddChannel} />
-            {expanded.chat && chatChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Hash size={16} />} />)}
+         
+         {!isSystem && chatChannels.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label={t('channels.text')} onToggle={() => toggle('chat')} onAdd={onAddChannel} />
+              {expanded.chat && chatChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Hash size={16} />} />)}
          </div>
-         <div className="space-y-1">
-            <CornerHeader label={t('help.matrix')} onToggle={() => toggle('voice')} />
-            {expanded.voice && voiceChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Volume2 size={16} />} />)}
-         </div>
-         <div className="space-y-1">
-            <CornerHeader label={t('nav.explore')} onToggle={() => toggle('media')} />
-            {expanded.media && mediaChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ImageIcon size={16} />} />)}
-         </div>
+         )}
+
+         {voiceChannels.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label={isSystem ? "VOICE LINKS" : t('channels.voice')} onToggle={() => toggle('voice')} />
+              {expanded.voice && voiceChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Volume2 size={16} />} />)}
+           </div>
+         )}
+
+         {mediaChannels.length > 0 && (
+           <div className="space-y-1">
+              <CornerHeader label={isSystem ? "MEDIA MATRIX" : t('channels.media')} onToggle={() => toggle('media')} />
+              {expanded.media && mediaChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ImageIcon size={16} />} />)}
+           </div>
+         )}
       </div>
     </div>
   );

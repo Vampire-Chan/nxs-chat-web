@@ -47,6 +47,7 @@ export interface IUser {
   isPrivate?: boolean;
   isLocked?: boolean;
   isDisabled?: boolean;
+  isShadowBanned?: boolean;
   isAdmin?: boolean;
   followers?: string[];
   following?: string[];
@@ -72,7 +73,7 @@ export interface IRole {
 export interface IChannel {
   _id: string;
   name: string;
-  type: 'text' | 'voice' | 'feed' | 'reels' | 'announcement' | 'dm' | 'group_dm';
+  type: 'text' | 'voice' | 'feed' | 'reels' | 'announcement' | 'dm' | 'group_dm' | 'mod_reports' | 'mod_messages' | 'mod_posts' | 'mod_users' | 'mod_stats';
   realm?: string;
   members?: IUser[];
   icon?: string;
@@ -91,6 +92,7 @@ export interface IRealm {
   memberRoles?: { user: string, roleId: string }[];
   vanityHandle?: string;
   isDiscoverable?: boolean; // Added
+  isSystem?: boolean;
   tier?: 'standard' | 'elite';
 }
 
@@ -139,14 +141,23 @@ export interface INotification {
 export const api = {
   getAdminStats: async () => { const res = await axios.get(`${API_URL}/admin/stats`); return res.data; },
   getAdminBroadcasts: async () => { const res = await axios.get<IPost[]>(`${API_URL}/admin/broadcasts`); return res.data; },
+  getAdminMessages: async () => { const res = await axios.get<IMessage[]>(`${API_URL}/admin/messages`); return res.data; },
   severBroadcast: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/broadcasts/${id}`); return res.data; },
   getAdminIdentities: async () => { const res = await axios.get<IUser[]>(`${API_URL}/admin/identities`); return res.data; },
   severIdentity: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/identities/${id}`); return res.data; },
+  modAction: async (id: string, action: 'ban' | 'unban' | 'shadow_ban' | 'unshadow_ban') => { const res = await axios.post(`${API_URL}/admin/identities/${id}/mod-action`, { action }); return res.data; },
+  editMessageAdmin: async (id: string, data: { content?: string, removeAttachments?: boolean }) => { const res = await axios.put(`${API_URL}/admin/messages/${id}`, data); return res.data; },
+  severMessageAdmin: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/messages/${id}`); return res.data; },
+  getAllRealmsAdmin: async () => { const res = await axios.get(`${API_URL}/admin/realms`); return res.data; },
+  purgeRealmAdmin: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/realms/${id}`); return res.data; },
   grantAuthority: async (id: string, data: { badges?: any[], isAdmin?: boolean }) => { const res = await axios.post(`${API_URL}/admin/identities/${id}/authority`, data); return res.data; },
   getPendingTransactions: async () => { const res = await axios.get<ITransaction[]>(`${API_URL}/admin/finance/pending`); return res.data; },
   approveTransaction: async (id: string) => { const res = await axios.post(`${API_URL}/admin/finance/approve/${id}`); return res.data; },
   rejectTransaction: async (id: string) => { const res = await axios.post(`${API_URL}/admin/finance/reject/${id}`); return res.data; },
-  submitPayment: async (data: { method: string, transactionId: string, amount: string }) => { const res = await axios.post(`${API_URL}/payments/submit`, data); return res.data; },
+  getReports: async () => { const res = await axios.get(`${API_URL}/admin/reports`); return res.data; },
+  resolveReport: async (id: string, action: string) => { const res = await axios.post(`${API_URL}/admin/reports/${id}/resolve`, { action }); return res.data; },
+  submitReport: async (data: { targetType: string, targetId: string, reason: string }) => { const res = await axios.post(`${API_URL}/admin/report`, data); return res.data; },
+  submitPayment: async (data: { method: string, transactionId: string, amount: number }) => { const res = await axios.post(`${API_URL}/payments/submit`, data); return res.data; },
   getUserProfile: async (id: string) => { const res = await axios.get<IUser>(`${API_URL}/users/${id}`); return res.data; },
   getSuggestedUsers: async () => { const res = await axios.get<IUser[]>(`${API_URL}/users/public/list`); return res.data; },
   getUserByHandle: async (handle: string) => { const res = await axios.get<{ id: string }>(`${API_URL}/users/handle/${handle}`); return res.data; },
@@ -205,5 +216,9 @@ export const api = {
     }); 
     return res.data; 
   },
-  globalSearch: async (query: string) => { const res = await axios.get<{ users: IUser[], realms: IRealm[], posts: IPost[] }>(`${API_URL}/search?q=${query}`); return res.data; }
+  globalSearch: async (query: string, filters: { type?: string, sortBy?: string, author?: string } = {}) => { 
+    const params = new URLSearchParams({ q: query, ...filters });
+    const res = await axios.get<{ users: IUser[], realms: IRealm[], posts: IPost[] }>(`${API_URL}/search?${params.toString()}`); 
+    return res.data; 
+  }
 };

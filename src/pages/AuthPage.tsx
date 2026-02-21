@@ -19,6 +19,7 @@ export default function AuthPage() {
     bio: ''
   });
   const [code, setCode] = useState('');
+  const [useBackup, setUseBackup] = useState(false);
   const [qrImage, setQrImage] = useState('');
   const [otpSecret, setOtpSecret] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export default function AuthPage() {
   const handleRegisterStart = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const res = await axios.post(`${API_URL}/auth/register`, { 
         username: formData.username,
@@ -53,12 +55,12 @@ export default function AuthPage() {
   const handleVerifyRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const res = await axios.post(`${API_URL}/auth/verify-registration`, { 
         username: formData.username, 
         token: code 
       });
-      // Store token but don't navigate yet, move to setup
       localStorage.setItem('token', res.data.token);
       axios.defaults.headers.common['x-auth-token'] = res.data.token;
       setStep('register-setup');
@@ -69,6 +71,7 @@ export default function AuthPage() {
   // Step 3: Identity Calibration (Avatar/Bio)
   const handleSetup = async () => {
     setLoading(true);
+    setError('');
     const fd = new FormData();
     if (avatarFile) fd.append('avatar', avatarFile);
     fd.append('bio', formData.bio);
@@ -76,7 +79,7 @@ export default function AuthPage() {
     try {
       const res = await axios.post(`${API_URL}/auth/setup`, fd);
       login(localStorage.getItem('token')!, res.data.user);
-      navigate('/');
+      navigate('/app');
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
   };
@@ -85,13 +88,14 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const res = await axios.post(`${API_URL}/auth/login`, { 
         username: formData.username, 
         token: code 
       });
       login(res.data.token, res.data.user);
-      navigate('/');
+      navigate('/app');
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
   };
@@ -137,8 +141,8 @@ export default function AuthPage() {
             <motion.form key="info" onSubmit={handleRegisterStart} className="space-y-6">
                <h2 className="text-2xl font-black uppercase tracking-tight">{t('register.title')}</h2>
                <div className="space-y-4">
-                  <InputField label={t('login.email')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
-                  <InputField label={t('profile.displayname')} icon={<Info size={14}/>} value={formData.displayName} onChange={(v: string) => setFormData({...formData, displayName: v})} placeholder="Display Name" />
+                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
+                  <InputField label={t('profile.displayname')} icon={<Info size={14}/>} value={formData.displayName} onChange={(v: string) => setFormData({...formData, displayName: v})} placeholder="Public Name" />
                   <InputField label={t('profile.dob')} icon={<Calendar size={14}/>} type="date" value={formData.dob} onChange={(v: string) => setFormData({...formData, dob: v})} />
                </div>
                <button type="submit" disabled={loading} className="w-full bg-vani-gradient text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs flex items-center justify-center space-x-2">
@@ -159,14 +163,13 @@ export default function AuthPage() {
                <div className="space-y-4 px-4 text-center">
                   <p className="text-xs text-gray-500 font-medium leading-relaxed">{t('auth.scan_desc')}</p>
                   
-                  {/* MANUAL ENTRY PROTOCOL */}
                   <div className="bg-white/5 border border-white/5 p-4 rounded-2xl space-y-2">
                      <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest block">{t('auth.manual_key')}</span>
                      <div className="flex items-center justify-between gap-3">
                         <code className="text-vani-blue font-mono text-[10px] bg-black/40 px-3 py-1.5 rounded-lg flex-1 truncate">{otpSecret}</code>
                         <button 
                           type="button"
-                          onClick={() => { navigator.clipboard.writeText(otpSecret); alert("Key buffered to clipboard."); }}
+                          onClick={() => { navigator.clipboard.writeText(otpSecret); alert(t('auth.key_buffered')); }}
                           className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
                         >
                           {t('common.copy')}
@@ -208,7 +211,7 @@ export default function AuthPage() {
                   <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest text-left ml-2">{t('auth.bio_transmission')}</label>
                   <textarea 
                     className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-sm text-gray-300 h-24 focus:border-vani-blue outline-none transition-all"
-                    placeholder={t('register.bio_placeholder')}
+                    placeholder="Add a bio..."
                     value={formData.bio}
                     onChange={(e) => setFormData({...formData, bio: e.target.value})}
                   />
@@ -227,12 +230,24 @@ export default function AuthPage() {
                   <p className="text-gray-500 text-xs mt-2 uppercase font-black tracking-widest">{t('login.subtitle')}</p>
                </div>
                <div className="space-y-4">
-                  <InputField label={t('login.email')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
+                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
                   <div className="pt-4">
-                    <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3 ml-1">{t('login.password')}</label>
+                    <div className="flex justify-between items-end mb-3 ml-1">
+                       <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{useBackup ? t('auth.backup_key') : t('login.password')}</label>
+                       <button 
+                         type="button" 
+                         onClick={() => { setUseBackup(!useBackup); setCode(''); }} 
+                         className="text-[9px] font-black uppercase tracking-widest text-vani-blue hover:text-white transition-colors"
+                       >
+                         {useBackup ? t('auth.use_totp') : t('auth.use_backup')}
+                       </button>
+                    </div>
                     <input 
-                      className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-center text-3xl font-black tracking-[0.4em] text-vani-accent"
-                      placeholder="000000" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)}
+                      className={`w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-center font-black tracking-[0.2em] text-vani-accent ${useBackup ? 'text-lg' : 'text-3xl'}`}
+                      placeholder={useBackup ? t('auth.backup_placeholder') : "000000"} 
+                      maxLength={useBackup ? 20 : 6} 
+                      value={code} 
+                      onChange={(e) => setCode(e.target.value)}
                     />
                   </div>
                </div>

@@ -267,14 +267,14 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
       if (msgChannelId === activeChannelRef.current?._id) { 
         setMessages(prev => [...prev, msg]); 
-        api.markNotificationsReadByChannel(msgChannelId); 
+        // Optimization: Don't hammer the read API for every single message
       } 
       else if (!isMe) {
         setLiveSignal({ sender: msg.sender, content: msg.content || (t as any)('app.incoming_transmission'), type: 'message' }); 
         setTimeout(() => setLiveSignal(null), 5000); 
         sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || (t as any)('app.incoming_visual_data')); 
+        loadDMs(); // Only reload DM list for background messages to update unread counts
       }
-      loadDMs(); setMatrixRefreshKey(k => k + 1); 
     });
     s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification((t as any)('app.incoming_call', { type: data.type }), (t as any)('app.establishing_link', { username: data.sender.username })); });
     s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: t('app.identity_link_rejected'), type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });

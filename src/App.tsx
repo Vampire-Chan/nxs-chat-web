@@ -402,7 +402,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     socketRef.current?.emit('request_direct_call', { to: targetUserId, type });
   };
   
-  const handleAcceptCall = () => {
+  const handleAcceptCall = (forcedType?: 'voice' | 'video') => {
     if (!incomingCall) return;
     
     // Notify the caller that we've accepted
@@ -410,12 +410,19 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
     // Join the voice channel immediately with correct media intent
     const channel = findChannel(incomingCall.channelId);
-    const callType = incomingCall.type;
+    const callType = forcedType || incomingCall.type;
     setIncomingCall(null);
-    if (channel) {
-       setActiveChannel({ ...channel, type: 'voice', initialVideo: callType === 'video' } as any);
+    if (channel || incomingCall.channelId.startsWith('direct:')) {
+       setActiveChannel({ 
+         _id: incomingCall.channelId, 
+         name: channel?.name || 'Direct Link', 
+         type: 'voice', 
+         initialVideo: callType === 'video' 
+       } as any);
     }
   };
+
+  const isCallerInActiveDM = incomingCall && activeChannel && incomingCall.channelId === `direct:${(activeChannel as any).members?.find((m: any) => (m._id || m.id) !== user?._id)?._id}`;
 
   const [showRealmModal, setShowRealmModal] = useState(false);
   const [showChannelModal, setShowChannelModal] = useState(false);
@@ -444,6 +451,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const showDmsAsMain = isMobile && viewMode === 'home' && !activeChannel;
   const hideHamburger = (viewMode === 'home' && !activeChannel) || viewMode === 'profile' || viewMode === 'social' || viewMode === 'explore' || viewMode === 'view-profile' || activeChannel?.type === 'feed' || activeChannel?.type === 'reels';
 
+  const VideoIcon = Video as any;
+
   return (
     <div className={`flex h-screen bg-discord-dark text-gray-100 font-sans overflow-hidden select-none ${isMobile ? 'flex-col-reverse' : (dockPosition === 'top' ? 'flex-col' : dockPosition === 'bottom' ? 'flex-col-reverse' : dockPosition === 'left' ? 'flex-row' : 'flex-row-reverse')}`}>
       {isMobile && (
@@ -455,7 +464,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
       {/* DYNAMIC PULSE (Samsung-style Notif) */}
       <AnimatePresence>
-        {(serverStatus || !isOnline || liveSignal) && (
+        {(serverStatus || !isOnline || liveSignal || (incomingCall && !isCallerInActiveDM)) && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none flex flex-col items-center">
              <motion.div 
                initial={{ width: 12, height: 12, borderRadius: 100, opacity: 0 }}
@@ -485,7 +494,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                          <div className="w-full h-full rounded-[10px] bg-black flex items-center justify-center overflow-hidden">
                             {!isOnline ? <WifiOff size={14} className="text-red-500" /> : 
                              serverStatus ? <Zap size={14} className={serverStatus === 'rate_limit' ? 'text-yellow-500' : 'text-red-500'} /> :
-                             <img src={getIdentityAvatar(liveSignal?.sender)} className="w-full h-full object-cover" />}
+                             <img src={getIdentityAvatar(incomingCall?.sender || liveSignal?.sender)} className="w-full h-full object-cover" />}
                          </div>
                       </div>
                       <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-black border border-white/10 flex items-center justify-center">
@@ -502,24 +511,32 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                           serverStatus === 'overload' ? t('server.overload') :
                           serverStatus === 'rate_limit' ? t('server.rate_limit') :
                           serverStatus === 'no_response' ? t('server.cold_start') :
-                          liveSignal?.sender?.username || 'SYSTEM'}
+                          (incomingCall?.sender?.username || liveSignal?.sender?.username || 'SYSTEM')}
                       </span>
                       <span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate mt-0.5">
                          {!isOnline ? t('ui.reconnecting') :
                           serverStatus === 'overload' ? t('server.overload_desc') :
                           serverStatus === 'rate_limit' ? t('server.rate_limit_desc') :
                           serverStatus === 'no_response' ? t('server.cold_start_desc') :
-                          liveSignal?.content}
+                          (incomingCall ? `${t('app.incoming_signal')} (${incomingCall.type})` : liveSignal?.content)}
                       </span>
                    </div>
 
-                   {/* ACTION / CLOSE */}
-                   <button 
-                     onClick={() => { setServerStatus(null); setLiveSignal(null); }}
-                     className="p-2 hover:bg-white/5 rounded-full text-gray-500 transition-all"
-                   >
-                      <X size={14} />
-                   </button>
+                   {/* CALL ACTIONS (Only if it's a call) */}
+                   {incomingCall && !isCallerInActiveDM ? (
+                     <div className="flex items-center space-x-2 ml-4">
+                        <button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><X size={14} /></button>
+                        <button onClick={() => { handleAcceptCall('voice'); }} className="p-2 bg-green-500/20 text-green-500 rounded-lg hover:bg-green-500 hover:text-white transition-all"><Phone size={14} /></button>
+                        {incomingCall.type === 'video' && <button onClick={() => { handleAcceptCall('video'); }} className="p-2 bg-vani-blue/20 text-vani-blue rounded-lg hover:bg-vani-blue hover:text-white transition-all"><VideoIcon size={14} /></button>}
+                     </div>
+                   ) : (
+                     <button 
+                       onClick={() => { setServerStatus(null); setLiveSignal(null); }}
+                       className="p-2 hover:bg-white/5 rounded-full text-gray-500 transition-all"
+                     >
+                        <X size={14} />
+                     </button>
+                   )}
                 </motion.div>
              </motion.div>
           </div>
@@ -527,7 +544,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {incomingCall && (
+        {incomingCall && isCallerInActiveDM && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="w-full max-w-sm">
                <div className="bg-[#0a0a0c] border-2 border-vani-blue/50 rounded-[40px] p-8 shadow-[0_0_50px_rgba(0,210,255,0.3)] flex flex-col items-center text-center">

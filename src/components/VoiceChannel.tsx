@@ -40,6 +40,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   const userVideoRef = useRef<HTMLVideoElement>(null);
   const screenStream = useRef<MediaStream | null>(null);
   const localAudioCtx = useRef<AudioContext | null>(null);
+  const hasJoinedRoom = useRef(false);
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -143,11 +144,12 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         updateIntensity();
       } catch (e) { console.warn("Intensity tracking failed", e); }
       
-      if (socket) {
+      if (socket && !hasJoinedRoom.current) {
         socket.emit('join_voice', { 
           roomID: channelId, 
           user: { username: currentUser.username, avatar: getIdentityAvatar(currentUser), id: currentUser.id || currentUser._id } 
         });
+        hasJoinedRoom.current = true;
       }
 
       socket.off('all_users');

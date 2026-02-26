@@ -334,6 +334,14 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     const channelWithFixedName = { ...channel, name: displayName };
     setActiveChannel(channelWithFixedName); socketRef.current?.emit('join_channel', channel._id);
     localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), activeChannel: channelWithFixedName }));
+    
+    // VANI OPTIMIZATION: Do not fetch messages/posts for pure voice links or direct calls
+    if (channel.type === 'voice') {
+      setMessages([]);
+      setPosts([]);
+      return;
+    }
+
     if (['text', 'dm', 'group_dm', 'mod_messages', 'mod_reports', 'mod_users', 'mod_stats'].includes(channel.type)) { 
       try {
         const msgs = await api.getMessages(channel._id); 

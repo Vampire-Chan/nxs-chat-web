@@ -105,7 +105,7 @@ export const DMSidebar = ({ dms, selectedDmId, onSelectDm, user, onlineUserIds, 
                 </div>
                 <div className="flex-1 min-w-0">
                    <div className={`font-black text-xs truncate uppercase tracking-tighter ${isUnread && selectedDmId !== dm._id ? 'text-white' : (selectedDmId === dm._id ? 'text-white' : 'text-gray-400')}`}>
-                      {isGroup ? (dm.name || 'Unnamed_Group') : (otherUser?.username || 'Ghost_Node')}
+                      {isGroup ? (dm.name || 'Unnamed_Group') : (dm.nicknames?.[otherUser?._id || ''] || otherUser?.displayName || otherUser?.username || 'Ghost_Node')}
                    </div>
                    <div className="text-[9px] text-gray-500 truncate font-mono uppercase tracking-widest">{getStatusDisplay()}</div>
                 </div>

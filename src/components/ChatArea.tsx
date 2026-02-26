@@ -354,7 +354,12 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
   const getDisplayName = (sender: IUser | null | undefined) => {
     if (!sender) return 'Deleted_Node';
-    if (activeChannel?.nicknames?.[sender._id || sender.id]) return activeChannel.nicknames[sender._id || sender.id];
+    const userId = sender._id || sender.id;
+    // 1. ABSOLUTE PEAK: Custom Nickname
+    if (activeChannel?.nicknames?.[userId]) return activeChannel.nicknames[userId];
+    // 2. Secondary: Public Display Name
+    if (sender.displayName) return sender.displayName;
+    // 3. Fallback: Username
     return sender.username;
   };
 

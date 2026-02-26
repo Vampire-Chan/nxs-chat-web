@@ -2,14 +2,11 @@ import type { IUser } from './api';
 
 /**
  * Returns the preferred identity name.
- * Respects display name if provided, otherwise falls back to username.
+ * Priority: Display Name -> Username.
  */
 export const getIdentityName = (user: IUser | null | undefined): string => {
   if (!user) return 'Deleted_Node';
-  if (user.displayName && user.displayName.trim() !== '') {
-    return user.displayName;
-  }
-  return user.username;
+  return user.displayName || user.username || 'Unknown_Node';
 };
 
 /**
@@ -33,21 +30,21 @@ export const getIdentityAge = (user: IUser | null | undefined): number | null =>
 
 /**
  * Returns the identity avatar URL.
- * Falls back to gender-specific DiceBear collections if no avatar is set.
+ * Falls back to high-quality avataaars with gender-aware seeds.
  */
 export const getIdentityAvatar = (user: IUser | null | undefined): string => {
-  if (!user) return `https://api.dicebear.com/7.x/bottts/svg?seed=deleted`;
+  if (!user) return `https://api.dicebear.com/7.x/avataaars/svg?seed=system_node`;
   if (user.avatar && user.avatar.trim() !== '') return user.avatar;
 
-  const username = user.username || 'anonymous';
+  const username = user.username || 'node';
   const gender = user.gender || 'none';
 
-  // Cyberpunk-themed gendered fallbacks
+  // Use high-quality avataaars for all, but differentiate seeds
   if (gender === 'male') {
-    return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}_male&hairColor=2c1b18`;
   } else if (gender === 'female') {
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}_female&top[]=longHair`;
   } else {
-    return `https://api.dicebear.com/7.x/identicon/svg?seed=${username}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
   }
 };

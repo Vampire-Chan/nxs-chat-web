@@ -103,6 +103,10 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
     addToast(t('app.audio_output_routed'), 'success');
   };
 
+  useEffect(() => {
+    if (initialVideo !== undefined) setIsVideoOn(!!initialVideo);
+  }, [initialVideo]);
+
   const initMedia = useCallback(async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: !!initialVideo });

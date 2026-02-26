@@ -396,11 +396,12 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     // Notify the caller that we've accepted
     socketRef.current?.emit('accept_call', { channelId: incomingCall.channelId });
 
-    // Join the voice channel immediately
+    // Join the voice channel immediately with correct media intent
     const channel = findChannel(incomingCall.channelId);
+    const callType = incomingCall.type;
     setIncomingCall(null);
     if (channel) {
-       setActiveChannel({ ...channel, type: 'voice' });
+       setActiveChannel({ ...channel, type: 'voice', initialVideo: callType === 'video' } as any);
     }
   };
 
@@ -465,12 +466,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           </motion.div>
         )}
         {incomingCall && (
-          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5000] w-[90%] max-w-sm pointer-events-auto">
-             <div className="bg-[#0a0a0c]/90 backdrop-blur-2xl border border-vani-blue/30 rounded-[32px] p-4 shadow-2xl flex items-center justify-between">
-                <div className="flex items-center space-x-4 min-w-0"><div className="relative shrink-0"><div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" /><img src={getIdentityAvatar(incomingCall.sender)} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" /></div><div className="min-w-0"><h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4><p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mt-1">{t('app.incoming_signal')}</p></div></div>
-                <div className="flex items-center space-x-2 shrink-0"><button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button><button onClick={() => handleAcceptCall()} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>{incomingCall.type === 'video' && <button onClick={() => handleAcceptCall()} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>}</div>
-             </div>
-          </motion.div>
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="w-full max-w-sm">
+               <div className="bg-[#0a0a0c] border-2 border-vani-blue/50 rounded-[40px] p-8 shadow-[0_0_50px_rgba(0,210,255,0.3)] flex flex-col items-center text-center">
+                  <div className="relative mb-6">
+                     <div className="absolute inset-[-8px] rounded-full border-2 border-vani-blue/50 animate-ping" />
+                     <div className="absolute inset-[-16px] rounded-full border border-vani-blue/20 animate-ping [animation-delay:0.5s]" />
+                     <img src={getIdentityAvatar(incomingCall.sender)} className="w-24 h-24 rounded-[32px] object-cover border-4 border-white/10 shadow-2xl relative z-10" />
+                  </div>
+                  <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-1">{incomingCall.sender.username}</h4>
+                  <p className="text-[10px] font-mono text-vani-blue uppercase tracking-[0.3em] mb-8 animate-pulse">{incomingCall.type === 'video' ? t('chat.video_call') : t('chat.voice_call')} {t('app.incoming_signal')}</p>
+                  
+                  <div className="flex items-center space-x-4 w-full">
+                     <button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="flex-1 p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"><X size={24} /></button>
+                     <button onClick={() => handleAcceptCall()} className="flex-[2] p-4 bg-green-500 text-black rounded-2xl hover:bg-green-400 transition-all flex items-center justify-center space-x-3 shadow-lg shadow-green-500/20"><Phone size={24} className="animate-bounce" /><span className="font-black uppercase text-xs tracking-widest">{t('feed.join_btn')}</span></button>
+                  </div>
+               </div>
+            </motion.div>
+          </div>
         )}
         {liveSignal && (
           <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer" onClick={() => setLiveSignal(null)}>

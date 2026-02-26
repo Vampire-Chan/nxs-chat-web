@@ -8,6 +8,7 @@ import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { api, API_URL } from './services/api';
 import type { IRealm, IChannel, IMessage, IPost, IUser } from './services/api';
+import { getIdentityAvatar } from './services/identity';
 import { TopNavbar as CoreDock } from './components/RealmSidebar';
 import { ChannelSidebar } from './components/ChannelSidebar';
 import { ChatArea } from './components/ChatArea';
@@ -139,6 +140,11 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [liveSignal, setLiveSignal] = useState<any>(null);
   
   const socketRef = useRef<Socket | null>(null);
+  const activeChannelRef = useRef<IChannel | null>(null);
+
+  useEffect(() => {
+    activeChannelRef.current = activeChannel;
+  }, [activeChannel]);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
@@ -242,12 +248,21 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     s.on('new_notification', (notif: any) => { setLiveSignal(notif); setTimeout(() => setLiveSignal(null), 5000); });
     s.on('receive_message', (msg: any) => { 
       const msgChannelId = msg.channel?._id || msg.channel;
-      if (msgChannelId === activeChannel?._id) { setMessages(prev => [...prev, msg]); api.markNotificationsReadByChannel(msgChannelId); } 
-      else { setLiveSignal({ sender: msg.sender, content: msg.content || "Incoming Transmission...", type: 'message' }); setTimeout(() => setLiveSignal(null), 5000); sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || "Incoming Visual Data"); }
+      const isMe = (msg.sender?._id || msg.sender?.id || msg.sender) === userId;
+
+      if (msgChannelId === activeChannelRef.current?._id) { 
+        setMessages(prev => [...prev, msg]); 
+        api.markNotificationsReadByChannel(msgChannelId); 
+      } 
+      else if (!isMe) {
+        setLiveSignal({ sender: msg.sender, content: msg.content || t('app.incoming_transmission'), type: 'message' }); 
+        setTimeout(() => setLiveSignal(null), 5000); 
+        sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || t('app.incoming_visual_data')); 
+      }
       loadDMs(); setMatrixRefreshKey(k => k + 1); 
     });
-    s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification(`Incoming ${data.type} call`, `${data.sender.username} is establishing a link...`); });
-    s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: 'Identity Link Rejected', type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });
+    s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification(t('app.incoming_call', { type: data.type }), t('app.establishing_link', { username: data.sender.username })); });
+    s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: t('app.identity_link_rejected'), type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });
     s.on('identity_sync_update', async () => { try { const u = await api.getUserProfile(user?.id || user?._id || ''); updateUserState(localStorage.getItem('token') || '', u); loadDMs(); loadRealms(); setMatrixRefreshKey(k => k + 1); } catch (e) {} });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
@@ -314,12 +329,63 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     else { const ps = await api.getPosts(channel._id); setPosts(ps); }
   };
 
-  const handleAcceptCall = (type: 'voice' | 'video') => {
+  const findChannel = (channelId: string) => {
+    for (const dm of dms) {
+      if (dm._id === channelId) return dm;
+    }
+    for (const realm of realms) {
+      const channel = realm.channels?.find(c => c._id === channelId);
+      if (channel) return channel;
+    }
+    return null;
+  }
+
+  useEffect(() => {
+    if (socketRef.current) {
+      const s = socketRef.current;
+      
+      s.on('call_initiated', ({ recipients }: { recipients: any[] }) => {
+        addToast(t('app.ringing_users', { count: recipients.length }), 'info');
+      });
+
+      s.on('caller_ready', ({ channelId }: { channelId: string }) => {
+        const channel = findChannel(channelId);
+        if (channel) {
+          setActiveChannel({ ...channel, type: 'voice' });
+        }
+      });
+
+      return () => {
+        s.off('call_initiated');
+        s.off('caller_ready');
+      };
+    }
+  }, [user, dms, realms, addToast, t]);
+
+  const handleStartCall = (type: 'voice' | 'video') => {
+    if (!activeChannel) return;
+    socketRef.current?.emit('initiate_call', { 
+      channelId: activeChannel._id, 
+      type, 
+      senderId: user!.id || user!._id, 
+      senderName: user!.username, 
+      senderAvatar: getIdentityAvatar(user) 
+    });
+    // We now wait for the 'caller_ready' event instead of joining immediately
+  };
+  
+  const handleAcceptCall = () => {
     if (!incomingCall) return;
-    let channel = dms.find(d => d._id === incomingCall.channelId);
-    if (!channel) { for (const r of realms) { const found = r.channels?.find(c => c._id === incomingCall.channelId); if (found) { channel = found; break; } } }
-    if (channel) { handleSelectChannel(channel); setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any); api.markNotificationsReadByChannel(channel._id); }
+    
+    // Notify the caller that we've accepted
+    socketRef.current?.emit('accept_call', { channelId: incomingCall.channelId });
+
+    // Join the voice channel immediately
+    const channel = findChannel(incomingCall.channelId);
     setIncomingCall(null);
+    if (channel) {
+       setActiveChannel({ ...channel, type: 'voice' });
+    }
   };
 
   const [showRealmModal, setShowRealmModal] = useState(false);
@@ -335,11 +401,11 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const handleViewOtherProfile = (id: string) => { setViewingUserId(id); setViewMode('view-profile'); setActiveRealm(null); setActiveChannel(null); if (isMobile) setIsSidebarOpen(false); };
   const handleViewSocials = (tab: any, userId: string) => { setSocialTab(tab); setSocialTargetId(userId); setViewMode('social'); setActiveRealm(null); setActiveChannel(null); };
-  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); addToast(isFollowing ? t('settings.link_severed') : t('settings.identity_synced'), 'success'); } catch(e:any){ addToast(e.response?.data?.message || "Sync error.", 'error'); } };
+  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); addToast(isFollowing ? t('settings.link_severed') : t('settings.identity_synced'), 'success'); } catch(e:any){ addToast(e.response?.data?.message || t('app.sync_error'), 'error'); } };
   const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { addToast(t('settings.link_init_failed'), 'error'); } };
   
-  const handleLeaveRealm = async (id: string) => { if (!window.confirm("Sever link?")) return; try { await api.leaveRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast("Link Severed", 'success'); } catch (e) { addToast("Severance failed", 'error'); } };
-  const handleDeleteRealm = async (id: string) => { if (!window.confirm("Collapse realm entirely?")) return; try { await api.deleteRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast("Sovereignty Purge Complete", 'success'); } catch (e) { addToast("Purge failed", 'error'); } };
+  const handleLeaveRealm = async (id: string) => { if (!window.confirm(t('app.sever_link_confirm'))) return; try { await api.leaveRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast(t('app.sever_success'), 'success'); } catch (e) { addToast(t('app.sever_failed'), 'error'); } };
+  const handleDeleteRealm = async (id: string) => { if (!window.confirm(t('app.collapse_realm_confirm'))) return; try { await api.deleteRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast(t('app.purge_success'), 'success'); } catch (e) { addToast(t('app.purge_failed'), 'error'); } };
 
   const handleTagSelect = async (tag: string | null) => { setViewMode('explore'); setActiveRealm(null); setActiveChannel(null); const d = await api.getGlobalPosts(tag || undefined); setPosts(d); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'explore', activeRealm: null, activeChannel: null })); };
 
@@ -367,14 +433,14 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         {incomingCall && (
           <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5000] w-[90%] max-w-sm pointer-events-auto">
              <div className="bg-[#0a0a0c]/90 backdrop-blur-2xl border border-vani-blue/30 rounded-[32px] p-4 shadow-2xl flex items-center justify-between">
-                <div className="flex items-center space-x-4 min-w-0"><div className="relative shrink-0"><div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" /><img src={incomingCall.sender.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${incomingCall.sender.username}`} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" /></div><div className="min-w-0"><h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4><p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mt-1">Incoming_Signal</p></div></div>
-                <div className="flex items-center space-x-2 shrink-0"><button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button><button onClick={() => handleAcceptCall('voice')} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>{incomingCall.type === 'video' && <button onClick={() => handleAcceptCall('video')} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>}</div>
+                <div className="flex items-center space-x-4 min-w-0"><div className="relative shrink-0"><div className="absolute inset-[-4px] rounded-full border-2 border-vani-blue/50 animate-ping" /><img src={getIdentityAvatar(incomingCall.sender)} className="w-12 h-12 rounded-2xl object-cover border-2 border-white/10" /></div><div className="min-w-0"><h4 className="text-xs font-black text-white uppercase truncate">{incomingCall.sender.username}</h4><p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mt-1">{t('app.incoming_signal')}</p></div></div>
+                <div className="flex items-center space-x-2 shrink-0"><button onClick={() => { socketRef.current?.emit('reject_call', { channelId: incomingCall.channelId, senderId: incomingCall.senderId }); setIncomingCall(null); }} className="p-3 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><X size={18} /></button><button onClick={() => handleAcceptCall()} className="p-3 bg-green-500/10 text-green-500 rounded-2xl hover:bg-green-500 hover:text-white transition-all"><Phone size={18} /></button>{incomingCall.type === 'video' && <button onClick={() => handleAcceptCall()} className="p-3 bg-vani-blue/10 text-vani-blue rounded-2xl hover:bg-vani-blue hover:text-white transition-all"><Video size={18} /></button>}</div>
              </div>
           </motion.div>
         )}
         {liveSignal && (
           <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer" onClick={() => setLiveSignal(null)}>
-             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]"><div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0"><img src={liveSignal.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${liveSignal.sender?.username}`} className="w-full h-full object-cover" /></div><div className="flex flex-col min-w-0"><span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">{liveSignal.sender?.username || 'SYSTEM'}</span><span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">{liveSignal.content}</span></div><div className="shrink-0 ml-2">{liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}{liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}{liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}{liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}</div></div>
+             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]"><div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0"><img src={getIdentityAvatar(liveSignal.sender)} className="w-full h-full object-cover" /></div><div className="flex flex-col min-w-0"><span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">{liveSignal.sender?.username || 'SYSTEM'}</span><span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">{liveSignal.content}</span></div><div className="shrink-0 ml-2">{liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}{liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}{liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}{liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}</div></div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -415,7 +481,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                   />
                 ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
-                    key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} onStartCall={() => { socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'voice', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar }); setActiveChannel({ ...activeChannel, type: 'voice' }); }} onStartVideo={() => { socketRef.current?.emit('initiate_call', { channelId: activeChannel._id, type: 'video', senderId: user?.id || user?._id, senderName: user?.username, senderAvatar: user?.avatar }); setActiveChannel({ ...activeChannel, type: 'voice', initialVideo: true } as any); }}
+                    key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} onStartCall={() => handleStartCall('voice')} 
+onStartVideo={() => handleStartCall('video')}
                     oversightMode={oversightMode} setOversightMode={setOversightMode}
                   />
                 ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
@@ -439,7 +506,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           </div>
         )}
         {activeMedia && <MediaPlayer type={activeMedia.type} url={activeMedia.url} onClose={() => setActiveMedia(null)} />}
-        {selectedPostId && <div className="fixed inset-0 z-[4000] flex items-center justify-center"><PostViewerModal post={posts.find(p => p._id === selectedPostId) || { _id: selectedPostId, caption: 'Loading...', author: { username: '...' }, likes: [], comments: [] } as any} onClose={() => setSelectedPostId(null)} currentUser={user} onUpdate={() => triggerRefresh()} /></div>}
+        {selectedPostId && <div className="fixed inset-0 z-[4000] flex items-center justify-center"><PostViewerModal post={posts.find(p => p._id === selectedPostId) || { _id: selectedPostId, caption: t('common.loading'), author: { username: '...' }, likes: [], comments: [] } as any} onClose={() => setSelectedPostId(null)} currentUser={user} onUpdate={() => triggerRefresh()} /></div>}
         {showGroupSettings && activeChannel && <GroupSettingsModal group={activeChannel} onClose={() => setShowGroupSettings(false)} onUpdate={() => loadDMs()} currentUser={user!} />}
         {showLogoutModal && <LogoutModal onClose={() => setShowLogoutModal(false)} />}
       </AnimatePresence>
@@ -450,7 +517,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast(t('settings.group_initialized'), 'success'); } catch(e){ addToast(t('settings.group_failed'), 'error'); } }} currentUser={user!} />}
       {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast(t('settings.calibration_saved'), 'success'); } catch(e){ addToast(t('settings.save_failed'), 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
-      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(`Joined ${r.name}`, 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
+      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(t('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
     </div>
   );
 }

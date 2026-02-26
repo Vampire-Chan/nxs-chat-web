@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser } from '../services/api';
-import { getIdentityName, getIdentityAge } from '../services/identity';
+import { getIdentityName, getIdentityAge, getIdentityAvatar } from '../services/identity';
 import { User as UserIcon, Heart, MessageCircle, Lock, Share2, Check, Clock, Shield, Star } from 'lucide-react';
 import { PostViewerModal } from './PostViewerModal';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   user: IUser;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocials, currentUser, onSelectTag, onViewProfile }: Props) => {
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<IPost[]>([]);
   const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
@@ -26,8 +28,8 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
     return (
       <div className="flex-1 bg-discord-dark flex flex-col items-center justify-center p-10 text-center">
          <div className="w-20 h-20 bg-red-500/10 rounded-[32px] mb-6 flex items-center justify-center border border-red-500/20 text-red-500"><Shield size={40} /></div>
-         <h3 className="text-xl font-black text-white uppercase tracking-widest mb-2">Severed Identity</h3>
-         <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">This node has been purged from the matrix or the transmission link is broken.</p>
+         <h3 className="text-xl font-black text-white uppercase tracking-widest mb-2">{t('profile.severed_identity')}</h3>
+         <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">{t('profile.purged_desc')}</p>
       </div>
     );
   }
@@ -46,11 +48,11 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
   const handleShare = () => {
     const url = `${window.location.origin}/id/${user.username}`;
     navigator.clipboard.writeText(url);
-    alert("Identity link copied to clipboard buffer.");
+    alert(t('profile.link_copied'));
   };
 
   const handleAccept = async () => {
-    try { await api.acceptSync(user.id || user._id); window.location.reload(); } catch (e) { alert("Fail"); }
+    try { await api.acceptSync(user.id || user._id); window.location.reload(); } catch (e) { alert(t('app.sync_error')); }
   };
 
   const fetchPosts = async () => {
@@ -69,20 +71,20 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
   useEffect(() => { if (!user.isLocked || isOwnProfile || isFriend) fetchPosts(); else setLoading(false); }, [user]);
 
   const renderActionButton = () => {
-    if (isOwnProfile) return <button onClick={onEdit} className="bg-white/5 hover:bg-white/10 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all backdrop-blur-md">Modify Node</button>;
+    if (isOwnProfile) return <button onClick={onEdit} className="bg-white/5 hover:bg-white/10 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all backdrop-blur-md">{t('profile.modify_node')}</button>;
     
     // FIXED: Added onClick to Break Link
-    if (isFriend) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-green-500/10 text-green-500 border border-green-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">Break Link</button>;
+    if (isFriend) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-green-500/10 text-green-500 border border-green-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">{t('profile.break_link')}</button>;
     
-    if (isFollowing && !user.isPrivate) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-white/5 text-white border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">Unsync Node</button>;
+    if (isFollowing && !user.isPrivate) return <button onClick={() => onFollow?.(user.id || user._id)} className="bg-white/5 text-white border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all">{t('profile.unsync_node')}</button>;
     
-    if (isRequestReceived) return <button onClick={handleAccept} className="bg-green-500/20 text-green-500 border border-green-500/50 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-2 shadow-lg shadow-green-500/10"><Check size={12} /> Accept Invasion</button>;
+    if (isRequestReceived) return <button onClick={handleAccept} className="bg-green-500/20 text-green-500 border border-green-500/50 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-2 shadow-lg shadow-green-500/10"><Check size={12} /> {t('profile.accept_invasion')}</button>;
     
-    if (isRequestSent) return <button disabled className="bg-white/5 text-gray-500 border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center gap-2 animate-pulse"><Clock size={12} /> Sync Pending</button>;
+    if (isRequestSent) return <button disabled className="bg-white/5 text-gray-500 border border-white/10 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center gap-2 animate-pulse"><Clock size={12} /> {t('profile.sync_pending')}</button>;
     
     return (
       <button onClick={() => onFollow?.(user.id || user._id)} className="bg-vani-gradient text-white shadow-red-500/20 px-10 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95">
-        {user.isPrivate ? 'Request Access' : 'Establish Sync'}
+        {user.isPrivate ? t('profile.request_access') : t('profile.establish_sync')}
       </button>
     );
   };
@@ -99,7 +101,7 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
                <div className="relative group z-20">
                   <div className="w-32 h-32 rounded-[32px] bg-vani-gradient p-0.5 shadow-2xl">
                      <div className="w-full h-full rounded-[30px] bg-discord-dark overflow-hidden border-4 border-discord-dark">
-                        <img src={user.avatar || defaultAvatar} className="w-full h-full object-cover" alt="pfp" />
+                        <img src={getIdentityAvatar(user)} className="w-full h-full object-cover" alt="pfp" />
                      </div>
                   </div>
                   <div className="absolute -bottom-1 -right-1 bg-vani-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-discord-dark shadow-xl z-30">
@@ -123,25 +125,28 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
                      </div>
                   </div>
                   <div className="flex justify-center md:justify-start space-x-8 opacity-80">
-                     <Stat label="Transmissions" value={posts.length} />
+                     <Stat label={t('profile.transmissions')} value={posts.length} />
                      {isOwnProfile && (
-                       <Stat label="Parallel" value={user.friends?.length || 0} onClick={() => onViewSocials?.('friends', user.id || user._id)} />
+                       <Stat label={t('profile.parallel')} value={user.friends?.length || 0} onClick={() => onViewSocials?.('friends', user.id || user._id)} />
                      )}
-                     <Stat label="Synced" value={user.following?.length || 0} onClick={() => onViewSocials?.('following', user.id || user._id)} />
-                     <Stat label="Nodes" value={user.followers?.length || 0} onClick={() => onViewSocials?.('followers', user.id || user._id)} />
+                     <Stat label={t('profile.synced')} value={user.following?.length || 0} onClick={() => onViewSocials?.('following', user.id || user._id)} />
+                     <Stat label={t('profile.nodes')} value={user.followers?.length || 0} onClick={() => onViewSocials?.('followers', user.id || user._id)} />
                   </div>
                </div>
             </div>
             <div className="mt-6 flex flex-col md:flex-row gap-4 items-start">
                <div className="flex-1 bg-white/[0.02] p-5 rounded-2xl border border-white/5 backdrop-blur-sm relative overflow-hidden group">
-                  <p className="text-gray-300 text-sm leading-relaxed font-medium relative z-10">{user.bio || "Node awaiting identity calibration."}</p>
+                  <p className="text-gray-300 text-sm leading-relaxed font-medium relative z-10">{user.bio || t('profile.awaiting_calib')}</p>
                </div>
                <div className="w-full md:w-48 bg-white/[0.01] border border-white/5 rounded-2xl p-4 flex flex-col space-y-2">
-                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Handle</span><span className="text-[8px] font-mono text-vani-blue">@{user.username}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">{t('profile.handle')}</span><span className="text-[8px] font-mono text-vani-blue">@{user.username}</span></div>
                   {user.displayName && (
-                    <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Alias</span><span className="text-[8px] font-mono text-white truncate max-w-[80px]">{user.displayName}</span></div>
+                    <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">{t('profile.alias')}</span><span className="text-[8px] font-mono text-white truncate max-w-[80px]">{user.displayName}</span></div>
                   )}
-                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">Tier</span><span className="text-[8px] font-mono text-yellow-500 uppercase">{user.tier}</span></div>
+                  {user.showGender && user.gender && user.gender !== 'none' && (
+                    <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">{t('profile.gender')}</span><span className="text-[8px] font-mono text-white uppercase">{t(`profile.gender_${user.gender}`)}</span></div>
+                  )}
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black text-gray-600 uppercase">{t('profile.tier')}</span><span className="text-[8px] font-mono text-yellow-500 uppercase">{user.tier}</span></div>
                </div>
             </div>
          </div>
@@ -150,8 +155,8 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
       {user.isLocked && !isOwnProfile && !isFriend ? (
         <div className="max-w-4xl mx-auto px-6 py-20 flex flex-col items-center border-t border-gray-900/50">
            <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/5"><Lock size={24} className="text-gray-600" /></div>
-           <h3 className="text-lg font-black text-white uppercase tracking-widest mb-1">Stealth Node Active</h3>
-           <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest text-center max-w-xs leading-relaxed">Establish a mutual sync to unlock visual matrix.</p>
+           <h3 className="text-lg font-black text-white uppercase tracking-widest mb-1">{t('profile.stealth_node')}</h3>
+           <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest text-center max-w-xs leading-relaxed">{t('profile.mutual_sync_desc')}</p>
         </div>
       ) : (
         <div className="max-w-4xl mx-auto px-6">

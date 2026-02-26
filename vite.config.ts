@@ -1,30 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vite.dev/config/
 export default defineConfig({
-  define: {
-    global: 'window',
-    'process.env': {}
-  },
-  resolve: {
-    alias: {
-      util: path.resolve(__dirname, './src/util-polyfill.ts'),
-      buffer: 'buffer',
-      events: 'events',
-      process: 'process/browser',
-    },
-  },
-  optimizeDeps: {
-    include: ['buffer', 'process', 'events', 'util'],
-  },
   plugins: [
     react(),
+    nodePolyfills({
+      // To exclude specific polyfills, add them to this array.
+      exclude: [
+        'fs', 
+      ],
+      // Whether to polyfill `global`.
+      globals: {
+        Buffer: true, // can also be 'build' | 'dev'
+        global: true,
+        process: true,
+      },
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],

@@ -5,6 +5,8 @@ import { Socket } from 'socket.io-client';
 import Peer from 'simple-peer';
 import type { IUser } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
+import { getIdentityAvatar } from '../services/identity';
 
 interface Props {
   channelId: string;
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialVideo }: Props) => {
+  const { t } = useLanguage();
   const { addToast } = useToast();
   const [peers, setPeers] = useState<any[]>([]);
   const [isMuted, setIsMuted] = useState(false);
@@ -63,7 +66,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         });
         setSelectedMic(deviceId);
       }
-    } catch (e) { addToast("Mic Calibration Failed", 'error'); }
+    } catch (e) { addToast(t('chat.calibration_failed'), 'error'); }
   };
 
   const switchCamera = async (deviceId: string) => {
@@ -85,7 +88,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         });
         setSelectedCamera(deviceId);
       }
-    } catch (e) { addToast("Camera Calibration Failed", 'error'); }
+    } catch (e) { addToast(t('chat.calibration_failed'), 'error'); }
   };
 
   const switchSpeaker = async (deviceId: string) => {
@@ -97,15 +100,13 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       }
     });
     setSelectedSpeaker(deviceId);
-    addToast("Audio Output Routed", 'success');
+    addToast(t('app.audio_output_routed'), 'success');
   };
 
   const initMedia = useCallback(async () => {
     try {
-      console.log("🎙️ Initializing Media Capture...");
       const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: !!initialVideo });
       userStream.current = s;
-      console.log("✅ Stream Captured:", s.id, "Tracks:", s.getTracks().length);
       
       if (userVideoRef.current) userVideoRef.current.srcObject = s;
       
@@ -113,7 +114,6 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       const audioTrack = s.getAudioTracks()[0];
       const videoTrack = s.getVideoTracks()[0];
       if (audioTrack) {
-        console.log("🎤 Audio Track Active:", audioTrack.label);
         setSelectedMic(audioTrack.getSettings().deviceId || '');
       }
       if (videoTrack) setSelectedCamera(videoTrack.getSettings().deviceId || '');
@@ -137,19 +137,17 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
           }
         };
         updateIntensity();
-      } catch (e) { console.warn("Intensity tracking initialization failed", e); }
+      } catch (e) { console.warn("Intensity tracking failed", e); }
       
       if (socket) {
-        console.log("📡 Emitting join_voice for room:", channelId);
         socket.emit('join_voice', { 
           roomID: channelId, 
-          user: { username: currentUser.username, avatar: currentUser.avatar, id: currentUser.id || currentUser._id } 
+          user: { username: currentUser.username, avatar: getIdentityAvatar(currentUser), id: currentUser.id || currentUser._id } 
         });
       }
 
       socket.off('all_users');
       socket.on('all_users', (users: any[]) => {
-        console.log("👥 Active users in voice room:", users.length);
         const p: any[] = [];
         users.forEach(uData => {
           if (peersRef.current.find(p => p.peerID === uData.socketId)) return;
@@ -163,7 +161,6 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
 
       socket.off('user_joined');
       socket.on('user_joined', (payload: any) => {
-        console.log("👤 User joining:", payload.user?.username);
         const item = peersRef.current.find(p => p.peerID === payload.callerID);
         if (item) {
           item.peer.signal(payload.signal);
@@ -182,7 +179,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
           try {
             item.peer.signal(payload.signal);
           } catch (e) {
-            console.warn("Signal processing error:", e);
+            console.warn("Signal error", e);
           }
         }
       });
@@ -195,30 +192,40 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         }
         peersRef.current = peersRef.current.filter(p => p.peerID !== userId);
         setPeers(prev => prev.filter(p => p.peerID !== userId));
-
-        if (peersRef.current.length === 0) {
-          addToast("Identity Node De-synchronized. Terminating link.", 'info');
-          setTimeout(() => {
-            onLeave();
-          }, 2000);
-        }
       });
     } catch (err: any) {
       console.error("❌ Media Access Error:", err);
-      addToast(`Media Access Denied: ${err.message}`, 'error');
+      addToast(`${t('chat.audio_sync_failed')}: ${err.message}`, 'error');
     }
-  }, [channelId, initialVideo, socket, addToast, currentUser, onLeave]);
+  }, [channelId, initialVideo, socket, addToast, currentUser, t]);
 
   useEffect(() => {
     initMedia();
     return () => {
+      console.log("🛑 Terminating Voice Link...");
       // CLEANUP ALL PEERS
-      peersRef.current.forEach(p => p.peer.destroy());
+      peersRef.current.forEach(p => {
+        try { p.peer.destroy(); } catch(e){}
+      });
       peersRef.current = [];
       setPeers([]);
 
-      userStream.current?.getTracks().forEach(t => t.stop());
-      screenStream.current?.getTracks().forEach(t => t.stop());
+      // STOP ALL TRACKS (Kill the Camera Light)
+      if (userStream.current) {
+        userStream.current.getTracks().forEach(t => {
+          console.log("✂️ Stopping track:", t.kind);
+          t.stop();
+        });
+        userStream.current = null;
+      }
+      if (screenStream.current) {
+        screenStream.current.getTracks().forEach(t => t.stop());
+        screenStream.current = null;
+      }
+      if (localAudioCtx.current) {
+        localAudioCtx.current.close().catch(() => {});
+        localAudioCtx.current = null;
+      }
       
       if (socket) {
         socket.emit('leave_voice', { channelId });
@@ -241,7 +248,13 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
     const p = new Peer({ initiator: true, stream: s, config: rtcConfig });
     p.on('signal', (signal: any) => socket.emit('sending_signal', { 
       userToSignal: u, callerID: c, signal,
-      user: { username: currentUser.username, avatar: currentUser.avatar, id: currentUser.id || currentUser._id }
+      user: { 
+        username: currentUser.username, 
+        avatar: getIdentityAvatar(currentUser), 
+        id: currentUser.id || currentUser._id,
+        gender: currentUser.gender,
+        showGender: currentUser.showGender
+      }
     }));
     
     p.on('connect', () => {
@@ -325,8 +338,8 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
                <Activity size={20} className="text-vani-blue animate-pulse" />
             </div>
             <div>
-               <h2 className="text-lg font-black text-white uppercase tracking-tighter">Secure_Link_Matrix</h2>
-               <div className="flex items-center space-x-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /><span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{peers.length + 1} NODES_SYNCED</span></div>
+               <h2 className="text-lg font-black text-white uppercase tracking-tighter">{t('ui.secure_link')}</h2>
+               <div className="flex items-center space-x-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /><span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{peers.length + 1} {t('ui.nodes_synced')}</span></div>
             </div>
          </div>
          <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-xl border border-white/5 backdrop-blur-md">
@@ -341,12 +354,12 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
               <div className="w-full h-full flex flex-col items-center justify-center bg-discord-dark min-h-[200px]">
                  <div className="relative">
                     <AnimatePresence>{!isMuted && micIntensity > 5 && <motion.div animate={{ scale: [1, 1 + (micIntensity / 100), 1], opacity: [0.2, 0.5, 0.2], borderWidth: [2, 4, 2] }} transition={{ repeat: Infinity, duration: 0.5 }} className="absolute inset-[-20px] rounded-full border-vani-blue/40 pointer-events-none" style={{ borderColor: `rgba(0, 210, 255, ${micIntensity / 100})` }} />}</AnimatePresence>
-                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl transition-transform duration-75" style={{ transform: `scale(${1 + (micIntensity / 500)})` }} />
+                    <img src={getIdentityAvatar(currentUser)} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl transition-transform duration-75" style={{ transform: `scale(${1 + (micIntensity / 500)})` }} />
                     <div className="absolute -bottom-2 -right-2 bg-vani-blue w-8 h-8 rounded-xl flex items-center justify-center border-4 border-gray-800 shadow-xl">{isMuted ? <MicOff size={14} className="text-white" /> : <Mic size={14} className="text-white" />}</div>
                  </div>
               </div>
             )}
-            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2"><span className="text-[10px] font-black text-white uppercase tracking-widest">{currentUser.username} (YOU)</span></div>
+            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2"><span className="text-[10px] font-black text-white uppercase tracking-widest">{currentUser.username} ({t('common.you')})</span></div>
          </div>
          {peers.map((p, i) => <RemoteNode key={p.peerID || i} peer={p.peer} user={p.user} status={p.status} isFocus={layoutMode === 'focus' && i === 0 && !(isVideoOn || isScreenSharing)} />)}
       </div>
@@ -358,7 +371,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
             <ControlBtn icon={isScreenSharing ? <Monitor size={20} /> : <MonitorOff size={20} />} active={isScreenSharing} onClick={() => handleControlClick(toggleScreenShare)} variant={isScreenSharing ? 'active' : 'normal'} />
             <ControlBtn icon={<Settings size={20} />} onClick={() => { fetchDevices(); setShowHardwareModal(true); }} variant="normal" />
             <div className="w-px h-8 bg-white/10 mx-2" />
-            <button onClick={onLeave} className="px-8 py-4 bg-red-500/80 hover:bg-red-600 text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center space-x-2"><PhoneOff size={18} /> <span>Sever Link</span></button>
+            <button onClick={onLeave} className="px-8 py-4 bg-red-500/80 hover:bg-red-600 text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center space-x-2"><PhoneOff size={18} /> <span>{t('ui.sever_link')}</span></button>
          </div>
       </div>
 
@@ -432,77 +445,70 @@ const ControlBtn = ({ icon, onClick, variant }: any) => {
 
 const RemoteNode = ({ peer, isFocus, user, status }: any) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [micIntensity, setMicIntensity] = useState(0);
   const [hasVideo, setHasVideo] = useState(false);
   const [zoom, setZoom] = useState(1);
   const scale = useMotionValue(1); const x = useMotionValue(0); const y = useMotionValue(0);
 
-  const attachStream = useCallback((stream: MediaStream) => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      // Force play in case of browser restrictions
-      videoRef.current.play().catch(e => console.warn("Auto-play blocked:", e));
+  useEffect(() => {
+    if (peer.streams && peer.streams[0]) {
+      setRemoteStream(peer.streams[0]);
     }
-    const checkTracks = () => { 
-      const vTrack = stream.getVideoTracks()[0]; 
-      setHasVideo(!!vTrack && vTrack.enabled); 
-    };
-    checkTracks();
-    
-    // Listen for track changes
-    stream.onaddtrack = checkTracks;
-    stream.onremovetrack = checkTracks;
 
-    try {
-      const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
-      const audioContext = new AudioCtx();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser(); analyser.fftSize = 256;
-      source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
-      const check = () => { if (!peer.destroyed) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); requestAnimationFrame(check); } };
-      check();
-    } catch { }
-  }, [peer]);
+    const onStream = (stream: MediaStream) => {
+      console.log("🌊 Stream event from:", user?.username);
+      setRemoteStream(stream);
+    };
+
+    const onTrack = (track: any, stream: MediaStream) => {
+      console.log("🎵 Track event from:", user?.username, track.kind);
+      setRemoteStream(stream);
+    };
+
+    peer.on('stream', onStream);
+    peer.on('track', onTrack);
+
+    return () => {
+      peer.off('stream', onStream);
+      peer.off('track', onTrack);
+    };
+  }, [peer, user]);
 
   useEffect(() => {
-    // If stream already exists (common in fast signaling)
-    if (peer.streams && peer.streams[0]) {
-      attachStream(peer.streams[0]);
+    if (videoRef.current && remoteStream) {
+      videoRef.current.srcObject = remoteStream;
+      videoRef.current.play().catch(e => console.warn("Auto-play blocked:", e));
+      
+      const checkTracks = () => {
+        const vTrack = remoteStream.getVideoTracks()[0];
+        setHasVideo(!!vTrack && vTrack.enabled);
+      };
+      checkTracks();
+      remoteStream.onaddtrack = checkTracks;
+      remoteStream.onremovetrack = checkTracks;
+
+      // INTENSITY
+      try {
+        const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
+        const ctx = new AudioCtx();
+        const source = ctx.createMediaStreamSource(remoteStream);
+        const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+        source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
+        const check = () => { if (remoteStream.active) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); requestAnimationFrame(check); } };
+        check();
+      } catch (e) {}
     }
-
-    peer.on('stream', (stream: MediaStream) => {
-      console.log("🌊 Remote stream received from:", user?.username);
-      attachStream(stream);
-    });
-
-    // Handle track additions/removals specifically for simple-peer
-    peer.on('track', (track: MediaStreamTrack, stream: MediaStream) => {
-      console.log("🎵 Remote track added:", track.kind);
-      attachStream(stream);
-    });
-
-  }, [peer, user, attachStream]);
+  }, [remoteStream]);
 
   const resetZoom = useCallback(() => { setZoom(1); scale.set(1); x.set(0); y.set(0); }, [scale, x, y]);
   const handleScroll = (e: React.WheelEvent) => { if (!hasVideo) return; const delta = e.deltaY * -0.001; const newZoom = Math.min(Math.max(zoom + delta, 1), 5); setZoom(newZoom); scale.set(newZoom); };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!hasVideo) return;
-      if (e.ctrlKey && (e.key === '=' || e.key === '+')) { e.preventDefault(); const nz = Math.min(zoom + 0.2, 5); setZoom(nz); scale.set(nz); }
-      if (e.ctrlKey && e.key === '-') { e.preventDefault(); const nz = Math.max(zoom - 0.2, 1); setZoom(nz); scale.set(nz); }
-      if (e.ctrlKey && e.key === '0') { e.preventDefault(); resetZoom(); }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoom, hasVideo, scale, resetZoom]);
 
   const talking = micIntensity > 5;
 
   return (
     <div className={`relative group bg-gray-900 rounded-[32px] overflow-hidden border-2 transition-all shadow-2xl ${isFocus ? 'flex-[3]' : 'flex-1'} ${talking ? 'border-vani-blue shadow-[0_0_30px_rgba(0,210,255,0.2)]' : 'border-white/5'} ${hasVideo ? 'cursor-grab active:cursor-grabbing' : ''}`} onWheel={handleScroll}>
        <motion.div className="w-full h-full" style={{ scale, x, y }} drag={zoom > 1} dragConstraints={{ left: -500 * (zoom-1), right: 500 * (zoom-1), top: -300 * (zoom-1), bottom: 300 * (zoom-1) }}>
-          {/* NEVER HIDE VIDEO ELEMENT: It carries the audio. Use opacity instead. */}
           <video 
             ref={videoRef} 
             autoPlay 
@@ -510,11 +516,24 @@ const RemoteNode = ({ peer, isFocus, user, status }: any) => {
             className={`w-full h-full object-contain bg-black transition-opacity duration-500 ${hasVideo ? 'opacity-100' : 'opacity-0'}`} 
           />
        </motion.div>
+       
+       {/* AUDIO RESCUE OVERLAY */}
+       {!hasVideo && remoteStream && (
+         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+            <button 
+              onClick={() => videoRef.current?.play()}
+              className="px-3 py-1 bg-vani-blue/20 hover:bg-vani-blue/40 text-vani-blue text-[8px] font-black uppercase rounded-full border border-vani-blue/30 transition-all"
+            >
+               {t('ui.sync_audio')}
+            </button>
+         </div>
+       )}
+
        {!hasVideo && (
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-discord-dark pointer-events-none">
             <div className="relative">
                <AnimatePresence>{talking && <motion.div animate={{ scale: [1, 1 + (micIntensity / 100), 1], opacity: [0.2, 0.5, 0.2], borderWidth: [2, 4, 2] }} transition={{ repeat: Infinity, duration: 0.5 }} className="absolute inset-[-25px] rounded-full border-vani-accent/40 pointer-events-none" style={{ borderColor: `rgba(255, 60, 60, ${micIntensity / 100})` }} />}</AnimatePresence>
-               <img src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'node'}`} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl transition-transform duration-75" style={{ transform: `scale(${1 + (micIntensity / 500)})` }} />
+               <img src={getIdentityAvatar(user)} className="w-24 h-24 rounded-[36px] object-cover border-4 border-gray-800 shadow-xl transition-transform duration-75" style={{ transform: `scale(${1 + (micIntensity / 500)})` }} />
             </div>
          </div>
        )}
@@ -523,7 +542,7 @@ const RemoteNode = ({ peer, isFocus, user, status }: any) => {
          <div className="absolute inset-0 z-10 bg-black/60 backdrop-blur-sm flex items-center justify-center">
             <div className="text-center space-y-4">
                <div className="w-12 h-12 border-4 border-vani-blue border-t-transparent rounded-full animate-spin mx-auto" />
-               <p className="text-[10px] font-black text-white uppercase tracking-widest animate-pulse">Establishing_Link...</p>
+               <p className="text-[10px] font-black text-white uppercase tracking-widest animate-pulse">{t('ui.establishing_link')}</p>
             </div>
          </div>
        )}
@@ -532,7 +551,7 @@ const RemoteNode = ({ peer, isFocus, user, status }: any) => {
          <div className="absolute inset-0 z-10 bg-red-500/20 backdrop-blur-md flex items-center justify-center">
             <div className="text-center space-y-2">
                <PhoneOff size={32} className="text-red-500 mx-auto" />
-               <p className="text-[10px] font-black text-white uppercase tracking-widest">Link_Severed</p>
+               <p className="text-[10px] font-black text-white uppercase tracking-widest">{t('ui.link_severed')}</p>
             </div>
          </div>
        )}

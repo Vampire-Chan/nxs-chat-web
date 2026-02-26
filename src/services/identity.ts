@@ -30,3 +30,24 @@ export const getIdentityAge = (user: IUser | null | undefined): number | null =>
   
   return age;
 };
+
+/**
+ * Returns the identity avatar URL.
+ * Falls back to gender-specific DiceBear collections if no avatar is set.
+ */
+export const getIdentityAvatar = (user: IUser | null | undefined): string => {
+  if (!user) return `https://api.dicebear.com/7.x/bottts/svg?seed=deleted`;
+  if (user.avatar && user.avatar.trim() !== '') return user.avatar;
+
+  const username = user.username || 'anonymous';
+  const gender = user.gender || 'none';
+
+  // Cyberpunk-themed gendered fallbacks
+  if (gender === 'male') {
+    return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}`;
+  } else if (gender === 'female') {
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+  } else {
+    return `https://api.dicebear.com/7.x/identicon/svg?seed=${username}`;
+  }
+};

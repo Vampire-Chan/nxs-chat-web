@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Globe, Heart, Send, Hash, RefreshCcw } from 'lucide-react';
+import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Globe, Heart, Send, Hash, RefreshCcw, LockKeyhole, ExternalLink, CreditCard } from 'lucide-react';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
+import { getIdentityAvatar } from '../services/identity';
 import type { IUser } from '../services/api';
 
 interface Props {
@@ -25,38 +26,29 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   // Profile States
   const [displayName, setDisplayName] = useState(user.displayName || '');
   const [bio, setBio] = useState(user.bio || '');
+  const [gender, setGender] = useState(user.gender || 'none');
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
   const [bannerBlob, setBannerBlob] = useState<Blob | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState(user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || 'deleted'}`);
+  const [avatarPreview, setAvatarPreview] = useState(getIdentityAvatar(user));
   const [bannerPreview, setBannerPreview] = useState(user.banner || '');
   
   // Privacy States
-  const [isPrivate] = useState(user.isPrivate || false);
-  const [showAge] = useState(user.showAge || false);
+  const [isPrivate, setIsPrivate] = useState(user.isPrivate || false);
+  const [showAge, setShowAge] = useState(user.showAge || false);
+  const [showGender, setShowGender] = useState(user.showGender || false);
   const [isDisabled, setIsDisabled] = useState(user.isDisabled || false);
   
-  // Interface States
-  const [creationUI, setCreationUI] = useState(user.creationUI || 'auto');
-  
-  // Donation States
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'paypal'>('upi');
-  const [donateAmount, setDonateAmount] = useState<string>('500');
-  const [donateCurrency, setDonateCurrency] = useState<'INR' | 'USD'>('INR');
-  const [transactionId, setTransactionId] = useState('');
-  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-
-  const avatarRef = useRef<HTMLInputElement>(null);
-  const bannerRef = useRef<HTMLInputElement>(null);
+  // ... (keeping other states) ...
 
   const handleSave = async (customKeys?: any[]) => {
     setLoading(true);
     const fd = new FormData();
     fd.append('displayName', displayName);
     fd.append('bio', bio);
+    fd.append('gender', gender);
     fd.append('isPrivate', String(isPrivate));
     fd.append('showAge', String(showAge));
+    fd.append('showGender', String(showGender));
     fd.append('creationUI', creationUI);
     if (customKeys) fd.append('recoveryKeys', JSON.stringify(customKeys));
     if (avatarBlob) fd.append('avatar', avatarBlob, 'avatar.jpg');
@@ -70,8 +62,8 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
       const nextStatus = !isDisabled;
       await api.toggleDisableAccount(nextStatus);
       setIsDisabled(nextStatus);
-      alert(nextStatus ? "Node Hidden" : "Node Active");
-    } catch (e) { alert("Failed"); }
+      alert(nextStatus ? t('settings.node_hidden') : t('settings.node_active'));
+    } catch (e) { alert(t('app.sync_error')); }
   };
 
   const upiId = import.meta.env.VITE_UPI_ID || 'sarthakgautam2782002@okicici';
@@ -81,7 +73,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const paypalUrl = `https://www.paypal.com/myaccount/transfer/homepage/external/summary?recipient=${encodeURIComponent(paypalId)}&amount=${donateAmount}&currency_code=${donateCurrency}`;
 
   const handleSubmitTransaction = async () => {
-    if (!transactionId.trim()) return addToast("Enter ID", 'error');
+    if (!transactionId.trim()) return addToast(t('settings.enter_id'), 'error');
     setIsSubmittingTx(true);
     try {
       await api.submitPayment({
@@ -89,10 +81,10 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
         transactionId,
         amount: Number(donateAmount)
       });
-      addToast("Signal Transmitted", 'success');
+      addToast(t('settings.signal_transmitted'), 'success');
       setTransactionId('');
     } catch (err: any) {
-      addToast(err.response?.data?.message || "Transmission Error", 'error');
+      addToast(err.response?.data?.message || t('auth.transmission_error'), 'error');
     } finally {
       setIsSubmittingTx(false);
     }
@@ -133,7 +125,9 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
            <div className="p-6 lg:p-10 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
               <div className="flex items-center gap-4">
                  <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl text-white"><ArrowLeft size={20} /></button>
-                 <h3 className="text-xl lg:text-2xl font-black text-white uppercase tracking-tighter">{activeTab}_Matrix</h3>
+                 <h3 className="text-xl lg:text-2xl font-black text-white uppercase tracking-tighter">
+                    {navItems.find(i => i.id === activeTab)?.label.split(' ')[0] || activeTab}_{t('settings.matrix_matrix')}
+                 </h3>
               </div>
               <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500 transition-all text-white"><X size={20} /></button>
            </div>
@@ -154,8 +148,30 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                            </div>
                         </div>
                      </div>
-                     <div className="grid grid-cols-1 gap-6 lg:gap-10">
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
                         <div className="space-y-3"><label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4">{t('profile.displayname')}</label><input className="w-full bg-[#050507] border border-white/5 p-5 rounded-3xl text-white outline-none focus:border-vani-blue/50 font-bold" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
+                        <div className="space-y-3">
+                           <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4 flex items-center gap-2">
+                              {t('profile.gender')}
+                              {user.gender && user.gender !== 'none' && <LockKeyhole size={10} className="text-vani-blue" />}
+                           </label>
+                           <select 
+                             className={`w-full bg-[#050507] border border-white/5 p-5 rounded-3xl text-white outline-none focus:border-vani-blue/50 font-bold appearance-none ${user.gender && user.gender !== 'none' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} 
+                             value={gender} 
+                             onChange={(e) => setGender(e.target.value)}
+                             disabled={!!(user.gender && user.gender !== 'none')}
+                           >
+                              <option value="male">{t('profile.gender_male')}</option>
+                              <option value="female">{t('profile.gender_female')}</option>
+                              <option value="other">{t('profile.gender_other')}</option>
+                              <option value="none">{t('profile.gender_none')}</option>
+                           </select>
+                           {user.gender && user.gender !== 'none' && (
+                             <p className="text-[7px] font-black text-vani-blue uppercase tracking-widest ml-4">{t('profile.gender_locked')}</p>
+                           )}
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-1 gap-6 lg:gap-10">
                         <div className="space-y-3"><label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4">{t('profile.bio')}</label><textarea className="w-full bg-[#050507] border border-white/5 p-5 rounded-3xl text-white outline-none focus:border-vani-blue/50 font-medium h-40 resize-none" value={bio} onChange={(e) => setBio(e.target.value)} /></div>
                         <button onClick={() => handleSave()} disabled={loading} className="bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all">{loading ? t('common.scanning') : t('common.save')}</button>
                      </div>
@@ -198,7 +214,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                                 </div>
                               )}
                               <div className="space-y-2">
-                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4">Magnitude Override</label>
+                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4">{t('settings.magnitude_override')}</label>
                                  <input type="number" className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none focus:border-vani-blue/50 font-bold" value={donateAmount} onChange={(e) => setDonateAmount(e.target.value)} />
                               </div>
                            </div>
@@ -207,13 +223,13 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         {/* RIGHT: VERIFICATION FORM */}
                         <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[40px] space-y-8">
                            <div>
-                              <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Shield size={20} className="text-green-400" /> Proof of Link</div>
-                              <p className="text-[10px] text-gray-500 font-medium mt-1">Manual account nodes require a transaction ID for energy sync.</p>
+                              <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Shield size={20} className="text-green-400" /> {t('settings.proof_of_link')}</div>
+                              <p className="text-[10px] text-gray-500 font-medium mt-1">{t('settings.proof_desc')}</p>
                            </div>
                            
                            <div className="space-y-6">
                               <div className="space-y-2">
-                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">Transaction ID / Reference</label>
+                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">{t('settings.transaction_id')}</label>
                                  <div className="relative flex items-center group">
                                     <div className="absolute left-4 text-gray-600 group-focus-within:text-vani-blue transition-colors"><Hash size={16} /></div>
                                     <input type="text" className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white outline-none focus:border-vani-blue/50 transition-all placeholder-gray-800" placeholder="XXXX-XXXX-XXXX" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} />
@@ -221,12 +237,12 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                               </div>
 
                               <div className="p-4 bg-vani-blue/5 border border-vani-blue/10 rounded-2xl">
-                                 <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">Verification protocol: The Architect core will verify the magnitude and transaction ID within 6-12 hours of transmission.</p>
+                                 <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">{t('settings.verification_protocol')}</p>
                               </div>
 
                               <button onClick={handleSubmitTransaction} disabled={isSubmittingTx} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50">
                                  {isSubmittingTx ? <RefreshCcw size={18} className="animate-spin" /> : <Send size={18} />}
-                                 {isSubmittingTx ? "Syncing..." : "Transmit Verification Signal"}
+                                 {isSubmittingTx ? t('common.loading') : t('settings.transmit_signal')}
                               </button>
                            </div>
                         </div>
@@ -239,7 +255,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
                         <div>
                            <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><ImageIcon size={20} className="text-pink-400" /> {t('settings.appearance')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">Select Matrix broadcast style.</p>
+                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.appearance_desc')}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                            {[{ id: 'auto', label: 'Auto', icon: <Layout size={20} /> }, { id: 'bar', label: 'Bar', icon: <Monitor size={20} /> }, { id: 'button', label: 'Float', icon: <Smartphone size={20} /> }].map(opt => (
@@ -250,12 +266,12 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
 
                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
                         <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Zap size={20} className="text-yellow-400" /> System Metrics</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">Configure core interface alignment and kinetic engines.</p>
+                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Zap size={20} className="text-yellow-400" /> {t('settings.system_metrics')}</div>
+                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.system_metrics_desc')}</p>
                         </div>
                         <div className="space-y-6">
                            <div className="space-y-3">
-                              <label className="text-[8px] font-black text-gray-600 uppercase tracking-widest ml-2">Dock Alignment</label>
+                              <label className="text-[8px] font-black text-gray-600 uppercase tracking-widest ml-2">{t('settings.dock_alignment')}</label>
                               <div className="grid grid-cols-4 gap-2">
                                  {['top', 'bottom', 'left', 'right'].map(pos => (
                                    <button key={pos} onClick={() => setDockPosition(pos as any)} className={`py-2 rounded-xl border text-[9px] font-black uppercase transition-all ${dockPosition === pos ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>{pos}</button>
@@ -264,8 +280,8 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                            </div>
                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                               <div>
-                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">Kinetic Transitions</div>
-                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">Enable motion engine effects</div>
+                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('settings.kinetic_transitions')}</div>
+                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.kinetic_desc')}</div>
                               </div>
                               <button onClick={() => setKineticTransitions?.(!kineticTransitions)} className={`w-12 h-6 rounded-full relative transition-all ${kineticTransitions ? 'bg-vani-blue' : 'bg-gray-800'}`}>
                                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${kineticTransitions ? 'left-7' : 'left-1'}`} />
@@ -286,6 +302,180 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                   </motion.div>
                 )}
 
+                {activeTab === 'archive' && (
+                  <motion.div key="archive" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                     <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
+                        <div>
+                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><HistoryIcon size={20} className="text-yellow-400" /> {t('settings.billing')}</div>
+                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.ledger_desc')}</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                           {transactions.length > 0 ? (
+                             transactions.map((tx, i) => (
+                               <div key={i} className="flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-[28px] hover:bg-white/[0.04] transition-all">
+                                  <div className="flex items-center gap-4">
+                                     <div className={`w-12 h-12 rounded-[20px] flex items-center justify-center ${tx.status === 'approved' ? 'bg-green-500/10 text-green-500' : tx.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                                        {tx.status === 'approved' ? <Shield size={20} /> : tx.status === 'rejected' ? <X size={20} /> : <Zap size={20} />}
+                                     </div>
+                                     <div>
+                                        <div className="text-[11px] font-black text-white uppercase tracking-widest">{tx.method} OVERRIDE</div>
+                                        <div className="text-[9px] text-gray-500 font-bold uppercase tracking-tight flex items-center gap-2">
+                                           {tx.transactionId.substring(0, 12)}...
+                                           <span className="w-1 h-1 rounded-full bg-gray-800" />
+                                           {new Date(tx.createdAt).toLocaleDateString()}
+                                        </div>
+                                     </div>
+                                  </div>
+                                  <div className="text-right">
+                                     <div className="text-[12px] font-black text-white uppercase tracking-tighter">Magnitude {tx.amount}</div>
+                                     <div className={`text-[9px] font-black uppercase tracking-widest ${tx.status === 'approved' ? 'text-green-500' : tx.status === 'rejected' ? 'text-red-500' : 'text-yellow-500'}`}>{tx.status}</div>
+                                  </div>
+                               </div>
+                             ))
+                           ) : (
+                             <div className="py-20 text-center space-y-4">
+                                <div className="w-16 h-16 bg-white/5 rounded-[24px] flex items-center justify-center mx-auto text-gray-700"><CreditCard size={32} /></div>
+                                <div className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">{t('settings.ledger_empty')}</div>
+                             </div>
+                           )}
+                        </div>
+
+                        <div className="p-6 bg-vani-blue/5 border border-vani-blue/10 rounded-[28px] space-y-4">
+                           <div className="text-[11px] font-black text-vani-blue uppercase tracking-widest flex items-center gap-2"><Zap size={16} /> {t('settings.data_portability')}</div>
+                           <p className="text-[10px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider">{t('settings.data_portability_desc')}</p>
+                           <button onClick={() => api.exportData()} className="flex items-center gap-2 px-6 py-3 bg-vani-blue text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"><ExternalLink size={14} /> {t('settings.request_export')}</button>
+                        </div>
+                     </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'security' && (
+                  <motion.div key="security" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                     <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
+                        <div>
+                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Shield size={20} className="text-green-400" /> {t('settings.identity_matrix')}</div>
+                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.identity_matrix_desc')}</p>
+                        </div>
+                        
+                        <div className="space-y-6">
+                           <div className="p-6 bg-yellow-500/5 border border-yellow-500/10 rounded-[24px] space-y-4">
+                              <div className="flex items-center gap-3 text-yellow-500"><LockKeyhole size={20} /> <span className="text-[11px] font-black uppercase tracking-widest">{t('settings.saviour_protocol')}</span></div>
+                              <p className="text-[10px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider">{t('settings.saviour_desc')}</p>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                 {backupKeys.length > 0 ? (
+                                   backupKeys.map((k, i) => (
+                                     <div key={i} className={`p-3 rounded-xl border font-mono text-[10px] flex items-center justify-between ${k.isUsed ? 'bg-red-500/10 border-red-500/20 text-red-500 line-through' : 'bg-black/40 border-white/5 text-green-400'}`}>
+                                       {k.code}
+                                       {k.isUsed ? <X size={12} /> : <Shield size={12} />}
+                                     </div>
+                                   ))
+                                 ) : (
+                                   <div className="col-span-2 py-4 text-center text-gray-600 text-[9px] font-black uppercase tracking-widest">{t('settings.no_keys')}</div>
+                                 )}
+                              </div>
+
+                              <button onClick={async () => {
+                                 try {
+                                    const res = await api.generateRecoveryKeys();
+                                    setBackupKeys(res.keys);
+                                    addToast(t('settings.keys_generated'), 'success');
+                                 } catch (e) { addToast(t('app.sync_failed'), 'error'); }
+                              }} className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white transition-all">{t('settings.generate_keys')}</button>
+                           </div>
+
+                           <div className="flex items-center justify-between p-6 bg-white/5 rounded-[24px] border border-white/5">
+                              <div>
+                                 <div className="text-[11px] font-black text-white uppercase tracking-widest">{t('settings.biometric_lock')}</div>
+                                 <div className="text-[9px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.biometric_desc')}</div>
+                              </div>
+                              <button className="w-12 h-6 rounded-full bg-gray-800 relative cursor-not-allowed">
+                                 <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white/20" />
+                              </button>
+                           </div>
+
+                           <div className="p-6 bg-vani-blue/5 border border-vani-blue/10 rounded-[24px] space-y-6">
+                              <div>
+                                 <div className="text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <RefreshCcw size={16} className="text-vani-blue" /> {t('settings.totp_keys')}
+                                 </div>
+                                 <p className="text-[10px] text-gray-500 font-medium mt-1 uppercase tracking-tight">{t('settings.totp_desc')}</p>
+                              </div>
+
+                              {newTOTP ? (
+                                <div className="space-y-4 text-center">
+                                   <div className="p-4 bg-white rounded-[24px] inline-block shadow-2xl">
+                                      <img src={newTOTP.qrCode} alt="TOTP QR" className="w-40 h-40" />
+                                   </div>
+                                   <div className="bg-black/40 p-3 rounded-xl border border-white/5 font-mono text-[10px] text-vani-blue select-all uppercase">
+                                      Secret: {newTOTP.secret}
+                                   </div>
+                                   <p className="text-[8px] text-red-400 font-black uppercase tracking-widest">⚠️ {t('settings.sync_authenticator')}</p>
+                                </div>
+                              ) : (
+                                <button onClick={async () => {
+                                   if(confirm(t('settings.mfa_confirm'))) {
+                                      try {
+                                         const res = await api.resetTOTP();
+                                         setNewTOTP(res);
+                                         addToast(t('settings.identity_synced'), 'success');
+                                      } catch (e) { addToast(t('app.sync_failed'), 'error'); }
+                                   }
+                                }} className="w-full py-4 bg-vani-blue/10 hover:bg-vani-blue/20 border border-vani-blue/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-vani-blue transition-all">
+                                   {t('settings.regenerate_mfa')}
+                                </button>
+                              )}
+                           </div>
+                        </div>
+                     </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'privacy' && (
+                  <motion.div key="privacy" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                     <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-8">
+                        <div>
+                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Lock size={20} className="text-purple-400" /> {t('settings.privacy_matrix')}</div>
+                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.privacy_matrix_desc')}</p>
+                        </div>
+                        
+                        <div className="space-y-6">
+                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                              <div>
+                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('settings.cloaked_identity')}</div>
+                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.cloaked_desc')}</div>
+                              </div>
+                              <button onClick={() => setIsPrivate(!isPrivate)} className={`w-12 h-6 rounded-full relative transition-all ${isPrivate ? 'bg-purple-500' : 'bg-gray-800'}`}>
+                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isPrivate ? 'left-7' : 'left-1'}`} />
+                              </button>
+                           </div>
+
+                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                              <div>
+                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('profile.temporal_signature')}</div>
+                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.temporal_desc')}</div>
+                              </div>
+                              <button onClick={() => setShowAge(!showAge)} className={`w-12 h-6 rounded-full relative transition-all ${showAge ? 'bg-vani-blue' : 'bg-gray-800'}`}>
+                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${showAge ? 'left-7' : 'left-1'}`} />
+                              </button>
+                           </div>
+
+                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                              <div>
+                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('profile.show_gender')}</div>
+                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('profile.show_gender_desc')}</div>
+                              </div>
+                              <button onClick={() => setShowGender(!showGender)} className={`w-12 h-6 rounded-full relative transition-all ${showGender ? 'bg-vani-blue' : 'bg-gray-800'}`}>
+                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${showGender ? 'left-7' : 'left-1'}`} />
+                              </button>
+                           </div>
+                        </div>
+                     </div>
+                     <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-5 rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">{t('common.save')}</button>
+                  </motion.div>
+                )}
+
                 {activeTab === 'sovereignty' && (
                   <motion.div key="sovereignty" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] space-y-6">
@@ -293,10 +483,19 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         <div className="grid grid-cols-2 gap-4">
                            <button onClick={() => window.location.reload()} className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400">{t('ui.reroute')}</button>
                            <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-red-500">{t('logout.btn_logout')}</button>
+                           <button onClick={async () => {
+                              if(confirm(t('settings.severance_confirm'))) {
+                                 try {
+                                    await api.terminateIdentity();
+                                    localStorage.clear();
+                                    window.location.href = '/login';
+                                 } catch (e) { addToast(t('app.sever_failed'), 'error'); }
+                              }
+                           }} className="p-4 bg-red-900/10 hover:bg-red-900/20 border border-red-900/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-red-900 col-span-2">{t('settings.permanent_severance')}</button>
                         </div>
                      </div>
                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex items-center justify-between">
-                        <div><div className="text-lg font-black text-white uppercase tracking-tight">Neural Camouflage</div><p className="text-[10px] text-gray-500 font-medium mt-1">Temporarily vanish from search and feeds.</p></div>
+                        <div><div className="text-lg font-black text-white uppercase tracking-tight">{t('settings.neural_camouflage')}</div><p className="text-[10px] text-gray-500 font-medium mt-1">{t('settings.camouflage_desc')}</p></div>
                         <button onClick={handleToggleDisable} className={`w-14 h-8 rounded-full relative transition-all ${isDisabled ? 'bg-vani-accent' : 'bg-gray-800'}`}><div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${isDisabled ? 'left-7' : 'left-1'}`} /></button>
                      </div>
                   </motion.div>

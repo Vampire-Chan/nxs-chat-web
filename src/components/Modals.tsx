@@ -5,8 +5,10 @@ import { api } from '../services/api';
 import type { IUser, IRealm, IChannel } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm, onClose: () => void, onUpdate: () => void }) => {
+  const { t } = useLanguage();
   const { addToast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'members'>('overview');
@@ -21,21 +23,21 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
   const bannerRef = useRef<HTMLInputElement>(null);
 
   const handleCreateRole = async () => {
-    const roleName = prompt("Identity role name?");
+    const roleName = prompt(t('modals.role_name_prompt'));
     if (!roleName) return;
     try {
       await api.createRole(realm._id, { name: roleName, color: "#00d2ff", permissions: [] });
       onUpdate();
-      addToast("Role Forged", 'success');
-    } catch (e) { addToast("Forge failed.", 'error'); }
+      addToast(t('modals.role_forged'), 'success');
+    } catch (e) { addToast(t('modals.forge_failed'), 'error'); }
   };
 
   const handleAssignRole = async (userId: string, roleId: string) => {
     try {
       await api.assignRole(realm._id, userId, roleId);
       onUpdate();
-      addToast("Authority Assigned", 'success');
-    } catch (e) { addToast("Assignment failed.", 'error'); }
+      addToast(t('modals.authority_assigned'), 'success');
+    } catch (e) { addToast(t('modals.assignment_failed'), 'error'); }
   };
 
   const handleSaveOverview = async () => {
@@ -46,26 +48,26 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
     if (bannerBlob) fd.append('banner', bannerBlob, 'banner.jpg');
     try {
       await api.updateRealm(realm._id, fd);
-      addToast("Calibration complete.", 'success');
+      addToast(t('modals.calib_complete'), 'success');
       onUpdate();
-    } catch (e) { addToast("Calibration failed.", 'error'); }
+    } catch (e) { addToast(t('modals.calib_failed'), 'error'); }
   };
 
   return (
     <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-4 md:p-10 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-5xl h-[80vh] bg-[#0a0a0c] border border-white/5 rounded-[48px] shadow-2xl flex overflow-hidden">
         <div className="w-64 bg-discord-sidebar/50 border-r border-white/5 p-8 flex flex-col shrink-0">
-           <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-10 flex items-center gap-2"><Settings size={20} className="text-vani-blue" /> Realm_CFG</h2>
+           <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-10 flex items-center gap-2"><Settings size={20} className="text-vani-blue" /> {t('modals.realm_cfg')}</h2>
            <div className="space-y-2">
-              <NavBtn label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<Globe size={16} />} />
-              <NavBtn label="Role Matrix" active={activeTab === 'roles'} onClick={() => setActiveTab('roles')} icon={<Shield size={16} />} />
-              <NavBtn label="Identity List" active={activeTab === 'members'} onClick={() => setActiveTab('members')} icon={<Users size={16} />} />
+              <NavBtn label={t('modals.overview')} active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<Globe size={16} />} />
+              <NavBtn label={t('modals.role_matrix')} active={activeTab === 'roles'} onClick={() => setActiveTab('roles')} icon={<Shield size={16} />} />
+              <NavBtn label={t('modals.identity_list')} active={activeTab === 'members'} onClick={() => setActiveTab('members')} icon={<Users size={16} />} />
            </div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-12 relative bg-discord-dark/20">
            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{activeTab}_Protocol</h3>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{t('modals.protocol', { tab: activeTab })}</h3>
               <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
            </div>
 
@@ -85,25 +87,25 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
                 </div>
                 <div className="grid grid-cols-1 gap-6 pt-10">
                    <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue font-bold" value={name} onChange={(e) => setName(e.target.value)} />
-                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-vani-blue font-black opacity-50">/join/</span><input className="w-full bg-[#050507] border border-gray-800 p-4 pl-14 rounded-2xl text-white outline-none focus:border-vani-blue font-mono text-sm" value={vanity} onChange={(e) => setVanity(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))} /></div>
-                   <button onClick={handleSaveOverview} className="bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"><Save size={16} /> Finalize Recalibration</button>
+                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-vani-blue font-black opacity-50">{t('modals.vanity_join')}</span><input className="w-full bg-[#050507] border border-gray-800 p-4 pl-14 rounded-2xl text-white outline-none focus:border-vani-blue font-mono text-sm" value={vanity} onChange={(e) => setVanity(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))} /></div>
+                   <button onClick={handleSaveOverview} className="bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"><Save size={16} /> {t('modals.finalize_recalib')}</button>
                    
                    {realm.owner === (user?.id || user?._id) && !realm.isSystem && (
                      <div className="border-t border-white/5 pt-6 mt-4">
                         <div className="bg-red-500/5 border border-red-500/20 p-6 rounded-[24px] flex items-center justify-between">
                            <div>
-                              <div className="text-sm font-black text-red-500 uppercase tracking-tight">Sovereignty Purge</div>
-                              <p className="text-[10px] text-gray-500 font-medium mt-1 max-w-xs">Permanently delete this realm and all its data. This action is irreversible.</p>
+                              <div className="text-sm font-black text-red-500 uppercase tracking-tight">{t('modals.sov_purge')}</div>
+                              <p className="text-[10px] text-gray-500 font-medium mt-1 max-w-xs">{t('modals.sov_purge_desc')}</p>
                            </div>
                            <button 
                              onClick={async () => {
-                               if(confirm("CRITICAL: Confirm realm deletion?")) {
-                                 try { await api.deleteRealm(realm._id); window.location.reload(); } catch(e) { addToast("Purge failed", 'error'); }
+                               if(confirm(t('modals.confirm_delete'))) {
+                                 try { await api.deleteRealm(realm._id); window.location.reload(); } catch(e) { addToast(t('app.purge_failed'), 'error'); }
                                }
                              }} 
                              className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all"
                            >
-                              Delete Realm
+                              {t('modals.delete_realm')}
                            </button>
                         </div>
                      </div>
@@ -116,7 +118,7 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
 
            {activeTab === 'roles' && (
              <div className="space-y-6">
-                <button onClick={handleCreateRole} className="w-full bg-white/5 border border-dashed border-gray-700 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:border-vani-blue transition-all"><UserPlus size={16} /> Forge New Authority Role</button>
+                <button onClick={handleCreateRole} className="w-full bg-white/5 border border-dashed border-gray-700 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:border-vani-blue transition-all"><UserPlus size={16} /> {t('modals.forge_authority')}</button>
                 <div className="grid grid-cols-1 gap-3">
                    {(realm.roles || []).map(role => (
                      <div key={role._id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex items-center justify-between group">
@@ -137,14 +139,14 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
                   <div key={member._id} className="bg-white/[0.02] border border-white/5 p-5 rounded-[24px] flex items-center justify-between">
                      <div className="flex items-center space-x-4">
                         <img src={member.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.username}`} className="w-10 h-10 rounded-xl" />
-                        <div><div className="text-xs font-black text-white uppercase">{member.username}</div><div className="text-[8px] font-mono text-gray-500 uppercase">Identity_Synced</div></div>
+                        <div><div className="text-xs font-black text-white uppercase">{member.username}</div><div className="text-[8px] font-mono text-gray-500 uppercase">{t('modals.identity_synced')}</div></div>
                      </div>
                      <select 
                        className="bg-black/40 text-[9px] font-black uppercase text-gray-400 border border-white/5 rounded-lg px-2 py-1 outline-none focus:border-vani-blue"
                        onChange={(e) => handleAssignRole(member._id || member.id, e.target.value)}
                        defaultValue={realm.memberRoles?.find(mr => (mr.user as any) === (member.id || member._id))?.roleId || ""}
                      >
-                        <option value="">No Authority</option>
+                        <option value="">{t('modals.no_authority')}</option>
                         {(realm.roles || []).map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
                      </select>
                   </div>
@@ -164,33 +166,35 @@ const NavBtn = ({ label, active, onClick, icon }: any) => (
 );
 
 export const CreateRealmModal = ({ onClose, onSubmit }: any) => {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   return (
     <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5 overflow-hidden">
-         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">Initialize_Realm</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
-         <div className="p-8 space-y-6"><input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Realm Name..." value={name} onChange={(e) => setName(e.target.value)} /><button onClick={() => onSubmit(name)} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl">Create Matrix Node</button></div>
+         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('modals.init_realm')}</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
+         <div className="p-8 space-y-6"><input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder={t('modals.realm_placeholder')} value={name} onChange={(e) => setName(e.target.value)} /><button onClick={() => onSubmit(name)} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl">{t('modals.create_matrix')}</button></div>
       </motion.div>
     </div>
   );
 };
 
 export const CreateChannelModal = ({ onClose, onSubmit }: any) => {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [type, setType] = useState('text');
   return (
     <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-white/5">
-         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">New_Sector</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
+         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('modals.new_sector')}</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
          <div className="p-8 space-y-6">
-            <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Sector Name..." value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder={t('modals.sector_placeholder')} value={name} onChange={(e) => setName(e.target.value)} />
             <div className="grid grid-cols-2 gap-3">
-               <div onClick={() => setType('text')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'text' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Hash size={16} /> <span className="text-[10px] font-black uppercase">Text</span></div>
-               <div onClick={() => setType('voice')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'voice' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Zap size={16} /> <span className="text-[10px] font-black uppercase">Voice</span></div>
-               <div onClick={() => setType('feed')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'feed' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Globe size={16} /> <span className="text-[10px] font-black uppercase">Broadcast</span></div>
-               <div onClick={() => setType('announcement')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'announcement' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Shield size={16} /> <span className="text-[10px] font-black uppercase">Alerts</span></div>
+               <div onClick={() => setType('text')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'text' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Hash size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.text')}</span></div>
+               <div onClick={() => setType('voice')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'voice' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Zap size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.voice')}</span></div>
+               <div onClick={() => setType('feed')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'feed' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Globe size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.broadcast')}</span></div>
+               <div onClick={() => setType('announcement')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'announcement' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Shield size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.alerts')}</span></div>
             </div>
-            <button onClick={() => onSubmit(name, type)} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Open Sector</button>
+            <button onClick={() => onSubmit(name, type)} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">{t('modals.open_sector')}</button>
          </div>
       </motion.div>
     </div>
@@ -198,6 +202,7 @@ export const CreateChannelModal = ({ onClose, onSubmit }: any) => {
 };
 
 export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose: () => void, onSubmit: any, currentUser: IUser }) => {
+  const { t } = useLanguage();
   const [friends, setFriends] = useState<IUser[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
@@ -215,9 +220,9 @@ export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose
   return (
     <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-lg rounded-[40px] shadow-2xl border border-white/5 flex flex-col overflow-hidden">
-         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">Initialize_Group</h2><button onClick={onClose} className="p-3 bg-white/5 hover:bg-red-500 rounded-2xl transition-all"><X size={18} /></button></div>
+         <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('modals.init_group')}</h2><button onClick={onClose} className="p-3 bg-white/5 hover:bg-red-500 rounded-2xl transition-all"><X size={18} /></button></div>
          <div className="p-8 space-y-6">
-            <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder="Group Name..." value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+            <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder={t('modals.group_placeholder')} value={groupName} onChange={(e) => setGroupName(e.target.value)} />
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
                {friends.map(f => (
                  <div key={f._id} onClick={() => toggle(f._id)} className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${selectedIds.includes(f._id) ? 'bg-vani-blue/10 border-vani-blue/30' : 'bg-white/[0.02] border-transparent'}`}>
@@ -227,13 +232,14 @@ export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose
                ))}
             </div>
          </div>
-         <div className="p-8 border-t border-white/5 flex justify-end"><button onClick={() => onSubmit(selectedIds, groupName)} className="bg-vani-gradient text-white px-12 py-4 rounded-2xl font-black uppercase text-[10px] shadow-2xl transition-all hover:scale-105 active:scale-95">Initialize transmission</button></div>
+         <div className="p-8 border-t border-white/5 flex justify-end"><button onClick={() => onSubmit(selectedIds, groupName)} className="bg-vani-gradient text-white px-12 py-4 rounded-2xl font-black uppercase text-[10px] shadow-2xl transition-all hover:scale-105 active:scale-95">{t('modals.init_transmission')}</button></div>
       </motion.div>
     </div>
   );
 };
 
 export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }: { onClose: () => void, onComplete: (post: any) => void, channelId: string, currentUser: IUser }) => {
+  const { t } = useLanguage();
   const { addToast } = useToast();
   const [caption, setCaption] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -243,7 +249,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
-    if (!file) return addToast("Visual data required for broadcast.", 'error');
+    if (!file) return addToast(t('modals.visual_required'), 'error');
     setLoading(true);
     const fd = new FormData();
     fd.append('caption', caption);
@@ -255,7 +261,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
       const res = await api.createPost(channelId, fd); 
       onComplete(res);
       onClose();
-    } catch (e) { addToast("Broadcast failed.", 'error'); }
+    } catch (e) { addToast(t('modals.broadcast_failed'), 'error'); }
     finally { setLoading(false); }
   };
 
@@ -265,7 +271,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
     <div className="fixed inset-0 bg-black/90 z-[2000] flex items-center justify-center p-2 lg:p-4 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-lg rounded-[32px] lg:rounded-[40px] border border-white/5 overflow-hidden flex flex-col shadow-2xl max-h-[95vh]">
          <div className="p-5 lg:p-6 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-base lg:text-lg font-black text-white uppercase tracking-widest">{isGlobal ? 'Global_Broadcast' : 'Sector_Post'}</h2>
+            <h2 className="text-base lg:text-lg font-black text-white uppercase tracking-widest">{isGlobal ? t('modals.global_broadcast') : t('modals.sector_post')}</h2>
             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button>
          </div>
          
@@ -274,7 +280,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
                {preview ? <img src={preview} className="w-full h-full object-cover" /> : (
                  <>
                    <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-gray-800 flex items-center justify-center mb-3 lg:mb-4 group-hover:scale-110 transition-transform"><ImageIcon size={24} className="text-gray-400 group-hover:text-white" /></div>
-                   <span className="text-[8px] lg:text-[10px] font-black uppercase text-gray-500 tracking-widest">Upload Visual Data</span>
+                   <span className="text-[8px] lg:text-[10px] font-black uppercase text-gray-500 tracking-widest">{t('modals.upload_visual')}</span>
                  </>
                )}
                <input type="file" ref={fileRef} hidden accept="image/*" onChange={(e) => { const f=e.target.files?.[0]; if(f){ setFile(f); setPreview(URL.createObjectURL(f)); } }} />
@@ -282,7 +288,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
 
             <textarea 
               className="w-full bg-[#050507] border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-vani-blue resize-none h-24 lg:h-32 custom-scrollbar text-sm"
-              placeholder="Add a caption..."
+              placeholder={t('modals.caption_placeholder')}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
             />
@@ -295,8 +301,8 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
                  <div className="flex items-center space-x-3">
                     <Globe size={16} className={isPublic ? 'text-vani-blue' : 'text-gray-600'} />
                     <div className="flex flex-col">
-                       <span className="text-[9px] lg:text-[10px] font-black text-white uppercase tracking-widest">Broadcast to Matrix</span>
-                       <span className="text-[7px] lg:text-[8px] text-gray-500 font-mono uppercase">Visible in Explore Feed</span>
+                       <span className="text-[9px] lg:text-[10px] font-black text-white uppercase tracking-widest">{t('modals.broadcast_matrix')}</span>
+                       <span className="text-[7px] lg:text-[8px] text-gray-500 font-mono uppercase">{t('modals.explore_visible')}</span>
                     </div>
                  </div>
                  <div className={`w-8 lg:w-10 h-4 lg:h-5 rounded-full relative transition-all ${isPublic ? 'bg-vani-blue' : 'bg-gray-800'}`}>
@@ -308,7 +314,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
 
          <div className="p-5 lg:p-6 border-t border-white/5 bg-black/40">
             <button onClick={handleSubmit} disabled={loading} className="w-full bg-vani-gradient text-white py-3.5 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[9px] lg:text-[10px] shadow-lg disabled:opacity-50 transition-all hover:scale-[1.02]">
-               {loading ? 'Transmitting...' : (isGlobal || isPublic ? 'Broadcast to Matrix' : 'Send to Sector')}
+               {loading ? t('modals.transmitting') : (isGlobal || isPublic ? t('modals.broadcast_matrix') : t('modals.send_sector'))}
             </button>
          </div>
       </motion.div>
@@ -317,6 +323,7 @@ export const CreatePostModal = ({ onClose, onComplete, channelId, currentUser }:
 };
 
 export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { group: IChannel, onClose: () => void, onUpdate: () => void, currentUser: IUser }) => {
+  const { t } = useLanguage();
   const { addToast } = useToast();
   const [name, setName] = useState(group.name);
   const [iconBlob, setIconBlob] = useState<Blob | null>(null);
@@ -336,8 +343,8 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
       await api.updateChannelMetadata(group._id, fd);
       onUpdate();
       onClose();
-      addToast("Matrix Calibration Applied", 'success');
-    } catch (e) { addToast("Matrix Calibration Failed", 'error'); }
+      addToast(t('modals.calib_success'), 'success');
+    } catch (e) { addToast(t('modals.calib_failed'), 'error'); }
     finally { setLoading(false); }
   };
 
@@ -345,7 +352,7 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
     <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
       <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0c] w-full max-w-2xl rounded-[48px] border border-white/5 flex flex-col max-h-[85vh] shadow-2xl">
          <div className="p-8 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xl font-black text-white uppercase tracking-widest">Group_Calibration</h2>
+            <h2 className="text-xl font-black text-white uppercase tracking-widest">{t('modals.group_calib')}</h2>
             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button>
          </div>
 
@@ -360,23 +367,23 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
                   <input type="file" ref={fileRef} hidden onChange={(e) => { const f=e.target.files?.[0]; if(f){ setIconBlob(f); setIconPreview(URL.createObjectURL(f)); } }} />
                </div>
                <div className="w-full space-y-2">
-                  <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4">Identity_Label</label>
+                  <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4">{t('modals.identity_label')}</label>
                   <input className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white outline-none focus:border-vani-blue font-bold text-center" value={name} onChange={(e) => setName(e.target.value)} />
                </div>
             </div>
 
             {/* NICKNAMES SECTION */}
             <div className="space-y-4">
-               <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4 block mb-4">Neural_Alias_Matrix</label>
+               <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4 block mb-4">{t('modals.neural_alias')}</label>
                <div className="grid grid-cols-1 gap-3">
                   {group.members?.map((m: IUser) => (
                     <div key={m._id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center space-x-4">
                        <img src={m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.username}`} className="w-10 h-10 rounded-xl" />
                        <div className="flex-1">
-                          <div className="text-[9px] font-black text-gray-500 uppercase mb-1">{m.username} {m._id === currentUser._id && '(YOU)'}</div>
+                          <div className="text-[9px] font-black text-gray-500 uppercase mb-1">{m.username} {m._id === currentUser._id && `(${t('common.you')})`}</div>
                           <input 
                             className="bg-transparent text-sm text-white font-medium outline-none w-full border-b border-white/5 focus:border-vani-blue transition-colors" 
-                            placeholder="Assign nickname..."
+                            placeholder={t('modals.assign_nickname')}
                             value={nicknames[m._id] || ''}
                             onChange={(e) => setNicknames({ ...nicknames, [m._id]: e.target.value })}
                           />
@@ -389,7 +396,7 @@ export const GroupSettingsModal = ({ group, onClose, onUpdate, currentUser }: { 
 
          <div className="p-8 border-t border-white/5 bg-black/40">
             <button onClick={handleSave} disabled={loading} className="w-full bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl disabled:opacity-50 transition-all hover:scale-[1.02]">
-               {loading ? 'Recalibrating...' : 'Apply Global Sync'}
+               {loading ? t('modals.recalibrating') : t('modals.apply_sync')}
             </button>
          </div>
       </motion.div>

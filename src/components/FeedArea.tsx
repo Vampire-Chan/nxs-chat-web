@@ -5,9 +5,10 @@ import type { IPost, IUser, IRealm } from '../services/api';
 import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users, Hash, X, Send, WifiOff, RefreshCcw, Radio, Activity } from 'lucide-react';
 import { ExploreLeftSidebar } from './ExploreLeftSidebar';
 import { ExploreRightSidebar } from './ExploreRightSidebar';
-import { getIdentityName } from '../services/identity';
+import { getIdentityName, getIdentityAvatar } from '../services/identity';
 import { PostViewerModal } from './PostViewerModal';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   posts: IPost[];
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, channelId, onViewProfile, liveStreamers = [] }: Props) => {
+  const { t } = useLanguage();
   const { addToast } = useToast();
   const [posts, setPosts] = useState(initialPosts);
   const [showHeart, setShowHeart] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
       }
     } catch (err) {
       setSyncError(true);
-      addToast("Matrix Sync Interrupted", 'error');
+      addToast(t('feed.matrix_sync_interrupted'), 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -125,8 +127,8 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
     try {
       await api.syncIdentity(targetUser._id || targetUser.id);
       setSuggestedUsers(prev => prev.filter(u => (u._id || u.id) !== (targetUser._id || targetUser.id)));
-      addToast("Identity Synced", 'success');
-    } catch (e) { addToast("Sync Protocol Failed", 'error'); }
+      addToast(t('feed.identity_synced'), 'success');
+    } catch (e) { addToast(t('feed.sync_failed'), 'error'); }
   };
 
   return (
@@ -152,10 +154,10 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                       <Radio size={24} />
                    </div>
                    <div>
-                      <h2 className="text-xl font-black text-white uppercase tracking-tighter">{activeStream.username}_TRANSMISSION</h2>
+                      <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('feed.transmission', { username: activeStream.username })}</h2>
                       <div className="flex items-center space-x-2">
                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                         <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">LIVE_FROM_MATRIX // {Math.floor(Math.random()*1000)} VIEWERS</span>
+                         <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('feed.live_from_matrix', { count: Math.floor(Math.random()*1000) })}</span>
                       </div>
                    </div>
                 </div>
@@ -169,7 +171,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                       <Activity size={100} className="text-white/10" />
                    </div>
                    <div className="absolute bottom-10 left-10 flex items-center space-x-4">
-                      <img src={activeStream.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeStream.username}`} className="w-16 h-16 rounded-[24px] border-4 border-[#0a0a0c] shadow-2xl" />
+                      <img src={getIdentityAvatar(activeStream)} className="w-16 h-16 rounded-[24px] border-4 border-[#0a0a0c] shadow-2xl" />
                       <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                          <span className="text-xs font-black text-white uppercase tracking-widest">{activeStream.displayName || activeStream.username}</span>
                       </div>
@@ -179,7 +181,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                 <div className="hidden lg:flex flex-col bg-white/[0.01] rounded-[40px] border border-white/5 overflow-hidden">
                    <div className="p-6 border-b border-white/5 flex items-center space-x-3">
                       <MessageCircle size={16} className="text-vani-blue" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Neural_Chat</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{t('feed.neural_chat')}</span>
                    </div>
                    <div className="flex-1 p-4 space-y-4 overflow-y-auto no-scrollbar opacity-40">
                       {[...Array(10)].map((_, i) => (
@@ -190,7 +192,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                       ))}
                    </div>
                    <div className="p-4 border-t border-white/5">
-                      <div className="bg-white/5 p-3 rounded-2xl text-[10px] text-gray-600 font-black uppercase text-center border border-white/5">Link Established</div>
+                      <div className="bg-white/5 p-3 rounded-2xl text-[10px] text-gray-600 font-black uppercase text-center border border-white/5">{t('feed.link_established')}</div>
                    </div>
                 </div>
              </div>
@@ -203,15 +205,15 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                     <WifiOff className="text-red-500" size={32} />
                  </div>
                  <div className="text-center">
-                    <h3 className="text-white font-black uppercase tracking-widest">Link_Severed</h3>
-                    <p className="text-gray-500 text-[10px] uppercase font-mono mt-2">Error_Code: 501 // Connection_Loss</p>
+                    <h3 className="text-white font-black uppercase tracking-widest">{t('feed.link_severed_title')}</h3>
+                    <p className="text-gray-500 text-[10px] uppercase font-mono mt-2">{t('feed.connection_loss')}</p>
                  </div>
                  <button 
                    onClick={triggerRefresh}
                    className="px-8 py-3 bg-white/5 hover:bg-vani-blue hover:text-black text-white rounded-xl font-black uppercase text-[10px] border border-white/10 transition-all flex items-center space-x-3"
                  >
                     <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                    <span>Retry Sync</span>
+                    <span>{t('feed.retry_sync')}</span>
                  </button>
               </div>
             ) : (
@@ -220,7 +222,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                   <div className="max-w-2xl mx-auto w-full mb-6 flex items-center justify-between bg-vani-blue/10 border border-vani-blue/30 p-4 rounded-2xl">
                      <div className="flex items-center space-x-3">
                         <Hash className="text-vani-blue" size={20} />
-                        <span className="text-sm font-black text-white uppercase tracking-widest">Signal_Filter: #{activeTag}</span>
+                        <span className="text-sm font-black text-white uppercase tracking-widest">{t('feed.signal_filter', { tag: activeTag })}</span>
                      </div>
                      <button onClick={() => handleTagSelect(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={18} /></button>
                   </div>
@@ -229,8 +231,8 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                 {isGlobal && !activeTag && suggestedUsers.length > 0 && (
                   <div className="max-w-2xl mx-auto w-full mb-12">
                      <div className="flex items-center justify-between mb-4 px-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Suggested_Identities</span>
-                        <button className="text-[9px] font-black text-vani-blue uppercase tracking-widest hover:text-white transition-colors">See_All</button>
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('feed.suggested_identities')}</span>
+                        <button className="text-[9px] font-black text-vani-blue uppercase tracking-widest hover:text-white transition-colors">{t('feed.see_all')}</button>
                      </div>
                      <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-4 -mx-2 px-2">
                         {suggestedUsers.map((user) => (
@@ -241,7 +243,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                           >
                              <div className="w-16 h-16 rounded-2xl bg-vani-gradient p-0.5 mb-3 shadow-lg group-hover:scale-110 transition-transform">
                                 <div className="w-full h-full rounded-[14px] overflow-hidden bg-discord-dark">
-                                   <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+                                   <img src={getIdentityAvatar(user)} className="w-full h-full object-cover" />
                                 </div>
                              </div>
                              <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{user.displayName || user.username}</span>
@@ -250,7 +252,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                                onClick={(e) => { e.stopPropagation(); handleSyncActionFromUser(user); }}
                                className="w-full py-1.5 bg-white/5 hover:bg-vani-blue text-white hover:text-black rounded-xl text-[8px] font-black uppercase tracking-widest border border-white/5 hover:border-vani-blue transition-all"
                              >
-                               Sync
+                               {t('feed.sync_btn')}
                              </button>
                           </motion.div>
                         ))}
@@ -263,9 +265,9 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                      <div onClick={onOpenCreateModal} className="bg-discord-channel p-4 rounded-2xl cursor-pointer hover:bg-discord-sidebar transition-all flex items-center space-x-4 text-gray-400 border border-gray-800 shadow-xl group">
                         <div className="w-10 h-10 rounded-xl bg-vani-gradient flex items-center justify-center text-white shadow-lg shadow-red-500/20"><ImageIcon size={20} /></div>
                         <div className="flex-1 bg-discord-dark h-11 rounded-xl flex items-center px-4 border border-gray-800 text-sm font-medium group-hover:border-gray-700 transition-all truncate">
-                          {isGlobal ? 'Broadcast to the Matrix...' : 'Share to this Sector...'}
+                          {isGlobal ? t('feed.broadcast') : t('feed.share_sector')}
                         </div>
-                        <div className="p-2 text-vani-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-vani-blue">Share</span></div>
+                        <div className="p-2 text-vani-blue group-hover:scale-110 transition-transform hidden sm:block"><span className="text-xs font-black uppercase tracking-widest text-vani-blue">{t('feed.share')}</span></div>
                      </div>
                    )}
                 </div>
@@ -283,9 +285,10 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                       isActive={selectedPost?._id === post._id}
                       onSelectTag={handleTagSelect}
                       onViewProfile={onViewProfile}
+                      t={t}
                     />
                   ))}
-                  {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-vani-blue font-black text-xl mb-2 opacity-20 uppercase">No Data Found</div></div>}
+                  {posts.length === 0 && <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-3xl"><div className="text-vani-blue font-black text-xl mb-2 opacity-20 uppercase">{t('feed.no_data')}</div></div>}
                 </div>
               </>
             )}
@@ -328,7 +331,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
   );
 };
 
-const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal, isActive, onSelectTag, onViewProfile }: any) => {
+const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal, isActive, onSelectTag, onViewProfile, t }: any) => {
   const { addToast } = useToast();
   const [quickComment, setQuickComment] = useState('');
   const [localLikes, setLocalLikes] = useState(post.likes || []);
@@ -352,7 +355,7 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     try {
       await api.addComment(post._id, quickComment);
       setQuickComment('');
-      addToast("Feedback Synced", 'success');
+      addToast(t('feed.feedback_synced'), 'success');
     } catch (err) { console.error(err); }
   };
 
@@ -394,12 +397,12 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     try {
       if (isSyncing) {
         await api.unfollowUser(post.author._id || post.author.id);
-        addToast("Identity Unsynced", 'success');
+        addToast(t('feed.identity_unsynced'), 'success');
       } else {
         await api.syncIdentity(post.author._id || post.author.id);
-        addToast("Identity Synced", 'success');
+        addToast(t('feed.identity_synced'), 'success');
       }
-    } catch (e) { addToast("Sync Protocol Failed", 'error'); }
+    } catch (e) { addToast(t('feed.sync_failed'), 'error'); }
   };
 
   const handleJoinRealm = async (e: React.MouseEvent) => {
@@ -407,9 +410,9 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
     if (!sourceRealm) return;
     try {
       await api.joinRealm(sourceRealm._id);
-      addToast(`Synchronized with ${sourceRealm.name}`, 'success');
+      addToast(t('feed.realm_synced', { name: sourceRealm.name }), 'success');
       window.location.reload(); 
-    } catch (e) { addToast("Realm Access Denied", 'error'); }
+    } catch (e) { addToast(t('feed.realm_access_denied'), 'error'); }
   };
 
   return (
@@ -422,16 +425,16 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
       <div className="p-4 lg:p-5 flex items-center justify-between bg-white/[0.01]">
         <div className="flex items-center space-x-3 lg:space-x-4">
           <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl lg:rounded-2xl bg-gray-800 overflow-hidden border border-gray-700 shadow-lg group-hover:scale-105 transition-transform">
-            <img src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`} alt="a" className="w-full h-full object-cover" />
+            <img src={getIdentityAvatar(post.author)} alt="a" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
               <div className="font-black tracking-tight text-xs lg:text-sm uppercase text-white truncate max-w-[120px] lg:max-w-none">{getIdentityName(post.author)}</div>
               {isGlobal && sourceRealm && (
                 <div className="flex items-center space-x-1.5 px-1.5 py-0.5 bg-white/5 rounded-md border border-white/5 shrink-0">
-                  <span className="text-[7px] lg:text-[8px] text-gray-500 font-black uppercase tracking-tighter">IN</span>
+                  <span className="text-[7px] lg:text-[8px] text-gray-500 font-black uppercase tracking-tighter">{t('feed.in')}</span>
                   <span className="text-[8px] lg:text-[9px] text-vani-blue font-black uppercase tracking-tight truncate max-w-[80px] lg:max-w-[100px]">
-                    {isDiscoverable ? sourceRealm.name : "Encrypted"}
+                    {isDiscoverable ? sourceRealm.name : t('feed.encrypted')}
                   </span>
                 </div>
               )}
@@ -442,10 +445,10 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
         
         <div className="flex items-center space-x-1.5 lg:space-x-2">
           {isGlobal && sourceRealm && isDiscoverable && !isMemberOfSource && (
-            <button onClick={handleJoinRealm} className="flex items-center space-x-1.5 lg:space-x-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-vani-blue/10 hover:bg-vani-blue text-vani-blue hover:text-black rounded-xl lg:rounded-2xl border border-vani-blue/20 transition-all font-black text-[8px] lg:text-[10px] uppercase tracking-widest"><Plus size={12} className="lg:w-3.5 lg:h-3.5" /><span>Join</span></button>
+            <button onClick={handleJoinRealm} className="flex items-center space-x-1.5 lg:space-x-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-vani-blue/10 hover:bg-vani-blue text-vani-blue hover:text-black rounded-xl lg:rounded-2xl border border-vani-blue/20 transition-all font-black text-[8px] lg:text-[10px] uppercase tracking-widest"><Plus size={12} className="lg:w-3.5 lg:h-3.5" /><span>{t('feed.join_btn')}</span></button>
           )}
           {isGlobal && !isMe && !isSyncing && (
-            <button onClick={handleSyncAction} className="flex items-center space-x-1.5 lg:space-x-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-white/5 text-white border border-white/5 hover:border-vani-blue hover:text-vani-blue rounded-xl lg:rounded-2xl transition-all font-black text-[8px] lg:text-[10px] uppercase tracking-widest"><Users size={12} className="lg:w-3.5 lg:h-3.5" /><span>Sync</span></button>
+            <button onClick={handleSyncAction} className="flex items-center space-x-1.5 lg:space-x-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-white/5 text-white border border-white/5 hover:border-vani-blue hover:text-vani-blue rounded-xl lg:rounded-2xl transition-all font-black text-[8px] lg:text-[10px] uppercase tracking-widest"><Users size={12} className="lg:w-3.5 lg:h-3.5" /><span>{t('feed.sync_btn')}</span></button>
           )}
           <MoreHorizontal className="text-gray-600 hover:text-white cursor-pointer ml-1 lg:ml-2" size={18} />
         </div>
@@ -485,10 +488,10 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
         )}
         <form onSubmit={handleQuickComment} className="flex items-center space-x-3">
            <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg overflow-hidden flex-shrink-0 border border-white/10">
-              <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`} className="w-full h-full object-cover" />
+              <img src={getIdentityAvatar(currentUser)} className="w-full h-full object-cover" />
            </div>
            <div className="flex-1 relative">
-              <input type="text" placeholder="Quick Feedback..." value={quickComment} onChange={(e) => setQuickComment(e.target.value)} className="w-full bg-black/40 border border-white/5 focus:border-vani-blue/50 rounded-xl px-4 py-2 text-[10px] lg:text-xs text-white outline-none transition-all" />
+              <input type="text" placeholder={t('feed.quick_feedback')} value={quickComment} onChange={(e) => setQuickComment(e.target.value)} className="w-full bg-black/40 border border-white/5 focus:border-vani-blue/50 rounded-xl px-4 py-2 text-[10px] lg:text-xs text-white outline-none transition-all" />
               <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 text-vani-blue opacity-50 hover:opacity-100"><Send size={14} /></button>
            </div>
         </form>

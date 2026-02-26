@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
 import { api } from '../services/api';
+import { getIdentityAvatar } from '../services/identity';
 import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, Calendar, Clock } from 'lucide-react';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
@@ -117,8 +118,8 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       setShowReportModal(false);
       setReportingMsgId(null);
       setReportReason('');
-      addToast("Anomaly Logged.", 'success');
-    } catch (e) { addToast("Sync Failed.", 'error'); }
+      addToast(t('app.anomaly_logged'), 'success');
+    } catch (e) { addToast(t('app.sync_failed'), 'error'); }
   };
 
   useEffect(() => {
@@ -167,11 +168,11 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
       setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
       addToast(t('chat.transmission_success'), 'success');
-    } catch (err: any) { addToast(`Matrix Sync Failed: ${err.message}`, 'error'); setUploadProgress(null); }
+    } catch (err: any) { addToast(t('chat.matrix_sync_failed', { message: err.message }), 'error'); setUploadProgress(null); }
   };
 
   const startRecording = async () => {
-    if (!window.isSecureContext && window.location.hostname !== 'localhost') return addToast("HTTPS Required", 'error');
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') return addToast(t('chat.https_required'), 'error');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -185,7 +186,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
           setUploadProgress(null);
           addToast(t('chat.audio_note'), 'success');
-        } catch (e: any) { addToast("Audio Sync Failed", 'error'); setUploadProgress(null); }
+        } catch (e: any) { addToast(t('chat.audio_sync_failed'), 'error'); setUploadProgress(null); }
         stream.getTracks().forEach(t => t.stop());
       };
       recorder.start(); setRecording(recorder); setIsRecording(true); setRecordingTime(0);
@@ -221,7 +222,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   };
 
   const handleSeverMessage = async (id: string) => {
-    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); addToast(t('chat.sever_transmission'), 'success'); } catch (e) { addToast("Severance failed", 'error'); }
+    try { await api.deleteMessage(id); setMessages(prev => prev.filter(m => m._id !== id)); addToast(t('chat.sever_transmission'), 'success'); } catch (e) { addToast(t('app.sever_failed'), 'error'); }
   };
 
   const handleStartEdit = (msg: IMessage) => {
@@ -234,7 +235,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       await api.editMessage(editingMessageId, editInput);
       setEditingMessageId(null); setEditInput('');
       addToast(t('common.edit'), 'success');
-    } catch (e) { addToast("Calibration Failed", 'error'); }
+    } catch (e) { addToast(t('chat.calibration_failed'), 'error'); }
   };
 
   const handleScheduleMessage = async () => {
@@ -245,7 +246,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       
       // TEMPORAL GUARD: Check if the time is in the past
       if (scheduledFor <= now) {
-        return addToast("Temporal Lock: Cannot dispatch to the past.", 'error');
+        return addToast(t('chat.temporal_lock'), 'error');
       }
 
       await api.scheduleMessage({
@@ -257,9 +258,9 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       setInput('');
       setReplyingTo(null);
       setShowScheduleModal(false);
-      addToast("Signal scheduled for future dispatch", 'success');
+      addToast(t('chat.signal_scheduled'), 'success');
     } catch (e: any) { 
-      const errorMsg = e.response?.data?.message || "Scheduling protocol failed";
+      const errorMsg = e.response?.data?.message || t('chat.scheduling_failed');
       addToast(errorMsg, 'error'); 
     }
   };
@@ -412,7 +413,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                 </div>
                 <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
                    {previewFile.type === 'image' ? <div className="relative group"><img src={previewFile.previewUrl} className="max-h-[40vh] rounded-2xl shadow-2xl transition-transform duration-300" id="p-img" /><button onClick={() => {const i=document.getElementById('p-img'); if(i){const r=(parseInt(i.getAttribute('data-r')||'0')+90)%360; i.style.transform=`rotate(${r}deg)`; i.setAttribute('data-r',r.toString());}}} className="absolute bottom-4 right-4 p-3 bg-black/60 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Zap size={16} /></button></div> : previewFile.type === 'video' ? <video src={previewFile.previewUrl} controls className="max-h-[40vh] rounded-2xl shadow-2xl" /> : <div className="w-full p-10 bg-white/5 rounded-[32px] border border-dashed border-white/10 flex flex-col items-center space-y-4"><FileIcon size={48} className="text-gray-600" /><div className="text-center"><div className="text-sm font-black text-white uppercase">{previewFile.file.name}</div><div className="text-[10px] font-mono text-gray-500 mt-1 uppercase tracking-widest">{(previewFile.file.size/1024/1024).toFixed(2)} MB</div></div></div>}
-                   <div className="w-full mt-8"><div className="bg-white/5 p-4 rounded-2xl border border-white/5"><label className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Encryption_Caption</label><input type="text" placeholder="Add a transmission note..." className="bg-transparent w-full outline-none text-white text-sm" value={previewCaption} onChange={(e)=>setPreviewCaption(e.target.value)} /></div></div>
+                   <div className="w-full mt-8"><div className="bg-white/5 p-4 rounded-2xl border border-white/5"><label className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2 block">{t('chat.encryption_caption')}</label><input type="text" placeholder={t('chat.transmission_note')} className="bg-transparent w-full outline-none text-white text-sm" value={previewCaption} onChange={(e)=>setPreviewCaption(e.target.value)} /></div></div>
                 </div>
                 <div className="p-6 border-t border-white/5 bg-black/40">
                    {uploadProgress !== null ? <div className="space-y-3"><div className="flex justify-between text-[10px] font-black uppercase text-vani-blue"><span>{t('chat.uploading')}</span><span>{uploadProgress}%</span></div><div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-gradient" initial={{width:0}} animate={{width:`${uploadProgress}%`}} /></div></div> : <div className="flex space-x-4"><button onClick={()=>setPreviewFile(null)} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-500 font-black uppercase text-[10px]">{t('common.cancel')}</button><button onClick={confirmUpload} className="flex-[2] py-4 rounded-2xl bg-vani-gradient text-white font-black uppercase text-[10px] shadow-2xl flex items-center justify-center space-x-3"><Send size={16} /><span>{t('chat.confirm_sync')}</span></button></div>}
@@ -472,16 +473,16 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[40px] border border-red-500/20 p-8 shadow-2xl">
                 <div className="flex items-center space-x-3 mb-6">
                    <div className="p-2 bg-red-500/10 rounded-xl text-red-500"><AlertTriangle size={20} /></div>
-                   <h2 className="text-xl font-black text-white uppercase tracking-tighter">Report_Anomaly</h2>
+                   <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('chat.report_anomaly')}</h2>
                 </div>
                 <div className="space-y-6">
                    <div className="space-y-2">
-                      <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">Anomalous Signal Reason</label>
-                      <textarea className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-sm outline-none focus:border-red-500/50 resize-none h-32" placeholder="Describe the violation..." value={reportReason} onChange={(e) => setReportReason(e.target.value)} />
+                      <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">{t('chat.report_anomaly')}</label>
+                      <textarea className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-sm outline-none focus:border-red-500/50 resize-none h-32" placeholder={t('chat.violation_desc')} value={reportReason} onChange={(e) => setReportReason(e.target.value)} />
                    </div>
                    <div className="flex gap-3">
-                      <button onClick={handleReport} className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-500/20">Log Anomaly</button>
-                      <button onClick={() => { setShowReportModal(false); setReportingMsgId(null); }} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Abort</button>
+                      <button onClick={handleReport} className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-500/20">{t('chat.log_anomaly')}</button>
+                      <button onClick={() => { setShowReportModal(false); setReportingMsgId(null); }} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">{t('common.abort')}</button>
                    </div>
                 </div>
              </motion.div>
@@ -498,7 +499,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
             >
               {channelType === 'dm' ? '@' : channelType === 'group_dm' ? '' : '#'}
             </motion.div>
-            <span className="font-black text-white uppercase tracking-tighter text-sm">{(channelType === 'group_dm' ? activeChannel?.name : channelName?.replace(/^@/, '')) || 'Unknown_Link'}</span>
+            <span className="font-black text-white uppercase tracking-tighter text-sm">{(channelType === 'group_dm' ? activeChannel?.name : channelName?.replace(/^@/, '')) || t('chat.unknown_link')}</span>
             {channelType === 'group_dm' && <button onClick={onGroupSettings} className="p-1.5 text-gray-500 hover:text-white transition-all bg-white/5 rounded-lg ml-2"><Settings size={14} /></button>}
          </div>
          
@@ -510,7 +511,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                 whileTap={{ scale: 0.9 }}
                 onClick={onStartCall}
                 className="p-2 text-gray-500 transition-colors" 
-                title="Voice Call"
+                title={t('chat.voice_call')}
               >
                 <Phone size={20} />
               </motion.button>
@@ -519,7 +520,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                 whileTap={{ scale: 0.9 }}
                 onClick={onStartVideo}
                 className="p-2 text-gray-500 transition-colors" 
-                title="Video Call"
+                title={t('chat.video_call')}
               >
                 <Video size={20} />
               </motion.button>
@@ -550,9 +551,9 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                       setTimeout(() => el?.classList.remove('bg-vani-blue/10'), 2000);
                     }}>
                        <Reply size={10} className="text-vani-blue shrink-0" />
-                       <img src={msg.parentMessage.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.parentMessage.sender?.username}`} className="w-3.5 h-3.5 rounded-full ring-1 ring-white/10" />
+                       <img src={getIdentityAvatar(msg.parentMessage.sender)} className="w-3.5 h-3.5 rounded-full ring-1 ring-white/10" />
                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter truncate">
-                         <span className="text-white/60">{msg.parentMessage.sender?.username}</span>: {msg.parentMessage.content || 'Visual_Data'}
+                         <span className="text-white/60">{msg.parentMessage.sender?.username}</span>: {msg.parentMessage.content || t('chat.visual_data')}
                        </span>
                     </div>
                  </div>
@@ -598,7 +599,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                   <Reply size={14} className="text-vani-blue shrink-0" />
                   <div className="text-[10px] text-gray-400 truncate">
                     {t('chat.replying_to')} <span className="font-black text-white uppercase">{replyingTo.sender?.username}</span>
-                    <p className="opacity-50 italic truncate">{replyingTo.content || 'Visual_Data'}</p>
+                    <p className="opacity-50 italic truncate">{replyingTo.content || t('chat.visual_data')}</p>
                   </div>
                </div>
                <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><X size={14} /></button>
@@ -668,7 +669,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           {showMediaMenu && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 left-6 bg-[#0a0a0c] border border-white/5 p-2 rounded-3xl shadow-2xl z-50 flex space-x-2"><MediaBtn icon={<ImageIcon size={18} />} label="Image" onClick={() => imageInputRef.current?.click()} color="text-blue-500" /><MediaBtn icon={<Camera size={18} />} label="Camera" onClick={() => cameraInputRef.current?.click()} color="text-green-500" /><MediaBtn icon={<FileIcon size={18} />} label="File" onClick={() => fileInputRef.current?.click()} color="text-yellow-500" /><MediaBtn icon={<Mic size={18} />} label="Audio" onClick={startRecording} color="text-red-500" /></motion.div>}
           {isRecording && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-4 bottom-4 bg-[#0a0a0c] border border-red-500/30 p-4 rounded-[32px] shadow-2xl z-50 flex items-center justify-between"><div className="flex items-center space-x-4"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="font-mono text-white font-black">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('chat.recording')}</span></div><div className="flex items-center space-x-3"><button onClick={() => stopRecording(false)} className="p-3 text-gray-500 hover:text-white transition-all"><X size={20} /></button><button onClick={() => stopRecording(true)} className="w-12 h-12 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Send size={20} /></button></div></motion.div>}
           {showCustomPicker && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-20 right-6 bg-[#0a0a0c] border border-white/5 p-4 rounded-[32px] shadow-2xl grid grid-cols-3 gap-4 z-50">{Object.keys(CUSTOM_EMOJI_MAP).map(code => { const Icon = CUSTOM_EMOJI_MAP[code]; return <div key={code} onClick={() => setInput(prev => prev + ' ' + code + ' ')} className="p-3 bg-white/5 rounded-2xl hover:bg-vani-blue/20 cursor-pointer transition-all flex items-center justify-center"><Icon /></div> })}</motion.div>}
-          {uploadProgress !== null && !previewFile && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-vani-blue/10 backdrop-blur-md border border-vani-blue/30 px-6 py-3 rounded-2xl shadow-2xl z-[60] flex items-center space-x-4 min-w-[240px]"><div className="w-2 h-2 bg-vani-blue rounded-full animate-ping" /><div className="flex-1"><div className="flex justify-between items-center mb-1"><span className="text-[8px] font-black text-white uppercase tracking-widest">Neural_Syncing...</span><span className="text-[10px] font-mono text-vani-blue">{uploadProgress}%</span></div><div className="h-1 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-blue" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} /></div></div></motion.div>}
+          {uploadProgress !== null && !previewFile && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-vani-blue/10 backdrop-blur-md border border-vani-blue/30 px-6 py-3 rounded-2xl shadow-2xl z-[60] flex items-center space-x-4 min-w-[240px]"><div className="w-2 h-2 bg-vani-blue rounded-full animate-ping" /><div className="flex-1"><div className="flex justify-between items-center mb-1"><span className="text-[8px] font-black text-white uppercase tracking-widest">{t('chat.neural_syncing')}</span><span className="text-[10px] font-mono text-vani-blue">{uploadProgress}%</span></div><div className="h-1 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-vani-blue" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} /></div></div></motion.div>}
         </AnimatePresence>
         <input type="file" ref={fileInputRef} hidden onChange={(e) => handleFileUpload(e)} />
         <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
@@ -735,7 +736,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">{t('chat.announcement_only')}</span></div>
         )}
       </div>
-      {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); addToast("Sync Request Buffered", 'success'); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
+      {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); addToast(t('settings.sync_request_buffered'), 'success'); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
     </div>
   );
 };
@@ -799,7 +800,7 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
           }} 
           className={`w-9 h-9 rounded-xl bg-gray-800 flex-shrink-0 mt-1 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
         >
-          <img src={msg.sender?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender?.username || 'deleted'}`} className="w-full h-full object-cover" />
+          <img src={getIdentityAvatar(msg.sender)} className="w-full h-full object-cover" />
         </div>
       ) : <div className="w-9 flex-shrink-0" />}
         <div className="min-w-0 flex-1 relative">

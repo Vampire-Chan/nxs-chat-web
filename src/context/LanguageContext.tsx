@@ -100,10 +100,17 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     document.documentElement.dir = lang === 'ur' ? 'rtl' : 'ltr';
   };
 
-  const t = (key: string): string => {
+  const t = (key: string, variables?: Record<string, string | number>): string => {
     try {
       const currentDict = translations[language] || translations['en'];
-      return currentDict[key] || translations['en'][key] || key;
+      let translation = currentDict[key] || translations['en'][key] || key;
+
+      if (variables) {
+        Object.entries(variables).forEach(([name, value]) => {
+          translation = translation.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value));
+        });
+      }
+      return translation;
     } catch (e) {
       return translations['en'][key] || key;
     }

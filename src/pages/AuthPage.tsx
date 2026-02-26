@@ -16,6 +16,7 @@ export default function AuthPage() {
     username: '', 
     displayName: '', 
     dob: '',
+    gender: 'none',
     bio: ''
   });
   const [code, setCode] = useState('');
@@ -31,7 +32,7 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getErrorMessage = (err: any) => err.response?.data?.message || "Transmission Error";
+  const getErrorMessage = (err: any) => err.response?.data?.message || t('auth.transmission_error');
 
   // Step 1: Initial Identity Creation
   const handleRegisterStart = async (e: React.FormEvent) => {
@@ -42,7 +43,8 @@ export default function AuthPage() {
       const res = await axios.post(`${API_URL}/auth/register`, { 
         username: formData.username,
         displayName: formData.displayName,
-        dob: formData.dob
+        dob: formData.dob,
+        gender: formData.gender
       });
       setQrImage(res.data.qrCode);
       setOtpSecret(res.data.secret);
@@ -75,6 +77,7 @@ export default function AuthPage() {
     const fd = new FormData();
     if (avatarFile) fd.append('avatar', avatarFile);
     fd.append('bio', formData.bio);
+    fd.append('gender', formData.gender);
 
     try {
       const res = await axios.post(`${API_URL}/auth/setup`, fd);
@@ -117,7 +120,7 @@ export default function AuthPage() {
                   <div className="w-20 h-20 bg-vani-gradient rounded-[32px] flex items-center justify-center mx-auto mb-6 shadow-2xl rotate-12">
                      <Zap size={40} className="-rotate-12 text-white" />
                   </div>
-                  <h2 className="text-4xl font-black tracking-tighter uppercase">Yantravani Core</h2>
+                  <h2 className="text-4xl font-black tracking-tighter uppercase">{t('auth.core_title')}</h2>
                   <p className="text-gray-500 text-sm mt-2 font-medium tracking-widest uppercase">{t('login.subtitle')}</p>
                </div>
 
@@ -141,9 +144,17 @@ export default function AuthPage() {
             <motion.form key="info" onSubmit={handleRegisterStart} className="space-y-6">
                <h2 className="text-2xl font-black uppercase tracking-tight">{t('register.title')}</h2>
                <div className="space-y-4">
-                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
-                  <InputField label={t('profile.displayname')} icon={<Info size={14}/>} value={formData.displayName} onChange={(v: string) => setFormData({...formData, displayName: v})} placeholder="Public Name" />
+                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder={t('auth.username_placeholder')} />
+                  <InputField label={t('profile.displayname')} icon={<Info size={14}/>} value={formData.displayName} onChange={(v: string) => setFormData({...formData, displayName: v})} placeholder={t('auth.name_placeholder')} />
                   <InputField label={t('profile.dob')} icon={<Calendar size={14}/>} type="date" value={formData.dob} onChange={(v: string) => setFormData({...formData, dob: v})} />
+                  
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">{t('profile.gender')}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                       <button type="button" onClick={() => setFormData({...formData, gender: 'male'})} className={`py-3 rounded-2xl border font-black uppercase text-[10px] transition-all ${formData.gender === 'male' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-white/5 text-gray-600'}`}>{t('profile.gender_male')}</button>
+                       <button type="button" onClick={() => setFormData({...formData, gender: 'female'})} className={`py-3 rounded-2xl border font-black uppercase text-[10px] transition-all ${formData.gender === 'female' ? 'bg-vani-accent/10 border-vani-accent text-white' : 'bg-white/[0.02] border-white/5 text-gray-600'}`}>{t('profile.gender_female')}</button>
+                    </div>
+                  </div>
                </div>
                <button type="submit" disabled={loading} className="w-full bg-vani-gradient text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs flex items-center justify-center space-x-2">
                   <span>{t('common.continue')}</span> <ArrowRight size={16} />
@@ -211,7 +222,7 @@ export default function AuthPage() {
                   <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest text-left ml-2">{t('auth.bio_transmission')}</label>
                   <textarea 
                     className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-sm text-gray-300 h-24 focus:border-vani-blue outline-none transition-all"
-                    placeholder="Add a bio..."
+                    placeholder={t('auth.bio_placeholder')}
                     value={formData.bio}
                     onChange={(e) => setFormData({...formData, bio: e.target.value})}
                   />
@@ -230,7 +241,7 @@ export default function AuthPage() {
                   <p className="text-gray-500 text-xs mt-2 uppercase font-black tracking-widest">{t('login.subtitle')}</p>
                </div>
                <div className="space-y-4">
-                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder="username" />
+                  <InputField label={t('register.handle')} icon={<UserIcon size={14}/>} value={formData.username} onChange={(v: string) => setFormData({...formData, username: v})} placeholder={t('auth.username_placeholder')} />
                   <div className="pt-4">
                     <div className="flex justify-between items-end mb-3 ml-1">
                        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{useBackup ? t('auth.backup_key') : t('login.password')}</label>

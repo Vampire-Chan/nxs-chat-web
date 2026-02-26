@@ -244,12 +244,15 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   const rtcConfig = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:global.stun.twilio.com:3478' }
-    ]
+    ],
+    iceCandidatePoolSize: 10,
   };
 
   function createPeer(u: string, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: true, stream: s, config: rtcConfig });
+    const p = new Peer({ initiator: true, stream: s, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('sending_signal', { 
       userToSignal: u, callerID: c, signal,
       user: { 
@@ -274,7 +277,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   }
 
   function addPeer(i: any, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: false, stream: s, config: rtcConfig });
+    const p = new Peer({ initiator: false, stream: s, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('returning_signal', { signal, callerID: c }));
     
     p.on('connect', () => {

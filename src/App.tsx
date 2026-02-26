@@ -28,7 +28,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff, Heart, MessageCircle, Users, Send, Zap } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, WifiOff, Zap } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -134,7 +134,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [activeMedia, setActiveMedia] = useState<{ type: 'image' | 'video' | 'audio', url: string } | null>(null);
   const [incomingCall, setIncomingCall] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [showConnPill, setShowConnPill] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveStreamers, setLiveStreamers] = useState<IUser[]>([]);
   const [liveSignal, setLiveSignal] = useState<any>(null);
@@ -173,8 +172,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [oversightMode, setOversightMode] = useState(true);
 
   useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); setShowConnPill(true); setTimeout(() => setShowConnPill(false), 3000); };
-    const handleOffline = () => { setIsOnline(false); setShowConnPill(true); };
+    const handleOnline = () => { setIsOnline(true); };
+    const handleOffline = () => { setIsOnline(false); };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     if ("Notification" in window && Notification.permission === "default") { Notification.requestPermission(); }
@@ -441,30 +440,80 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         </div>
       )}
 
+      {/* DYNAMIC PULSE (Samsung-style Notif) */}
       <AnimatePresence>
-        {serverStatus && (
-          <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-md pointer-events-auto">
-             <div className={`backdrop-blur-2xl border p-6 rounded-[32px] shadow-2xl flex items-start space-x-4 ${serverStatus === 'rate_limit' ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                <div className={`p-3 rounded-2xl ${serverStatus === 'rate_limit' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'}`}>
-                   <Zap size={24} className={serverStatus === 'no_response' ? 'animate-pulse' : ''} />
-                </div>
-                <div className="flex-1">
-                   <h4 className={`text-sm font-black uppercase tracking-tighter ${serverStatus === 'rate_limit' ? 'text-yellow-400' : 'text-red-400'}`}>
-                      {serverStatus === 'overload' ? t('server.overload') : serverStatus === 'rate_limit' ? t('server.rate_limit') : t('server.cold_start')}
-                   </h4>
-                   <p className="text-[10px] text-gray-400 font-medium leading-relaxed mt-1 uppercase">
-                      {serverStatus === 'overload' ? t('server.overload_desc') : serverStatus === 'rate_limit' ? t('server.rate_limit_desc') : t('server.cold_start_desc')}
-                   </p>
-                </div>
-                <button onClick={() => setServerStatus(null)} className="p-2 text-gray-500 hover:text-white transition-all"><X size={18} /></button>
-             </div>
-          </motion.div>
+        {(serverStatus || !isOnline || liveSignal) && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none flex flex-col items-center">
+             <motion.div 
+               initial={{ width: 12, height: 12, borderRadius: 100, opacity: 0 }}
+               animate={{ 
+                 width: 'auto', 
+                 height: 'auto', 
+                 borderRadius: 32, 
+                 opacity: 1,
+                 transition: { 
+                   width: { delay: 0.2, duration: 0.4, type: 'spring', bounce: 0.4 },
+                   height: { delay: 0.2, duration: 0.4 },
+                   opacity: { duration: 0.2 }
+                 }
+               }}
+               exit={{ width: 12, height: 12, borderRadius: 100, opacity: 0 }}
+               className="bg-black/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto overflow-hidden flex items-center p-1.5"
+             >
+                {/* CONTENT WRAPPER */}
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1, transition: { delay: 0.4 } }}
+                  className="flex items-center space-x-4 px-4 py-2 min-w-[200px] max-w-[90vw]"
+                >
+                   {/* ICON NODE */}
+                   <div className="relative">
+                      <div className="w-8 h-8 rounded-xl bg-vani-gradient p-0.5 shadow-lg">
+                         <div className="w-full h-full rounded-[10px] bg-black flex items-center justify-center overflow-hidden">
+                            {!isOnline ? <WifiOff size={14} className="text-red-500" /> : 
+                             serverStatus ? <Zap size={14} className={serverStatus === 'rate_limit' ? 'text-yellow-500' : 'text-red-500'} /> :
+                             <img src={getIdentityAvatar(liveSignal?.sender)} className="w-full h-full object-cover" />}
+                         </div>
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-black border border-white/10 flex items-center justify-center">
+                         {!isOnline ? <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> :
+                          serverStatus ? <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${serverStatus === 'rate_limit' ? 'bg-yellow-500' : 'bg-red-500'}`} /> :
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
+                      </div>
+                   </div>
+
+                   {/* TEXT NODE */}
+                   <div className="flex flex-col min-w-0 pr-4">
+                      <span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">
+                         {!isOnline ? t('ui.connection_lost') :
+                          serverStatus === 'overload' ? t('server.overload') :
+                          serverStatus === 'rate_limit' ? t('server.rate_limit') :
+                          serverStatus === 'no_response' ? t('server.cold_start') :
+                          liveSignal?.sender?.username || 'SYSTEM'}
+                      </span>
+                      <span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate mt-0.5">
+                         {!isOnline ? t('ui.reconnecting') :
+                          serverStatus === 'overload' ? t('server.overload_desc') :
+                          serverStatus === 'rate_limit' ? t('server.rate_limit_desc') :
+                          serverStatus === 'no_response' ? t('server.cold_start_desc') :
+                          liveSignal?.content}
+                      </span>
+                   </div>
+
+                   {/* ACTION / CLOSE */}
+                   <button 
+                     onClick={() => { setServerStatus(null); setLiveSignal(null); }}
+                     className="p-2 hover:bg-white/5 rounded-full text-gray-500 transition-all"
+                   >
+                      <X size={14} />
+                   </button>
+                </motion.div>
+             </motion.div>
+          </div>
         )}
-        {showConnPill && (
-          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[6000] w-fit pointer-events-none">
-             <div className={`backdrop-blur-2xl border px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 ${isOnline ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>{isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}<span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? t('ui.back_online') : t('ui.connection_lost')}</span></div>
-          </motion.div>
-        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {incomingCall && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="w-full max-w-sm">
@@ -484,11 +533,6 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                </div>
             </motion.div>
           </div>
-        )}
-        {liveSignal && (
-          <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[5500] w-fit max-w-[90%] pointer-events-auto cursor-pointer" onClick={() => setLiveSignal(null)}>
-             <div className="bg-[#050507]/80 backdrop-blur-2xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 min-w-[200px]"><div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shrink-0"><img src={getIdentityAvatar(liveSignal.sender)} className="w-full h-full object-cover" /></div><div className="flex flex-col min-w-0"><span className="text-[10px] font-black text-white uppercase tracking-tighter truncate">{liveSignal.sender?.username || 'SYSTEM'}</span><span className="text-[8px] text-gray-400 font-mono uppercase tracking-widest truncate">{liveSignal.content}</span></div><div className="shrink-0 ml-2">{liveSignal.type === 'like' && <Heart size={12} className="text-red-500 fill-red-500" />}{liveSignal.type === 'comment' && <MessageCircle size={12} className="text-vani-blue" />}{liveSignal.type === 'follow' && <Users size={12} className="text-vani-accent" />}{liveSignal.type === 'message' && <Send size={12} className="text-green-500" />}</div></div>
-          </motion.div>
         )}
       </AnimatePresence>
 

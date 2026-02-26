@@ -68,6 +68,7 @@ export const hi = {
   "ui.nodes": "नोड्स",
   "ui.back_online": "वापस ऑनलाइन",
   "ui.connection_lost": "कनेक्शन टूट गया",
+  "ui.reconnecting": "न्यूरल लिंक पुनः स्थापित करने का प्रयास...",
 
   "auth.security_link": "सुरक्षा लिंक",
   "auth.scan_desc": "इस पहचान नोड को लिंक करने के लिए अपने ऑथेंटिकेटर ऐप से स्कैन करें।",

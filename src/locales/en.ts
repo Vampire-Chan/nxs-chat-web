@@ -71,6 +71,7 @@ export const en = {
   "ui.nodes": "Nodes",
   "ui.back_online": "Back_Online",
   "ui.connection_lost": "Connection_Lost",
+  "ui.reconnecting": "Attempting to re-establish neural link...",
   "ui.secure_link": "Secure_Link_Matrix",
   "ui.nodes_synced": "NODES_SYNCED",
   "ui.sever_link": "Sever Link",

@@ -78,6 +78,10 @@ export const en = {
   "ui.sync_audio": "Sync Audio",
   "ui.establishing_link": "Establishing_Link...",
   "ui.link_severed": "Link_Severed",
+  "ui.call_ringing": "Signal_Ringing...",
+  "ui.call_busy": "Node_Busy",
+  "ui.call_offline": "Node_Offline",
+  "ui.call_ignored": "Signal_Ignored",
   
   // Auth Page
   "auth.security_link": "Security Link",

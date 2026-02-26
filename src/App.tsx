@@ -28,7 +28,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, WifiOff, Zap } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, WifiOff, Zap } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -379,6 +379,16 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const handleStartCall = (type: 'voice' | 'video') => {
     if (!activeChannel) return;
+    
+    // Check if it's a DM or Group DM for Global/Direct signaling
+    if (activeChannel.type === 'dm') {
+      const otherUser = activeChannel.members?.find(m => (m._id || m.id) !== (user?.id || user?._id));
+      if (otherUser) {
+        socketRef.current?.emit('request_direct_call', { to: otherUser._id || otherUser.id, type });
+        return;
+      }
+    }
+
     socketRef.current?.emit('initiate_call', { 
       channelId: activeChannel._id, 
       type, 
@@ -386,7 +396,10 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       senderName: user!.username, 
       senderAvatar: getIdentityAvatar(user) 
     });
-    // We now wait for the 'caller_ready' event instead of joining immediately
+  };
+
+  const handleGlobalCall = (targetUserId: string, type: 'voice' | 'video') => {
+    socketRef.current?.emit('request_direct_call', { to: targetUserId, type });
   };
   
   const handleAcceptCall = () => {
@@ -569,6 +582,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                     onViewProfile={handleViewOtherProfile} 
                     isOwnProfile={viewingUserId === (user?.id || user?._id)}
                     onEdit={() => setShowIdentitySettings(true)}
+                    onCall={(type) => handleGlobalCall(viewingUserId, type)}
                   />
                 ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
@@ -613,16 +627,21 @@ onStartVideo={() => handleStartCall('video')}
   );
 }
 
-const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials, onSelectTag, onViewProfile, isOwnProfile = false, onEdit }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void, onSelectTag?: (tag: string) => void, onViewProfile?: (userId: string) => void, isOwnProfile?: boolean, onEdit?: () => void }) => {
+const OtherProfileView = ({ userId, onStartDM, currentUser, onFollow, onViewSocials, onSelectTag, onViewProfile, isOwnProfile = false, onEdit, onCall }: { userId: string, onStartDM: (id: string) => void, currentUser: IUser, onFollow: (id: string) => void, onViewSocials: (tab: any, userId: string) => void, onSelectTag?: (tag: string) => void, onViewProfile?: (userId: string) => void, isOwnProfile?: boolean, onEdit?: () => void, onCall?: (type: 'voice' | 'video') => void }) => {
   const { t } = useLanguage();
   const [targetUser, setTargetUser] = useState<IUser | null>(null);
   useEffect(() => { api.getUserProfile(userId).then(setTargetUser); }, [userId]);
   if (!targetUser) return <div className="flex-1 flex items-center justify-center font-black uppercase text-vani-blue animate-pulse">{t('common.scanning')}</div>;
+  const VideoIcon = Video as any;
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-discord-dark">
        <div className="flex-1 overflow-y-auto custom-scrollbar"><ProfileNode user={targetUser} isOwnProfile={isOwnProfile} onEdit={onEdit} currentUser={currentUser} onFollow={onFollow} onViewSocials={onViewSocials} onSelectTag={onSelectTag} onViewProfile={onViewProfile} /></div>
        {!isOwnProfile && (
-         <div className="p-6 border-t border-white/5 bg-discord-sidebar/30 flex justify-center backdrop-blur-md"><button onClick={() => onStartDM(userId)} className="w-full max-w-sm bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center space-x-4"><MessageSquare size={20} /><span>{t('common.init_link')}</span></button></div>
+         <div className="p-6 border-t border-white/5 bg-discord-sidebar/30 flex items-center justify-center gap-4 backdrop-blur-md">
+            <button onClick={() => onCall?.('voice')} className="p-4 bg-white/5 hover:bg-vani-blue/20 text-gray-400 hover:text-vani-blue rounded-2xl border border-white/5 transition-all"><Phone size={24} /></button>
+            <button onClick={() => onCall?.('video')} className="p-4 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-500 rounded-2xl border border-white/5 transition-all"><VideoIcon size={24} /></button>
+            <button onClick={() => onStartDM(userId)} className="flex-1 max-w-sm bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center space-x-4"><MessageSquare size={20} /><span>{t('common.init_link')}</span></button>
+         </div>
        )}
     </div>
   );

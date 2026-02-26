@@ -17,7 +17,7 @@ type Language = 'en' | 'en-simple' | 'hi' | 'ne' | 'mr' | 'pa' | 'bho' | 'te' | 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, variables?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

@@ -16,18 +16,34 @@ axios.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// IDENTITY SYNC: Handle 401 Unauthorized globally
+// IDENTITY SYNC: Handle Global Errors (Unauthorized, Overload, Rate Limits)
 axios.interceptors.response.use((response) => {
   return response;
 }, (error) => {
-  if (error.response && error.response.status === 401) {
-    console.warn('⚠️ UNAUTHORIZED: Severing session and redirecting to login...');
-    localStorage.removeItem('token');
-    localStorage.removeItem('vani_view_state');
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login';
+  if (error.response) {
+    const { status } = error.response;
+    
+    if (status === 401) {
+      console.warn('⚠️ UNAUTHORIZED: Severing session and redirecting to login...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('vani_view_state');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
+
+    if (status === 429) {
+      window.dispatchEvent(new CustomEvent('vani_server_status', { detail: { type: 'rate_limit' } }));
+    }
+
+    if ([502, 503, 504].includes(status)) {
+      window.dispatchEvent(new CustomEvent('vani_server_status', { detail: { type: 'overload' } }));
+    }
+  } else if (error.request) {
+    // Request made but no response received (possible cold start or network drop)
+    window.dispatchEvent(new CustomEvent('vani_server_status', { detail: { type: 'no_response' } }));
   }
+  
   return Promise.reject(error);
 });
 
@@ -37,7 +53,9 @@ export interface IUser {
   username: string;
   displayName?: string; // Added
   dob?: string; // Added
+  gender?: 'male' | 'female' | 'other' | 'none';
   showAge?: boolean; // Added
+  showGender?: boolean;
   email?: string;
   avatar: string;
   banner?: string;

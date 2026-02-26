@@ -154,10 +154,10 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                       <Radio size={24} />
                    </div>
                    <div>
-                      <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('feed.transmission', { username: activeStream.username })}</h2>
+                      <h2 className="text-xl font-black text-white uppercase tracking-tighter">{(t as any)('feed.transmission', { username: activeStream.username })}</h2>
                       <div className="flex items-center space-x-2">
                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                         <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('feed.live_from_matrix', { count: Math.floor(Math.random()*1000) })}</span>
+                         <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{(t as any)('feed.live_from_matrix', { count: Math.floor(Math.random()*1000) })}</span>
                       </div>
                    </div>
                 </div>
@@ -222,7 +222,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                   <div className="max-w-2xl mx-auto w-full mb-6 flex items-center justify-between bg-vani-blue/10 border border-vani-blue/30 p-4 rounded-2xl">
                      <div className="flex items-center space-x-3">
                         <Hash className="text-vani-blue" size={20} />
-                        <span className="text-sm font-black text-white uppercase tracking-widest">{t('feed.signal_filter', { tag: activeTag })}</span>
+                        <span className="text-sm font-black text-white uppercase tracking-widest">{(t as any)('feed.signal_filter', { tag: activeTag })}</span>
                      </div>
                      <button onClick={() => handleTagSelect(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={18} /></button>
                   </div>

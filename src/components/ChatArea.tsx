@@ -168,7 +168,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
       await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
       setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
       addToast(t('chat.transmission_success'), 'success');
-    } catch (err: any) { addToast(t('chat.matrix_sync_failed', { message: err.message }), 'error'); setUploadProgress(null); }
+    } catch (err: any) { addToast((t as any)('chat.matrix_sync_failed', { message: err.message }), 'error'); setUploadProgress(null); }
   };
 
   const startRecording = async () => {

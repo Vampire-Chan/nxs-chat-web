@@ -38,7 +38,35 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const [showGender, setShowGender] = useState(user.showGender || false);
   const [isDisabled, setIsDisabled] = useState(user.isDisabled || false);
   
-  // ... (keeping other states) ...
+  // Interface States
+  const [creationUI, setCreationUI] = useState(user.creationUI || 'auto');
+  
+  // Donation States
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'paypal'>('upi');
+  const [donateAmount, setDonateAmount] = useState<string>('500');
+  const [donateCurrency, setDonateCurrency] = useState<'INR' | 'USD'>('INR');
+  const [transactionId, setTransactionId] = useState('');
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+
+  // Security States
+  const [backupKeys, setBackupKeys] = useState<{ code: string, isUsed: boolean }[]>(user.recoveryKeys || []);
+  const [newTOTP, setNewTOTP] = useState<{ secret: string, qrCode: string } | null>(null);
+
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const avatarRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchTxs = async () => {
+      try {
+        const res = await api.getTransactions();
+        setTransactions(res.data);
+      } catch (e) { console.error("Failed to fetch ledger", e); }
+    };
+    if (activeTab === 'archive') fetchTxs();
+  }, [activeTab]);
 
   const handleSave = async (customKeys?: any[]) => {
     setLoading(true);
@@ -158,7 +186,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                            <select 
                              className={`w-full bg-[#050507] border border-white/5 p-5 rounded-3xl text-white outline-none focus:border-vani-blue/50 font-bold appearance-none ${user.gender && user.gender !== 'none' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} 
                              value={gender} 
-                             onChange={(e) => setGender(e.target.value)}
+                             onChange={(e) => setGender(e.target.value as any)}
                              disabled={!!(user.gender && user.gender !== 'none')}
                            >
                               <option value="male">{t('profile.gender_male')}</option>

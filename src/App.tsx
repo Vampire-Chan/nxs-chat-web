@@ -28,7 +28,7 @@ import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff, Heart, MessageCircle, Users, Send } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, Wifi, WifiOff, Heart, MessageCircle, Users, Send, Zap } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -147,8 +147,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   }, [activeChannel]);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
-  const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
+    const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
+    const [serverStatus, setServerStatus] = useState<'overload' | 'no_response' | 'rate_limit' | null>(null);
+  
+    useEffect(() => {
+      const handleStatus = (e: any) => {
+        setServerStatus(e.detail.type);
+        // Auto-clear after 10 seconds for overloads
+        if (e.detail.type !== 'rate_limit') {
+          setTimeout(() => setServerStatus(null), 10000);
+        } else {
+          setTimeout(() => setServerStatus(null), 5000);
+        }
+      };
+      window.addEventListener('vani_server_status', handleStatus);
+      return () => window.removeEventListener('vani_server_status', handleStatus);
+    }, []);
+  
+    const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
   const [sidebarWidth, setSidebarWidth] = useState(savedState.sidebarWidth || 240);
   const [isResizing, setIsResizing] = useState(false);
   const [kineticTransitions, setKineticTransitions] = useState<boolean>(savedState.kineticTransitions !== undefined ? savedState.kineticTransitions : true);
@@ -255,13 +271,13 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         api.markNotificationsReadByChannel(msgChannelId); 
       } 
       else if (!isMe) {
-        setLiveSignal({ sender: msg.sender, content: msg.content || t('app.incoming_transmission'), type: 'message' }); 
+        setLiveSignal({ sender: msg.sender, content: msg.content || (t as any)('app.incoming_transmission'), type: 'message' }); 
         setTimeout(() => setLiveSignal(null), 5000); 
-        sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || t('app.incoming_visual_data')); 
+        sendLocalNotification(`New signal from ${msg.sender.username}`, msg.content || (t as any)('app.incoming_visual_data')); 
       }
       loadDMs(); setMatrixRefreshKey(k => k + 1); 
     });
-    s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification(t('app.incoming_call', { type: data.type }), t('app.establishing_link', { username: data.sender.username })); });
+    s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification((t as any)('app.incoming_call', { type: data.type }), (t as any)('app.establishing_link', { username: data.sender.username })); });
     s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: t('app.identity_link_rejected'), type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });
     s.on('identity_sync_update', async () => { try { const u = await api.getUserProfile(user?.id || user?._id || ''); updateUserState(localStorage.getItem('token') || '', u); loadDMs(); loadRealms(); setMatrixRefreshKey(k => k + 1); } catch (e) {} });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
@@ -345,7 +361,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       const s = socketRef.current;
       
       s.on('call_initiated', ({ recipients }: { recipients: any[] }) => {
-        addToast(t('app.ringing_users', { count: recipients.length }), 'info');
+        addToast((t as any)('app.ringing_users', { count: recipients.length }), 'info');
       });
 
       s.on('caller_ready', ({ channelId }: { channelId: string }) => {
@@ -425,6 +441,24 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       )}
 
       <AnimatePresence>
+        {serverStatus && (
+          <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-md pointer-events-auto">
+             <div className={`backdrop-blur-2xl border p-6 rounded-[32px] shadow-2xl flex items-start space-x-4 ${serverStatus === 'rate_limit' ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                <div className={`p-3 rounded-2xl ${serverStatus === 'rate_limit' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'}`}>
+                   <Zap size={24} className={serverStatus === 'no_response' ? 'animate-pulse' : ''} />
+                </div>
+                <div className="flex-1">
+                   <h4 className={`text-sm font-black uppercase tracking-tighter ${serverStatus === 'rate_limit' ? 'text-yellow-400' : 'text-red-400'}`}>
+                      {serverStatus === 'overload' ? t('server.overload') : serverStatus === 'rate_limit' ? t('server.rate_limit') : t('server.cold_start')}
+                   </h4>
+                   <p className="text-[10px] text-gray-400 font-medium leading-relaxed mt-1 uppercase">
+                      {serverStatus === 'overload' ? t('server.overload_desc') : serverStatus === 'rate_limit' ? t('server.rate_limit_desc') : t('server.cold_start_desc')}
+                   </p>
+                </div>
+                <button onClick={() => setServerStatus(null)} className="p-2 text-gray-500 hover:text-white transition-all"><X size={18} /></button>
+             </div>
+          </motion.div>
+        )}
         {showConnPill && (
           <motion.div initial={{ y: -100, x: '-50%', opacity: 0 }} animate={{ y: 20, x: '-50%', opacity: 1 }} exit={{ y: -100, x: '-50%', opacity: 0 }} className="fixed top-0 left-1/2 z-[6000] w-fit pointer-events-none">
              <div className={`backdrop-blur-2xl border px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 ${isOnline ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>{isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}<span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? t('ui.back_online') : t('ui.connection_lost')}</span></div>
@@ -517,7 +551,7 @@ onStartVideo={() => handleStartCall('video')}
       {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast(t('settings.group_initialized'), 'success'); } catch(e){ addToast(t('settings.group_failed'), 'error'); } }} currentUser={user!} />}
       {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast(t('settings.calibration_saved'), 'success'); } catch(e){ addToast(t('settings.save_failed'), 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
-      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast(t('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
+      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast((t as any)('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
     </div>
   );
 }

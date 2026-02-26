@@ -361,7 +361,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
             )}
             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2"><span className="text-[10px] font-black text-white uppercase tracking-widest">{currentUser.username} ({t('common.you')})</span></div>
          </div>
-         {peers.map((p, i) => <RemoteNode key={p.peerID || i} peer={p.peer} user={p.user} status={p.status} isFocus={layoutMode === 'focus' && i === 0 && !(isVideoOn || isScreenSharing)} />)}
+         {peers.map((p, i) => <RemoteNode key={p.peerID || i} peer={p.peer} user={p.user} status={p.status} t={t} isFocus={layoutMode === 'focus' && i === 0 && !(isVideoOn || isScreenSharing)} />)}
       </div>
 
       <div className="mt-6 flex justify-center z-20 pb-4">
@@ -443,7 +443,7 @@ const ControlBtn = ({ icon, onClick, variant }: any) => {
   return (<button onClick={onClick} className={`w-14 h-14 rounded-[24px] flex items-center justify-center transition-all hover:scale-110 active:scale-90 ${bg}`}>{icon}</button>);
 };
 
-const RemoteNode = ({ peer, isFocus, user, status }: any) => {
+const RemoteNode = ({ peer, isFocus, user, status, t }: any) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [micIntensity, setMicIntensity] = useState(0);

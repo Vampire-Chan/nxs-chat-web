@@ -67,7 +67,7 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-12 relative bg-discord-dark/20">
            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{t('modals.protocol', { tab: activeTab })}</h3>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{(t as any)('modals.protocol', { tab: activeTab })}</h3>
               <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
            </div>
 

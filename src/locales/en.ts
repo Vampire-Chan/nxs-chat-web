@@ -21,6 +21,12 @@ export const en = {
   "common.continue": "Continue",
   "common.abort": "Abort",
   "common.loading": "Loading Node...",
+  "server.overload": "Architect Core Overloaded",
+  "server.overload_desc": "The Matrix is experiencing high magnitude activity. Attempting to stabilize... please wait or try again.",
+  "server.cold_start": "Awakening Core...",
+  "server.cold_start_desc": "The Architect Core is coming online. Neural links will establish shortly.",
+  "server.rate_limit": "Pulse Too High",
+  "server.rate_limit_desc": "Your transmission frequency is too rapid. Stabilize your pulse and try again.",
 
   // Navigation
   "nav.protocols": "Protocols",

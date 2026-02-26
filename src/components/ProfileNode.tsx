@@ -34,7 +34,6 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
     );
   }
 
-  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || 'deleted'}`;
   const currentUserId = currentUser?.id || currentUser?._id;
   
   const isFollowing = user.followers?.some((f: any) => (f._id || f) === currentUserId);

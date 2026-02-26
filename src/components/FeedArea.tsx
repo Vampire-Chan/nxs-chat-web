@@ -246,7 +246,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                                    <img src={getIdentityAvatar(user)} className="w-full h-full object-cover" />
                                 </div>
                              </div>
-                             <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{user.displayName || user.username}</span>
+                             <span className="text-[10px] font-black text-white uppercase truncate w-full mb-1">{getIdentityName(user)}</span>
                              <span className="text-[8px] text-gray-600 font-mono truncate w-full mb-3">@{user.username}</span>
                              <button 
                                onClick={(e) => { e.stopPropagation(); handleSyncActionFromUser(user); }}

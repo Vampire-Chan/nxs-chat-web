@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { IPost, IUser } from '../services/api';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { getIdentityName } from '../services/identity';
+import { getIdentityName, getIdentityAvatar } from '../services/identity';
+import { useLanguage } from '../context/LanguageContext';
 
 interface PulseEvent {
   id: string;
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClosePost, onRefresh, onSelectTag, onViewProfile }: Props) => {
+  const { t } = useLanguage();
   const [comment, setComment] = useState('');
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -112,11 +114,11 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
             <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm bg-white/[0.01]">
                <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-800">
-                     <img src={selectedPost.author.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedPost.author.username}`} className="w-full h-full object-cover" />
+                     <img src={getIdentityAvatar(selectedPost.author)} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex flex-col">
                      <span className="font-black text-white uppercase tracking-tighter text-[10px]">{getIdentityName(selectedPost.author)}</span>
-                     <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Active_Transmission</span>
+                     <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('feed.active_transmission')}</span>
                   </div>
                </div>
                <button onClick={onClosePost} className="p-2 hover:bg-white/5 rounded-xl transition-all text-gray-500 hover:text-white">
@@ -129,7 +131,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                {/* Description & Tags */}
                <div className="space-y-4">
                   <p className="text-sm text-gray-300 leading-relaxed font-medium">
-                     {renderCaption(selectedPost.caption) || "No description provided."}
+                     {renderCaption(selectedPost.caption) || t('feed.no_description')}
                   </p>
                   
                   {/* Mock Tags - If real tags exist in your model, use selectedPost.tags */}
@@ -147,7 +149,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                {/* Comments Section */}
                <div className="space-y-6 pt-6 border-t border-gray-900">
                   <div className="flex items-center justify-between">
-                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Neural_Feedback</span>
+                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('feed.neural_feedback')}</span>
                      <span className="text-[9px] font-mono text-vani-blue">{selectedPost.comments?.length || 0} Nodes</span>
                   </div>
                   <div className="space-y-5">
@@ -162,7 +164,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                                 onClick={() => !isAuthorPrivate && onViewProfile?.(c.user?._id || c.user?.id)}
                                 className={`w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5 cursor-pointer ${isAuthorPrivate ? 'filter blur-[4px] grayscale' : ''}`}
                               >
-                                 <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username}`} className="w-full h-full object-cover" />
+                                 <img src={getIdentityAvatar(c.user)} className="w-full h-full object-cover" />
                               </div>
                               {isAuthorPrivate && (
                                 <div className="absolute -top-1 -right-1 bg-black text-[6px] font-black text-vani-accent px-1 rounded border border-vani-accent/30 tracking-tighter">GHOST</div>
@@ -191,7 +193,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                                 onClick={() => setReplyingTo({ id: c._id, username: c.user?.username || 'Unknown', userId: c.user?._id || c.user?.id })}
                                 className="text-[8px] font-black text-vani-blue uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all hover:text-white"
                               >
-                                Reply
+                                {t('chat.reply_transmission')}
                               </button>
                            </div>
                         </div>
@@ -200,7 +202,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                      {selectedPost.comments?.length === 0 && (
                        <div className="py-10 text-center flex flex-col items-center opacity-20">
                           <MessageSquare size={24} className="mb-2" />
-                          <span className="text-[8px] font-black uppercase tracking-widest">Awaiting neural input...</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest">{t('feed.awaiting_input')}</span>
                        </div>
                      )}
                   </div>
@@ -218,21 +220,21 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                      <button className="text-gray-500 hover:text-white transition-all"><Send size={20} /></button>
                   </div>
                   <div className="text-right">
-                     <div className="text-xs font-black text-white uppercase tracking-tighter">{likeCount} Links</div>
+                     <div className="text-xs font-black text-white uppercase tracking-tighter">{likeCount} {t('feed.links_detected')}</div>
                   </div>
                </div>
 
                <div className="space-y-2">
                   {replyingTo && (
                     <div className="flex items-center justify-between px-3 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10">
-                       <span className="text-[8px] font-mono text-vani-blue uppercase">Replying to @{replyingTo.username}</span>
+                       <span className="text-[8px] font-mono text-vani-blue uppercase">{t('chat.replying_to')} @{replyingTo.username}</span>
                        <button onClick={() => setReplyingTo(null)}><X size={10} className="text-gray-500 hover:text-white" /></button>
                     </div>
                   )}
                   <div className="relative">
                      <input 
                        type="text" 
-                       placeholder={replyingTo ? "Broadcast reply..." : "Broadcast comment..."}
+                       placeholder={replyingTo ? t('feed.reply_placeholder') : t('feed.feedback_placeholder')}
                        className="w-full bg-black/40 border border-gray-800 focus:border-vani-blue p-3.5 rounded-2xl text-xs text-gray-300 outline-none transition-all pr-12"
                        value={comment}
                        onChange={(e) => setComment(e.target.value)}
@@ -293,15 +295,15 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
               {events.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full opacity-20">
                   <Radio size={24} className="mb-2" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Scanning Pulse...</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest">{t('feed.pulse_scanning')}</span>
                 </div>
               )}
             </div>
 
             <div className="p-4 border-t border-gray-900 bg-black/20">
                <div className="bg-vani-blue/10 border border-vani-blue/20 p-4 rounded-2xl text-center">
-                  <div className="text-[9px] font-black text-vani-blue uppercase tracking-[0.2em] mb-1">Select Transmission</div>
-                  <div className="text-[8px] text-gray-500 font-mono uppercase">To view metadata & feedback</div>
+                  <div className="text-[9px] font-black text-vani-blue uppercase tracking-[0.2em] mb-1">{t('feed.select_transmission')}</div>
+                  <div className="text-[8px] text-gray-500 font-mono uppercase">{t('feed.select_desc')}</div>
                </div>
             </div>
           </motion.div>

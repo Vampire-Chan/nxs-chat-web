@@ -1,5 +1,7 @@
 import { Hash, TrendingUp, Users, ArrowUpRight, Radio } from 'lucide-react';
 import type { IPost, IUser } from '../services/api';
+import { useLanguage } from '../context/LanguageContext';
+import { getIdentityAvatar, getIdentityName } from '../services/identity';
 
 interface Props {
   trendingTags: string[];
@@ -12,13 +14,15 @@ interface Props {
 }
 
 export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers, onSelectTag, onSelectUser, liveStreamers = [], onSelectStream }: Props) => {
+  const { t } = useLanguage();
+  
   return (
     <div className="hidden lg:flex flex-col bg-discord-channel h-full border-r border-gray-900 w-72">
       {/* Header - Consistent with DMSidebar */}
       <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm">
          <div className="flex flex-col">
             <span className="font-black text-white uppercase tracking-widest text-[10px]">Vani Matrix</span>
-            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Global_Discovery_Active</span>
+            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('feed.pulse_active')}</span>
          </div>
          <div className="p-2.5 bg-white/5 rounded-xl border border-white/5 text-vani-blue">
             <TrendingUp size={16} />
@@ -29,7 +33,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
         {/* LIVE TRANSMISSIONS */}
         <div className="space-y-1">
            <div className="px-2 mb-2 flex items-center justify-between">
-              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live_Transmissions</span>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{t('feed.live_transmissions')}</span>
               <div className="flex items-center space-x-1.5 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20 animate-pulse">
                  <div className="w-1 h-1 bg-red-500 rounded-full" />
                  <span className="text-[7px] font-black text-red-500 uppercase">Live</span>
@@ -44,7 +48,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                 >
                   <div className="relative mr-3 flex-shrink-0">
                      <div className="w-10 h-10 rounded-xl overflow-hidden border border-vani-blue/20 p-0.5 ring-2 ring-vani-blue/10">
-                        <img src={streamer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}`} className="w-full h-full object-cover" />
+                        <img src={getIdentityAvatar(streamer)} className="w-full h-full object-cover" />
                      </div>
                      <div className="absolute -bottom-1 -right-1 bg-red-500 p-1 rounded-lg border-2 border-discord-channel shadow-lg">
                         <Radio size={8} className="text-white" />
@@ -52,17 +56,17 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                   </div>
                   <div className="flex-1 min-w-0">
                      <div className="font-black text-xs truncate uppercase tracking-tighter text-white">
-                        {streamer.username}
+                        {getIdentityName(streamer)}
                      </div>
                      <div className="text-[8px] text-vani-blue truncate font-mono uppercase tracking-widest">
-                        Broadcasting_Now
+                        {t('feed.broadcasting_now')}
                      </div>
                   </div>
                 </div>
               ))}
               {liveStreamers.length === 0 && (
                 <div className="px-4 py-6 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/5 mx-2">
-                   <div className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Zero Active Streams</div>
+                   <div className="text-[8px] font-black text-gray-600 uppercase tracking-widest">{t('feed.zero_active')}</div>
                 </div>
               )}
            </div>
@@ -71,7 +75,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
         {/* Trending Tags Section */}
         <div className="space-y-1 px-2">
            <div className="flex items-center space-x-1 mb-2">
-              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Trending_Tags</span>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{t('feed.trending_tags')}</span>
            </div>
            <div className="flex flex-wrap gap-1.5">
               {trendingTags.map((tag) => (
@@ -90,7 +94,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
         {/* High Pulse Posts Section (Visual) */}
         <div className="space-y-1">
            <div className="px-2 mb-2">
-              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">High_Pulse_Data</span>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{t('feed.high_pulse')}</span>
            </div>
            <div className="space-y-0.5">
               {popularPosts.map(post => (
@@ -119,7 +123,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
         {/* Suggested Identities Section (List format like DMs) */}
         <div className="space-y-1">
            <div className="px-2 mb-2 flex items-center justify-between">
-              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sync_Suggestions</span>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{t('feed.sync_suggestions')}</span>
               <Users size={12} className="text-gray-600" />
            </div>
            <div className="space-y-0.5">
@@ -132,13 +136,13 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                   <div className="relative mr-3 flex-shrink-0">
                      <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-700 bg-gray-800 p-[1px]">
                         <div className="w-full h-full rounded-[7px] overflow-hidden bg-discord-dark">
-                           <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+                           <img src={getIdentityAvatar(user)} className="w-full h-full object-cover" />
                         </div>
                      </div>
                   </div>
                   <div className="flex-1 min-w-0">
                      <div className="font-black text-[11px] truncate uppercase tracking-tighter group-hover:text-white">
-                        {user.displayName || user.username}
+                        {getIdentityName(user)}
                      </div>
                      <div className="text-[8px] text-gray-600 truncate font-mono tracking-tight">
                         @{user.username}
@@ -149,7 +153,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
               ))}
               {suggestedUsers.length === 0 && (
                 <div className="px-4 py-8 text-center">
-                   <div className="text-[8px] font-black text-gray-700 uppercase tracking-[0.3em]">No Identities Found</div>
+                   <div className="text-[8px] font-black text-gray-700 uppercase tracking-[0.3em]">{t('feed.no_identities')}</div>
                 </div>
               )}
            </div>

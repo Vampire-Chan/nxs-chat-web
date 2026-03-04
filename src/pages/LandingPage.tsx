@@ -130,7 +130,7 @@ export default function LandingPage() {
                   <div className="w-40 md:w-60 bg-discord-channel border-r border-white/5 p-6 space-y-4">
                      <div className="h-4 bg-white/10 rounded-full w-3/4 animate-pulse" />
                      <div className="space-y-2 pt-4">
-                        {[...Array(6)].map((_, i) => <div key={i} className="h-2 bg-white/5 rounded-full" style={{ width: Math.random()*50 + 40 + '%' }} />)}
+                        {[...Array(6)].map((_, i) => <div key={i} className="h-2 bg-white/5 rounded-full" style={{ width: (40 + (i * 13) % 45) + '%' }} />)}
                      </div>
                   </div>
                   <div className="flex-1 p-10 relative">

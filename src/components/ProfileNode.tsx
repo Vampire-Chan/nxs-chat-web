@@ -26,6 +26,37 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
   const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
 
+  const currentUserId = currentUser?.id || currentUser?._id;
+  
+  const isFollowing = user?.followers?.some((f: any) => (f._id || f) === currentUserId);
+  const isFriend = user?.friends?.some((f: any) => (f._id || f) === currentUserId);
+  const isRequestSent = user?.inboundRequests?.some((id: any) => (id._id || id) === currentUserId);
+  const isRequestReceived = currentUser?.inboundRequests?.some((id: any) => (id._id || id) === (user?.id || user?._id));
+
+  const gridLimit = user?.tier === 'elite' ? 64 : 8;
+
+  const fetchPosts = async () => {
+    if (!user?.id && !user?._id) return;
+    try {
+      const data = await api.getUserPosts(user.id || user._id);
+      setPosts(data);
+    } catch (err: any) { 
+      if (err.response?.status !== 401) {
+        console.error(err); 
+      }
+    }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { 
+    if (!user || (!user.id && !user._id)) {
+      setLoading(false);
+      return;
+    }
+    if (!user.isLocked || isOwnProfile || isFriend) fetchPosts(); 
+    else setLoading(false); 
+  }, [user, isOwnProfile, isFriend]);
+
   if (!user || (!user.id && !user._id)) {
     return (
       <div className="flex-1 bg-discord-dark flex flex-col items-center justify-center p-10 text-center">
@@ -36,40 +67,7 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
     );
   }
 
-  const currentUserId = currentUser?.id || currentUser?._id;
-  
-  const isFollowing = user.followers?.some((f: any) => (f._id || f) === currentUserId);
-  const isFriend = user.friends?.some((f: any) => (f._id || f) === currentUserId);
-  const isRequestSent = user.inboundRequests?.some((id: any) => (id._id || id) === currentUserId);
-  const isRequestReceived = currentUser?.inboundRequests?.some((id: any) => (id._id || id) === (user.id || user._id));
-
-  const gridLimit = user.tier === 'elite' ? 64 : 8;
   const displayedPosts = posts.slice(0, gridLimit);
-
-  const handleShare = () => {
-    const url = `${window.location.origin}/id/${user.username}`;
-    navigator.clipboard.writeText(url);
-    addToast(t('profile.link_copied'), 'success');
-  };
-
-  const handleAccept = async () => {
-    try { await api.acceptSync(user.id || user._id); onFollow?.(user.id || user._id); addToast('Link established.', 'success'); } catch (e) { addToast(t('app.sync_error'), 'error'); }
-  };
-
-  const fetchPosts = async () => {
-    try {
-      const data = await api.getUserPosts(user.id || user._id);
-      setPosts(data);
-    } catch (err: any) { 
-      // 401 is handled by global interceptor
-      if (err.response?.status !== 401) {
-        console.error(err); 
-      }
-    }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { if (!user.isLocked || isOwnProfile || isFriend) fetchPosts(); else setLoading(false); }, [user]);
 
   const renderActionButton = () => {
     if (isOwnProfile) return <button onClick={onEdit} className="bg-white/5 hover:bg-white/10 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all backdrop-blur-md">{t('profile.modify_node')}</button>;

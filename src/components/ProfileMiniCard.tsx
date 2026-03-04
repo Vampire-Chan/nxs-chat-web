@@ -58,7 +58,7 @@ export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM
                    <span className="text-[10px] font-black text-vani-blue/60 ml-1">{getIdentityAge(user)}Y</span>
                  )}
               </div>
-              <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">Node_Established: {new Date(user.createdAt || Date.now()).getFullYear()}</p>
+              <p className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">Node_Established: {new Date(user.createdAt || '2024-01-01').getFullYear()}</p>
               {user.displayName && (
                 <p className="text-[8px] text-gray-600 font-mono uppercase tracking-tighter">@{user.username}</p>
               )}

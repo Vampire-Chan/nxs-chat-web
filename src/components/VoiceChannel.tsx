@@ -248,13 +248,18 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' }
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      // Free TURN relay — required for peers behind symmetric NAT / firewalls
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
     ],
     iceCandidatePoolSize: 10,
   };
 
   function createPeer(u: string, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: true, stream: s, config: rtcConfig, trickle: true });
+    const clonedStream = s.clone();
+    const p = new Peer({ initiator: true, stream: clonedStream, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('sending_signal', { 
       userToSignal: u, callerID: c, signal,
       user: { 
@@ -279,7 +284,8 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   }
 
   function addPeer(i: any, c: string, s: MediaStream) {
-    const p = new Peer({ initiator: false, stream: s, config: rtcConfig, trickle: true });
+    const clonedStream = s.clone();
+    const p = new Peer({ initiator: false, stream: clonedStream, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('returning_signal', { signal, callerID: c }));
     
     p.on('connect', () => {
@@ -301,7 +307,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   };
 
   const toggleVideo = async () => {
-    if (isScreenSharing) { addToast("Stop screen share first", 'error'); return; }
+    if (isScreenSharing) { addToast(t('voice.stop_screenshare_first'), 'error'); return; }
     if (isVideoOn) {
       userStream.current?.getVideoTracks().forEach(t => { t.stop(); userStream.current?.removeTrack(t); });
       setIsVideoOn(false);
@@ -312,8 +318,8 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         userStream.current?.addTrack(videoTrack);
         setIsVideoOn(true);
         if (userVideoRef.current) userVideoRef.current.srcObject = userStream.current;
-        peersRef.current.forEach(({ peer }) => peer.addTrack(videoTrack, userStream.current));
-      } catch { addToast("Camera Access Denied", 'error'); }
+        peersRef.current.forEach(({ peer }) => { if (userStream.current) peer.addTrack(videoTrack, userStream.current); });
+      } catch { addToast(t('voice.camera_denied'), 'error'); }
     }
   };
 
@@ -326,8 +332,8 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         if (userVideoRef.current) userVideoRef.current.srcObject = stream;
         const screenTrack = stream.getVideoTracks()[0];
         screenTrack.onended = () => { setIsScreenSharing(false); };
-        peersRef.current.forEach(({ peer }) => peer.addTrack(screenTrack, userStream.current));
-      } catch { addToast("Screen Share Cancelled", 'info'); }
+        peersRef.current.forEach(({ peer }) => { if (userStream.current) peer.addTrack(screenTrack, userStream.current); });
+      } catch { addToast(t('voice.screenshare_cancelled'), 'info'); }
     }
   };
 
@@ -498,15 +504,22 @@ const RemoteNode = ({ peer, isFocus, user, status, t }: any) => {
       remoteStream.onremovetrack = checkTracks;
 
       // INTENSITY
+      let rafId: number;
+      let intensityCtx: AudioContext | null = null;
       try {
         const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
-        const ctx = new AudioCtx();
-        const source = ctx.createMediaStreamSource(remoteStream);
-        const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+        intensityCtx = new AudioCtx();
+        const source = intensityCtx.createMediaStreamSource(remoteStream);
+        const analyser = intensityCtx.createAnalyser(); analyser.fftSize = 256;
         source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
-        const check = () => { if (remoteStream.active) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); requestAnimationFrame(check); } };
+        const check = () => { if (remoteStream.active) { analyser.getByteFrequencyData(data); const volume = data.reduce((a, b) => a + b, 0) / data.length; setMicIntensity(Math.min(volume * 2, 100)); rafId = requestAnimationFrame(check); } };
         check();
       } catch (e) {}
+
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        intensityCtx?.close().catch(() => {});
+      };
     }
   }, [remoteStream]);
 

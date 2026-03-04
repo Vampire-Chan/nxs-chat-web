@@ -6,6 +6,7 @@ import { getIdentityName, getIdentityAge, getIdentityAvatar } from '../services/
 import { User as UserIcon, Heart, MessageCircle, Lock, Share2, Check, Clock, Shield, Star } from 'lucide-react';
 import { PostViewerModal } from './PostViewerModal';
 import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 
 interface Props {
   user: IUser;
@@ -20,6 +21,7 @@ interface Props {
 
 export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocials, currentUser, onSelectTag, onViewProfile }: Props) => {
   const { t } = useLanguage();
+  const { addToast } = useToast();
   const [posts, setPosts] = useState<IPost[]>([]);
   const [, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<IPost | null>(null);
@@ -47,11 +49,11 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
   const handleShare = () => {
     const url = `${window.location.origin}/id/${user.username}`;
     navigator.clipboard.writeText(url);
-    alert(t('profile.link_copied'));
+    addToast(t('profile.link_copied'), 'success');
   };
 
   const handleAccept = async () => {
-    try { await api.acceptSync(user.id || user._id); window.location.reload(); } catch (e) { alert(t('app.sync_error')); }
+    try { await api.acceptSync(user.id || user._id); onFollow?.(user.id || user._id); addToast('Link established.', 'success'); } catch (e) { addToast(t('app.sync_error'), 'error'); }
   };
 
   const fetchPosts = async () => {

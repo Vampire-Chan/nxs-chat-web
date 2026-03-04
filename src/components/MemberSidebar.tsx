@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { IUser } from '../services/api';
 import { api } from '../services/api';
 
@@ -14,10 +14,10 @@ export const MemberSidebar = ({ members, onMemberClick, currentUser }: Props) =>
   const [localMembers, setLocalMembers] = useState(members);
   const [activeMiniCard, setActiveMiniCard] = useState<{ user: IUser, position: { x: number, y: number } } | null>(null);
 
-  // Sync with props
-  if (members.length !== localMembers.length) {
+  // Sync with props (via effect, not during render)
+  useEffect(() => {
     setLocalMembers(members);
-  }
+  }, [members]);
 
   const handleMemberClick = (e: React.MouseEvent, member: IUser) => {
     e.preventDefault();

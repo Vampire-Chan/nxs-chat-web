@@ -90,8 +90,8 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
       const nextStatus = !isDisabled;
       await api.toggleDisableAccount(nextStatus);
       setIsDisabled(nextStatus);
-      alert(nextStatus ? t('settings.node_hidden') : t('settings.node_active'));
-    } catch (e) { alert(t('app.sync_error')); }
+      addToast(nextStatus ? t('settings.node_hidden') : t('settings.node_active'), 'success');
+    } catch (e) { addToast(t('app.sync_error'), 'error'); }
   };
 
   const upiId = import.meta.env.VITE_UPI_ID || 'sarthakgautam2782002@okicici';

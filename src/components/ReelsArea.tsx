@@ -37,6 +37,9 @@ export const ReelsArea = ({ posts, onOpenCreateModal, currentUser }: Props) => {
 const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) => {
   const [isLiked, setIsLiked] = useState(post.likes?.includes(currentUser.id || currentUser._id));
   const [likesCount, setLikesCount] = useState(post.likes?.length || 0);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState(post.comments || []);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -60,6 +63,26 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
       const res = await api.likePost(post._id); 
       setIsLiked(res.likes.includes(currentUser.id || currentUser._id));
       setLikesCount(res.likes.length);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      const res = await api.addComment(post._id, commentText.trim());
+      setComments(prev => [...prev, res]);
+      setCommentText('');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/post/${post._id}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+  };
+
+  const handleSync = async () => {
+    try {
+      await api.syncIdentity(post.author._id || (post.author as any).id);
     } catch (e) { console.error(e); }
   };
 
@@ -96,13 +119,17 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
          </div>
 
          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-all">
+            <div 
+              onClick={() => setShowComments(!showComments)}
+              className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-all">
                <MessageCircle size={24} className="text-white" />
             </div>
-            <span className="text-[10px] font-black text-white mt-2 drop-shadow-md">{post.comments?.length || 0}</span>
+            <span className="text-[10px] font-black text-white mt-2 drop-shadow-md">{comments.length}</span>
          </div>
 
-         <div className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-all">
+         <div 
+           onClick={handleShare}
+           className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-all">
             <Send size={24} className="text-white" />
          </div>
       </div>
@@ -120,7 +147,7 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
                </h4>
                <p className="text-[9px] text-vani-blue font-mono uppercase tracking-widest opacity-70">Stream_Active</p>
             </div>
-            <button className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black px-4 py-1.5 rounded-lg border border-white/10 transition-all ml-2 uppercase tracking-widest">Sync</button>
+            <button onClick={handleSync} className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black px-4 py-1.5 rounded-lg border border-white/10 transition-all ml-2 uppercase tracking-widest">Sync</button>
          </div>
 
          <p className="text-sm text-gray-200 line-clamp-2 font-medium mb-4 pr-12">{post.caption}</p>
@@ -134,6 +161,39 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
             </div>
          </div>
       </div>
+
+      {/* Comments Panel */}
+      {showComments && (
+        <div className="absolute bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl z-30 max-h-[50%] flex flex-col border-t border-white/10 rounded-t-2xl">
+          <div className="flex items-center justify-between p-4 border-b border-white/5">
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">Neural Feedback ({comments.length})</span>
+            <button onClick={() => setShowComments(false)} className="text-white/50 hover:text-white text-xs">Close</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {comments.map((c: any, i: number) => (
+              <div key={i} className="flex items-start space-x-2">
+                <div className="w-6 h-6 rounded-full bg-gray-700 overflow-hidden flex-shrink-0">
+                  <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username || 'anon'}`} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black text-vani-blue">{c.user?.username || 'Unknown'}</span>
+                  <p className="text-xs text-gray-300">{c.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center p-3 border-t border-white/5 gap-2">
+            <input
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleComment()}
+              placeholder="Add feedback..."
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-vani-blue"
+            />
+            <button onClick={handleComment} className="text-vani-blue font-black text-[10px] uppercase">Send</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

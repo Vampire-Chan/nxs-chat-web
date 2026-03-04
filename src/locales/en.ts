@@ -544,5 +544,15 @@ export const en = {
   "auth.username_placeholder": "username",
   "auth.name_placeholder": "Public Name",
   "auth.bio_placeholder": "Add a bio...",
-  "auth.feedback_placeholder": "Describe the violation..."
+  "auth.feedback_placeholder": "Describe the violation...",
+
+  // Call Modal
+  "call.establishing": "Establishing Connection...",
+  "call.incoming": "Incoming Transmission...",
+  "call.active": "Neural Link Secured",
+
+  // Voice Channel
+  "voice.stop_screenshare_first": "Stop screen share first",
+  "voice.camera_denied": "Camera Access Denied",
+  "voice.screenshare_cancelled": "Screen Share Cancelled"
 };

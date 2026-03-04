@@ -278,6 +278,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     });
     s.on('incoming_call', (data: any) => { setIncomingCall(data); setTimeout(() => setIncomingCall((prev: any) => (prev?.timestamp === data.timestamp ? null : prev)), 60000); sendLocalNotification((t as any)('app.incoming_call', { type: data.type }), (t as any)('app.establishing_link', { username: data.sender.username })); });
     s.on('call_rejected', ({ channelId }: any) => { setLiveSignal({ sender: { username: 'SYSTEM' }, content: t('app.identity_link_rejected'), type: 'error' }); setTimeout(() => setLiveSignal(null), 5000); setActiveChannel((prev: any) => prev?._id === channelId ? { ...prev, type: 'dm' } : prev); });
+    s.on('call_dismissed', () => { setIncomingCall(null); });
+    s.on('call_status_update', ({ status, to }: any) => { if (status === 'ringing') { addToast((t as any)('app.ringing_users', { count: 1 }), 'info'); } else if (status === 'offline') { addToast((t as any)('app.user_offline') || 'User is offline', 'error'); } else if (status === 'denied') { addToast((t as any)('app.call_denied') || 'Call denied', 'error'); } });
     s.on('identity_sync_update', async () => { try { const u = await api.getUserProfile(user?.id || user?._id || ''); updateUserState(localStorage.getItem('token') || '', u); loadDMs(); loadRealms(); setMatrixRefreshKey(k => k + 1); } catch (e) {} });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
@@ -371,10 +373,13 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         addToast((t as any)('app.ringing_users', { count: recipients.length }), 'info');
       });
 
-      s.on('caller_ready', ({ channelId }: { channelId: string }) => {
+      s.on('caller_ready', ({ channelId, type }: { channelId: string, type?: string }) => {
         const channel = findChannel(channelId);
         if (channel) {
-          setActiveChannel({ ...channel, type: 'voice' });
+          setActiveChannel({ ...channel, type: 'voice', initialVideo: type === 'video' } as any);
+        } else if (channelId.startsWith('direct:')) {
+          // Direct call: no channel in DM list, create a virtual voice channel
+          setActiveChannel({ _id: channelId, name: 'Direct Link', type: 'voice', initialVideo: type === 'video' } as any);
         }
       });
 
@@ -393,6 +398,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       const otherUser = activeChannel.members?.find(m => (m._id || m.id) !== (user?.id || user?._id));
       if (otherUser) {
         socketRef.current?.emit('request_direct_call', { to: otherUser._id || otherUser.id, type });
+        // Immediately transition caller to voice view so they see ringing state
+        setActiveChannel({ _id: `direct:${user!.id || user!._id}`, name: `@${otherUser.username}`, type: 'voice', initialVideo: type === 'video' } as any);
         return;
       }
     }
@@ -584,7 +591,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             <motion.div initial={isMobile ? { x: '-100%' } : { width: 0 }} animate={isMobile ? { x: 0 } : { width: sidebarWidth }} exit={isMobile ? { x: '-100%' } : { width: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`flex-shrink-0 flex relative z-40 bg-discord-channel ${isMobile ? 'absolute inset-0 w-[85%] shadow-2xl' : 'border-r border-gray-900'}`}>
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isMobile && <div className="h-16 flex items-center justify-between px-4 bg-discord-sidebar border-b border-white/5"><span className="text-[10px] font-black uppercase text-white tracking-widest">{t('common.navigator')}</span><button onClick={() => setIsSidebarOpen(false)}><X size={18} /></button></div>}
-                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRetry={loadDMs} isSyncing={isSyncing} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} oversightMode={oversightMode} setOversightMode={setOversightMode} />}
+                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRetry={loadDMs} isSyncing={isSyncing} onRefresh={loadDMs} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} oversightMode={oversightMode} setOversightMode={setOversightMode} />}
               </div>
               {!isMobile && <div onMouseDown={startResizing} className="absolute top-0 -right-0.5 w-1 h-full cursor-col-resize z-40 hover:bg-vani-blue/30 transition-colors" />}
             </motion.div>
@@ -595,7 +602,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           <motion.div className="flex-1 flex flex-col overflow-hidden" onPanEnd={handleDragEnd}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId} initial={kineticTransitions ? { opacity: 0, x: 20, filter: 'blur(10px)' } : { opacity: 1 }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={kineticTransitions ? { opacity: 0, x: -20, filter: 'blur(10px)' } : { opacity: 1 }} transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }} className="flex-1 flex flex-col overflow-hidden">
-                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" oversightMode={oversightMode} setOversightMode={setOversightMode} /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? (
+                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRefresh={loadDMs} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" oversightMode={oversightMode} setOversightMode={setOversightMode} /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? (
                   <OtherProfileView 
                     key="other" 
                     userId={viewingUserId} 
@@ -609,7 +616,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                     onEdit={() => setShowIdentitySettings(true)}
                     onCall={(type) => handleGlobalCall(viewingUserId, type)}
                   />
-                ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => {}} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
+                ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
                     key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} onStartCall={() => handleStartCall('voice')} 
 onStartVideo={() => handleStartCall('video')}

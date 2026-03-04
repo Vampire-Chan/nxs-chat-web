@@ -457,7 +457,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                     <ContextItem label={t('chat.sever_transmission')} icon={<Trash2 size={14} />} variant="danger" onClick={() => handleSeverMessage(msgContextMenu.msgId)} />
                   </>
                 )}
-                <ContextItem label={t('chat.forward_link')} icon={<Forward size={14} />} onClick={() => addToast("Forward Stub", 'info')} />
+                <ContextItem label={t('chat.forward_link')} icon={<Forward size={14} />} onClick={() => { const m = messages.find(msg => msg._id === msgContextMenu.msgId); if (m?.content) { navigator.clipboard.writeText(m.content); addToast('Copied to clipboard', 'success'); } setMsgContextMenu(null); }} />
                 <ContextItem label={t('chat.report_violation')} icon={<AlertTriangle size={14} />} variant="danger" onClick={() => { setReportingMsgId(msgContextMenu.msgId); setShowReportModal(true); setMsgContextMenu(null); }} />
              </div>
           </motion.div>

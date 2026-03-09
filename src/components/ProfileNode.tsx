@@ -35,6 +35,23 @@ export const ProfileNode = ({ user, isOwnProfile, onEdit, onFollow, onViewSocial
 
   const gridLimit = user?.tier === 'elite' ? 64 : 8;
 
+  const handleAccept = async () => {
+    try {
+      await api.acceptSync(user.id || user._id);
+      addToast(t('profile.sync_established'), 'success');
+      // Ideally we should refresh the user data here or trigger a parent refresh
+      if (onFollow) onFollow(user.id || user._id); 
+    } catch (err) {
+      addToast(t('errors.generic'), 'error');
+    }
+  };
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/app/profile/${user.username}`;
+    navigator.clipboard.writeText(url);
+    addToast(t('profile.link_copied'), 'success');
+  };
+
   const fetchPosts = async () => {
     if (!user?.id && !user?._id) return;
     try {

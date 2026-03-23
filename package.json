@@ -48,5 +48,9 @@
     "typescript-eslint": "^8.57.1",
     "vite": "^8.0.2",
     "vite-plugin-node-polyfills": "^0.25.0"
+  },
+  "overrides": {
+    "eslint": "$eslint",
+    "vite": "$vite"
   }
 }

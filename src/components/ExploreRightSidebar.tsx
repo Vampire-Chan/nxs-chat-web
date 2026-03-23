@@ -67,7 +67,6 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
         const tag = part.substring(1).replace(/[^\w]/g, '');
         return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
       }
-      // Manual @mentions in comments are plain text as per Protocol
       return part;
     });
   };
@@ -100,7 +99,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
   };
 
   return (
-    <div className="hidden xl:flex flex-col bg-discord-channel h-full border-l border-gray-900 w-80 lg:w-96 transition-all duration-500">
+    <div className="hidden xl:flex flex-col bg-discord-channel h-full border-l border-gray-900 w-80 lg:w-96 shrink-0 overflow-hidden relative">
       <AnimatePresence mode="wait">
         {selectedPost ? (
           <motion.div 
@@ -128,16 +127,14 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-               {/* Description & Tags */}
                <div className="space-y-4">
                   <p className="text-sm text-gray-300 leading-relaxed font-medium">
                      {renderCaption(selectedPost.caption) || t('feed.no_description')}
                   </p>
                   
-                  {/* Mock Tags - If real tags exist in your model, use selectedPost.tags */}
                   <div className="flex flex-wrap gap-2">
-                     {(selectedPost.tags || ['identity', 'vani', 'matrix']).map((tag: string) => (
-                       <span key={tag} onClick={() => onSelectTag?.(tag)} className="text-[9px] font-black text-vani-blue uppercase tracking-widest px-2 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10 cursor-pointer hover:bg-vani-blue/10">#{tag}</span>
+                     {(selectedPost.tags && selectedPost.tags.length > 0 ? selectedPost.tags : ['identity', 'vani', 'matrix']).map((tag: string) => (
+                       <span key={tag} onClick={() => onSelectTag?.(tag)} className="text-[9px] font-black text-vani-blue uppercase tracking-widest px-2 py-1 bg-vani-blue/5 rounded-lg border border-vani-blue/10 cursor-pointer hover:bg-vani-blue/10 transition-all">#{tag}</span>
                      ))}
                   </div>
 
@@ -159,7 +156,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                        
                        return (
                         <div key={i} className={`flex space-x-3 group ${c.parentCommentId ? 'ml-8' : ''}`}>
-                           <div className="relative">
+                           <div className="relative shrink-0">
                               <div 
                                 onClick={() => !isAuthorPrivate && onViewProfile?.(c.user?._id || c.user?.id)}
                                 className={`w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5 cursor-pointer ${isAuthorPrivate ? 'filter blur-[4px] grayscale' : ''}`}
@@ -167,7 +164,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                                  <img src={getIdentityAvatar(c.user)} className="w-full h-full object-cover" />
                               </div>
                               {isAuthorPrivate && (
-                                <div className="absolute -top-1 -right-1 bg-black text-[6px] font-black text-vani-accent px-1 rounded border border-vani-accent/30 tracking-tighter">GHOST</div>
+                                <div className="absolute -top-1 -right-1 bg-black text-[6px] font-black text-vani-accent px-1 rounded border border-vani-accent/30 tracking-tighter shadow-lg">GHOST</div>
                               )}
                            </div>
                            <div className="flex-1 min-w-0">
@@ -188,7 +185,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                                    </div>
                                  )}
                               </div>
-                              <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{renderComment(c.text)}</div>
+                              <div className="text-[11px] text-gray-400 mt-0.5 leading-snug break-words">{renderComment(c.text)}</div>
                               <button 
                                 onClick={() => setReplyingTo({ id: c._id, username: c.user?.username || 'Unknown', userId: c.user?._id || c.user?.id })}
                                 className="text-[8px] font-black text-vani-blue uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all hover:text-white"
@@ -255,7 +252,6 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
             exit={{ opacity: 0 }}
             className="flex flex-col h-full"
           >
-            {/* Original Pulse View as Fallback */}
             <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm bg-white/[0.01]">
                <div className="flex flex-col">
                   <span className="font-black text-white uppercase tracking-widest text-[10px]">Global Pulse</span>

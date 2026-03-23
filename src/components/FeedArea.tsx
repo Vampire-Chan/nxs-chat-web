@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import type { IPost, IUser, IRealm } from '../services/api';
-import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users, Hash, X, Send, WifiOff, RefreshCcw, Radio, Activity } from 'lucide-react';
+import { Image as ImageIcon, Heart, MessageCircle, MoreHorizontal, Plus, Users, Hash, X, Send, WifiOff, RefreshCcw, Radio, Activity, Menu, Bell } from 'lucide-react';
 import { ExploreLeftSidebar } from './ExploreLeftSidebar';
 import { ExploreRightSidebar } from './ExploreRightSidebar';
 import { getIdentityName, getIdentityAvatar } from '../services/identity';
@@ -39,12 +39,16 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
   const [suggestedUsers, setSuggestedUsers] = useState<IUser[]>([]);
   const [pulseEvents, setPulseEvents] = useState<any[]>([]);
 
+  // Mobile Sidebars
+  const [showLeftDrawer, setShowLeftDrawer] = useState(false);
+  const [showRightDrawer, setShowRightDrawer] = useState(false);
+
   if (initialPosts.length !== posts.length && !activeTag) setPosts(initialPosts);
 
   const isGlobal = channelId === 'global' || !channelId;
   const canPost = true;
 
-  const useMobileUI = window.innerWidth < 1024;
+  const useMobileUI = typeof window !== 'undefined' && window.innerWidth < 1024;
   const creationPref = currentUser.creationUI || 'auto';
   
   const showBar = (creationPref === 'bar') || (creationPref === 'auto' && !useMobileUI);
@@ -52,6 +56,8 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
 
   const handleTagSelect = async (tag: string | null) => {
     setActiveTag(tag);
+    setShowLeftDrawer(false);
+    setShowRightDrawer(false);
     if (tag) {
       const ps = await api.getGlobalPosts(tag);
       setPosts(ps);
@@ -96,12 +102,20 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
       }).catch(() => setTrendingTags(['Yantravani', 'matrix', 'cyberpunk', 'web3', 'identity', 'privacy']));
 
       setPopularPosts(initialPosts.slice(0, 5));
-      const mockEvents = [
-        { id: '1', type: 'like', user: 'System_Admin', timestamp: new Date() },
-        { id: '2', type: 'sync', user: 'Ghost_Node', timestamp: new Date() },
-        { id: '3', type: 'broadcast', user: 'Reality_Coder', timestamp: new Date() },
-      ];
-      setPulseEvents(mockEvents);
+      
+      api.getNotifications().then(notifs => {
+        const events = notifs.slice(0, 5).map((n: any) => ({
+          id: n._id,
+          type: n.type,
+          user: n.sender?.username || 'ANON_NODE',
+          timestamp: new Date(n.createdAt)
+        }));
+        setPulseEvents(events);
+      }).catch(() => {
+        setPulseEvents([
+          { id: '1', type: 'system', user: 'Architect', timestamp: new Date() }
+        ]);
+      });
     }
   }, [isGlobal, initialPosts]);
 
@@ -132,8 +146,9 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden h-full bg-[#050507]">
-      {isGlobal && (
+    <div className="flex-1 flex overflow-hidden h-full bg-[#050507] relative">
+      {/* DESKTOP SIDEBARS */}
+      {isGlobal && !useMobileUI && (
         <ExploreLeftSidebar 
           trendingTags={trendingTags} 
           popularPosts={popularPosts} 
@@ -145,7 +160,75 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
         />
       )}
 
-      <div className="flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar p-4 md:p-6 lg:px-12">
+      {/* MOBILE HEADER FOR SIDEBARS */}
+      {useMobileUI && isGlobal && (
+        <div className="absolute top-0 left-0 right-0 h-14 bg-black/40 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-4 z-[200]">
+           <button onClick={() => setShowLeftDrawer(true)} className="p-2 text-vani-blue bg-vani-blue/5 rounded-xl border border-vani-blue/10"><Menu size={18} /></button>
+           <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Vani_Matrix</span>
+           <button onClick={() => setShowRightDrawer(true)} className="p-2 text-vani-accent bg-vani-accent/5 rounded-xl border border-vani-accent/10"><Activity size={18} /></button>
+        </div>
+      )}
+
+      {/* MOBILE DRAWER: LEFT */}
+      <AnimatePresence>
+        {showLeftDrawer && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowLeftDrawer(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1000] lg:hidden" />
+            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="fixed top-0 left-0 bottom-0 w-[85%] bg-discord-channel z-[1001] lg:hidden overflow-hidden flex flex-col shadow-2xl">
+               <div className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-discord-sidebar/50 shrink-0">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{t('ui.global_matrix')}</span>
+                  <button onClick={() => setShowLeftDrawer(false)} className="p-2 bg-white/5 rounded-xl text-gray-400"><X size={18} /></button>
+               </div>
+               <div className="flex-1 overflow-y-auto">
+                 <div className="flex flex-col lg:hidden h-full">
+                    {/* Reuse ExploreLeftSidebar inside the drawer but make it visible */}
+                    <div className="flex flex-col h-full">
+                      <ExploreLeftSidebar 
+                        trendingTags={trendingTags} 
+                        popularPosts={popularPosts} 
+                        suggestedUsers={suggestedUsers}
+                        onSelectTag={handleTagSelect}
+                        onSelectUser={(u) => { onViewProfile?.(u); setShowLeftDrawer(false); }}
+                        liveStreamers={liveStreamers}
+                        onSelectStream={(u) => { setActiveStream(u); setShowLeftDrawer(false); }}
+                      />
+                    </div>
+                 </div>
+               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* MOBILE DRAWER: RIGHT */}
+      <AnimatePresence>
+        {showRightDrawer && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowRightDrawer(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1000] lg:hidden" />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="fixed top-0 right-0 bottom-0 w-[85%] bg-discord-channel z-[1001] lg:hidden overflow-hidden flex flex-col shadow-2xl">
+               <div className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-discord-sidebar/50 shrink-0">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{t('feed.pulse')}</span>
+                  <button onClick={() => setShowRightDrawer(false)} className="p-2 bg-white/5 rounded-xl text-gray-400"><X size={18} /></button>
+               </div>
+               <div className="flex-1 overflow-y-auto">
+                 <div className="flex flex-col h-full lg:hidden">
+                    <ExploreRightSidebar 
+                      events={pulseEvents} 
+                      selectedPost={selectedPost} 
+                      currentUser={currentUser}
+                      onClosePost={() => setSelectedPost(null)}
+                      onRefresh={triggerRefresh}
+                      onSelectTag={handleTagSelect}
+                      onViewProfile={(u) => { onViewProfile?.(u); setShowRightDrawer(false); }}
+                    />
+                 </div>
+               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <div className={`flex-1 flex flex-col bg-discord-dark min-w-0 h-full overflow-y-auto custom-scrollbar ${useMobileUI && isGlobal ? 'pt-14 pb-24' : 'p-4 md:p-6 lg:px-12'}`}>
         {activeStream ? (
           <div className="flex-1 flex flex-col h-full space-y-6">
              <div className="flex items-center justify-between bg-white/[0.02] p-6 rounded-[32px] border border-white/5">
@@ -165,15 +248,15 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
              </div>
 
              <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0">
-                <div className="lg:col-span-3 bg-[#0a0a0c] rounded-[48px] border-2 border-white/5 overflow-hidden relative shadow-2xl group">
+                <div className="lg:col-span-3 bg-[#0a0a0c] rounded-[32px] md:rounded-[48px] border-2 border-white/5 overflow-hidden relative shadow-2xl group">
                    <div className="absolute inset-0 bg-vani-gradient opacity-10 animate-pulse" />
                    <div className="absolute inset-0 flex items-center justify-center">
                       <Activity size={100} className="text-white/10" />
                    </div>
-                   <div className="absolute bottom-10 left-10 flex items-center space-x-4">
-                      <img src={getIdentityAvatar(activeStream)} className="w-16 h-16 rounded-[24px] border-4 border-[#0a0a0c] shadow-2xl" />
-                      <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                         <span className="text-xs font-black text-white uppercase tracking-widest">{activeStream.displayName || activeStream.username}</span>
+                   <div className="absolute bottom-6 left-6 md:bottom-10 md:left-10 flex items-center space-x-4">
+                      <img src={getIdentityAvatar(activeStream)} className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[24px] border-4 border-[#0a0a0c] shadow-2xl" />
+                      <div className="bg-black/60 backdrop-blur-md p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/10">
+                         <span className="text-[10px] md:text-xs font-black text-white uppercase tracking-widest">{activeStream.displayName || activeStream.username}</span>
                       </div>
                    </div>
                 </div>
@@ -200,7 +283,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
         ) : (
           <>
             {syncError ? (
-              <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+              <div className="flex-1 flex flex-col items-center justify-center space-y-6 p-10">
                  <div className="w-20 h-20 bg-red-500/10 rounded-[32px] flex items-center justify-center border border-red-500/20">
                     <WifiOff className="text-red-500" size={32} />
                  </div>
@@ -272,7 +355,7 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
                    )}
                 </div>
 
-                <div className="max-w-2xl mx-auto w-full space-y-12 md:space-y-16 pb-40 lg:pb-20">
+                <div className="max-w-2xl mx-auto w-full space-y-8 md:space-y-16 pb-40 lg:pb-20 px-2 sm:px-0">
                   {posts.map((post) => (
                     <PostCard 
                       key={post._id} 
@@ -310,13 +393,13 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
       {canPost && showButton && (
         <button 
           onClick={onOpenCreateModal}
-          className="fixed bottom-28 right-6 w-16 h-16 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-[0_10px_40px_rgba(255,60,60,0.4)] z-[3000] active:scale-90 transition-transform lg:hidden"
+          className="fixed bottom-24 right-6 w-16 h-16 bg-vani-gradient rounded-2xl flex items-center justify-center text-white shadow-[0_10px_40px_rgba(255,60,60,0.4)] z-[3000] active:scale-90 transition-transform lg:hidden"
         >
           <Plus size={32} strokeWidth={3} />
         </button>
       )}
 
-      {isGlobal && (
+      {isGlobal && !useMobileUI && (
         <ExploreRightSidebar 
           events={pulseEvents} 
           selectedPost={selectedPost} 

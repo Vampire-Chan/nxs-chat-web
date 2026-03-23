@@ -15,13 +15,27 @@ interface Props {
 }
 
 export const ProfileMiniCard = ({ user, isMe, isFollowing, onViewFull, onStartDM, onFollow, onClose, position }: Props) => {
+  // Calculate constrained position
+  const cardWidth = 288; // w-72 = 18rem = 288px
+  const cardHeight = 350; // approximate height
+  
+  let x = position.x;
+  let y = position.y;
+
+  if (typeof window !== 'undefined') {
+    if (x + cardWidth > window.innerWidth) x = window.innerWidth - cardWidth - 10;
+    if (y + cardHeight > window.innerHeight) y = window.innerHeight - cardHeight - 10;
+    if (x < 10) x = 10;
+    if (y < 10) y = 10;
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-[150]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        style={{ top: position.y, left: position.x }}
+        style={{ top: y, left: x }}
         className="fixed z-[151] w-72 bg-[#0a0a0c] border border-gray-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden"
       >
         {/* Banner */}

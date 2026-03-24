@@ -168,7 +168,7 @@ export const api = {
   severMessageAdmin: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/messages/${id}`); return res.data; },
   getAllRealmsAdmin: async () => { const res = await axios.get(`${API_URL}/admin/realms`); return res.data; },
   purgeRealmAdmin: async (id: string) => { const res = await axios.delete(`${API_URL}/admin/realms/${id}`); return res.data; },
-  grantAuthority: async (id: string, data: { badges?: any[], isAdmin?: boolean }) => { const res = await axios.post(`${API_URL}/admin/identities/${id}/authority`, data); return res.data; },
+  grantAuthority: async (id: string, data: { badges?: any[], isAdmin?: boolean, username?: string }) => { const res = await axios.post(`${API_URL}/admin/identities/${id}/authority`, data); return res.data; },
   getPendingTransactions: async () => { const res = await axios.get<ITransaction[]>(`${API_URL}/admin/finance/pending`); return res.data; },
   approveTransaction: async (id: string) => { const res = await axios.post(`${API_URL}/admin/finance/approve/${id}`); return res.data; },
   rejectTransaction: async (id: string) => { const res = await axios.post(`${API_URL}/admin/finance/reject/${id}`); return res.data; },

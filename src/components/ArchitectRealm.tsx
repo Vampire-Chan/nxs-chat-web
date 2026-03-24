@@ -292,8 +292,16 @@ export const ArchitectRealm = ({ embeddedMode = false, initialTab: propTab, over
            <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#0a0a0c] w-full max-w-md rounded-[48px] border border-white/5 p-10">
                  <h2 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3"><Fingerprint size={28} className="text-vani-blue" /> Node_Authority</h2>
-                 <div className="space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5"><span className="text-xs font-black text-white uppercase">Architect Clearance</span><input type="checkbox" checked={selectedIdentity.isAdmin} onChange={(e) => setSelectedIdentity({...selectedIdentity, isAdmin: e.target.checked})} className="w-5 h-5 accent-vani-blue" /></div>
+                 <div className="space-y-6">                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Identity Designation (Username)</label>
+                        <input
+                          type="text"
+                          value={selectedIdentity.username}
+                          onChange={(e) => setSelectedIdentity({...selectedIdentity, username: e.target.value})}
+                          className="w-full bg-white/5 border border-white/5 text-white p-4 rounded-2xl outline-none focus:border-vani-blue transition-all"
+                          placeholder="Node Designation"
+                        />
+                      </div>                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5"><span className="text-xs font-black text-white uppercase">Architect Clearance</span><input type="checkbox" checked={selectedIdentity.isAdmin} onChange={(e) => setSelectedIdentity({...selectedIdentity, isAdmin: e.target.checked})} className="w-5 h-5 accent-vani-blue" /></div>
                     <div className="space-y-3">
                        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Identity Badges</label>
                        <div className="grid grid-cols-2 gap-2">
@@ -306,7 +314,16 @@ export const ArchitectRealm = ({ embeddedMode = false, initialTab: propTab, over
                           ))}
                        </div>
                     </div>
-                    <div className="flex gap-3 pt-6"><button onClick={async () => { await api.grantAuthority(selectedIdentity._id, { badges: selectedIdentity.badges || [], isAdmin: selectedIdentity.isAdmin || false }); setSelectedIdentity(null); loadAll(); }} className="flex-1 bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl">Confirm Sync</button><button onClick={() => setSelectedIdentity(null)} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Cancel</button></div>
+                      <div className="flex gap-3 pt-6"><button onClick={async () => {
+                        try {
+                          await api.grantAuthority(selectedIdentity._id, { badges: selectedIdentity.badges || [], isAdmin: selectedIdentity.isAdmin || false, username: selectedIdentity.username });
+                          addToast("Node parameters synchronized", 'success');
+                          setSelectedIdentity(null);
+                          loadAll();
+                        } catch (e: any) {
+                          addToast(e.response?.data?.message || "Failed to sync node parameters", 'error');
+                        }
+                      }} className="flex-1 bg-vani-gradient text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl">Confirm Sync</button><button onClick={() => setSelectedIdentity(null)} className="px-6 py-4 bg-white/5 text-gray-500 rounded-2xl font-black uppercase text-[10px]">Cancel</button></div>
                  </div>
               </motion.div>
            </div>

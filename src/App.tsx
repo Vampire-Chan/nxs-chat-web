@@ -281,6 +281,18 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     s.on('call_dismissed', () => { setIncomingCall(null); });
     s.on('call_status_update', ({ status }: any) => { if (status === 'ringing') { addToast((t as any)('app.ringing_users', { count: 1 }), 'info'); } else if (status === 'offline') { addToast((t as any)('app.user_offline') || 'User is offline', 'error'); } else if (status === 'denied') { addToast((t as any)('app.call_denied') || 'Call denied', 'error'); } });
     s.on('identity_sync_update', async () => { try { const u = await api.getUserProfile(user?.id || user?._id || ''); updateUserState(localStorage.getItem('token') || '', u); loadDMs(); loadRealms(); setMatrixRefreshKey(k => k + 1); } catch (e) {} });
+    s.on('identity_updated', (updatedUser: any) => {
+      setMessages(prev => prev.map(m => {
+        const sid = m.sender?._id || m.sender?.id || m.sender;
+        return sid === updatedUser.userId && typeof m.sender === 'object' ? { ...m, sender: { ...m.sender, ...updatedUser, _id: updatedUser.userId } } : m;
+      }));
+      setPosts(prev => prev.map(p => {
+        const aid = p.author?._id || p.author?.id || p.author;
+        return aid === updatedUser.userId && typeof p.author === 'object' ? { ...p, author: { ...p.author, ...updatedUser, _id: updatedUser.userId } } : p;
+      }));
+      setDms(prev => prev.map(d => ({ ...d, members: d.members?.map(member => (member._id || member.id) === updatedUser.userId ? { ...member, ...updatedUser, _id: updatedUser.userId } : member) })));
+      loadRealms();
+    });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
     s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });

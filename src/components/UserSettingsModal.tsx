@@ -58,11 +58,25 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
 
+   useEffect(() => {
+      setDisplayName(user.displayName || '');
+      setBio(user.bio || '');
+      setGender(user.gender || 'none');
+      setAvatarPreview(getIdentityAvatar(user));
+      setBannerPreview(user.banner || '');
+      setIsPrivate(user.isPrivate || false);
+      setShowAge(user.showAge || false);
+      setShowGender(user.showGender || false);
+      setIsDisabled(user.isDisabled || false);
+      setCreationUI(user.creationUI || 'auto');
+      setBackupKeys(user.recoveryKeys || []);
+   }, [user]);
+
   useEffect(() => {
     const fetchTxs = async () => {
       try {
         const res = await api.getTransactions();
-        setTransactions(res.data);
+        setTransactions(Array.isArray(res) ? res : (res.data || []));
       } catch (e) { console.error("Failed to fetch ledger", e); }
     };
     if (activeTab === 'archive') fetchTxs();
@@ -71,18 +85,46 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const handleSave = async (customKeys?: any[]) => {
     setLoading(true);
     const fd = new FormData();
-    fd.append('displayName', displayName);
-    fd.append('bio', bio);
-    fd.append('gender', gender);
-    fd.append('isPrivate', String(isPrivate));
-    fd.append('showAge', String(showAge));
-    fd.append('showGender', String(showGender));
-    fd.append('creationUI', creationUI);
-    if (customKeys) fd.append('recoveryKeys', JSON.stringify(customKeys));
-    if (avatarBlob) fd.append('avatar', avatarBlob, 'avatar.jpg');
-    if (bannerBlob) fd.append('banner', bannerBlob, 'banner.jpg');
-    await onSave(fd);
-    setLoading(false);
+
+      const normalizedDisplayName = displayName.trim();
+      const initialDisplayName = (user.displayName || '').trim();
+      if (normalizedDisplayName !== initialDisplayName) {
+         fd.append('displayName', normalizedDisplayName);
+      }
+
+      if (bio !== (user.bio || '')) {
+         fd.append('bio', bio);
+      }
+
+      if (gender !== (user.gender || 'none')) {
+         fd.append('gender', gender);
+      }
+
+      if (isPrivate !== !!user.isPrivate) {
+         fd.append('isPrivate', String(isPrivate));
+      }
+
+      if (showAge !== !!user.showAge) {
+         fd.append('showAge', String(showAge));
+      }
+
+      if (showGender !== !!user.showGender) {
+         fd.append('showGender', String(showGender));
+      }
+
+      if (creationUI !== (user.creationUI || 'auto')) {
+         fd.append('creationUI', creationUI);
+      }
+
+      if (customKeys) fd.append('recoveryKeys', JSON.stringify(customKeys));
+      if (avatarBlob) fd.append('avatar', avatarBlob, 'avatar.jpg');
+      if (bannerBlob) fd.append('banner', bannerBlob, 'banner.jpg');
+
+      try {
+         await onSave(fd);
+      } finally {
+         setLoading(false);
+      }
   };
 
   const handleToggleDisable = async () => {
@@ -339,7 +381,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                         </div>
                         
                         <div className="space-y-3 md:space-y-4">
-                           {transactions.length > 0 ? (
+                             {transactions?.length > 0 ? (
                              transactions.map((tx, i) => (
                                <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-[28px] hover:bg-white/[0.04] transition-all gap-4 sm:gap-0">
                                   <div className="flex items-center gap-3 md:gap-4">
@@ -349,9 +391,9 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                                      <div>
                                         <div className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-widest">{tx.method} OVERRIDE</div>
                                         <div className="text-[8px] md:text-[9px] text-gray-500 font-bold uppercase tracking-tight flex items-center gap-2">
-                                           {tx.transactionId.substring(0, 10)}...
-                                           <span className="w-1 h-1 rounded-full bg-gray-800" />
-                                           {new Date(tx.createdAt).toLocaleDateString()}
+                                             {tx.transactionId ? tx.transactionId.substring(0, 10) : 'N/A'}...
+                                             <span className="w-1 h-1 rounded-full bg-gray-800" />
+                                             {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'N/A'}
                                         </div>
                                      </div>
                                   </div>

@@ -297,19 +297,20 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
         components={{
           p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
           a: ({ href, children }) => {
-            const isInternal = href?.startsWith('/') || href?.startsWith(window.location.origin);
-            if (isInternal && href) {
+            const safeHref = href?.startsWith('javascript:') || href?.startsWith('data:') ? '#' : href;
+            const isInternal = safeHref?.startsWith('/') || safeHref?.startsWith(window.location.origin);
+            if (isInternal && safeHref && safeHref !== '#') {
               return (
-                <a 
-                  href={href} 
-                  onClick={(e) => { e.preventDefault(); navigate(href.replace(window.location.origin, '')); }} 
+                <a
+                  href={safeHref}
+                  onClick={(e) => { e.preventDefault(); navigate(safeHref.replace(window.location.origin, '')); }}
                   className="text-vani-blue hover:underline font-bold transition-all cursor-pointer"
                 >
                   {children}
                 </a>
               );
             }
-            return <a href={href} target="_blank" rel="noopener noreferrer" className="text-vani-blue hover:underline font-bold transition-all">{children}</a>;
+            return <a href={safeHref} target="_blank" rel="noopener noreferrer" className="text-vani-blue hover:underline font-bold transition-all">{children}</a>;
           },
           strong: ({ children }) => <strong className="font-black text-white">{children}</strong>,
           em: ({ children }) => <em className="italic opacity-90">{children}</em>,

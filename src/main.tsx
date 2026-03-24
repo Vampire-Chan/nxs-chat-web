@@ -20,6 +20,18 @@ import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { BrowserRouter } from 'react-router-dom'
 
+// Self-XSS Warning Pattern
+if (typeof window !== 'undefined') {
+  console.log(
+    '%cSTOP!',
+    'color: red; font-family: sans-serif; font-size: 4em; font-weight: bolder; text-shadow: #000 1px 1px;'
+  );
+  console.log(
+    '%cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable a feature or "hack" someone\'s account, it is a scam and will give them access to your account (Session Hijacking).',
+    'font-family: sans-serif; font-size: 1.5em;'
+  );
+}
+
 console.log('🚀 Yantravani CLIENT BOOTSTRAPPING...');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

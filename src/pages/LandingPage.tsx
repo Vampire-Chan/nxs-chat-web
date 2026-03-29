@@ -2,12 +2,15 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Shield, Globe, Users, ArrowRight, MessageSquare, Sparkles, Server, Settings, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, VISIBLE_LANGUAGE_OPTIONS } from '../context/LanguageContext';
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const primaryLanguageIds = ['en', 'hi', 'ne'];
+  const primaryLanguages = VISIBLE_LANGUAGE_OPTIONS.filter(l => primaryLanguageIds.includes(l.id));
+  const secondaryLanguages = VISIBLE_LANGUAGE_OPTIONS.filter(l => !primaryLanguageIds.includes(l.id));
 
   return (
     <div className="h-screen bg-[#0a0a0c] text-white font-sans selection:bg-vani-blue selection:text-black overflow-y-auto custom-scrollbar">
@@ -31,38 +34,25 @@ export default function LandingPage() {
           <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors uppercase tracking-widest">{t('nav.legal')}</button>
           
           <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/5 relative group/lang">
-            {['en', 'hi', 'ne'].map(l => (
+            {primaryLanguages.map(l => (
               <button 
-                key={l} 
-                onClick={() => setLanguage(l as any)} 
-                className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase ${language === l ? 'bg-vani-blue text-black shadow-[0_0_10px_rgba(0,210,255,0.3)]' : 'hover:text-white'}`}
+                key={l.id} 
+                onClick={() => setLanguage(l.id as any)} 
+                className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase ${language === l.id ? 'bg-vani-blue text-black shadow-[0_0_10px_rgba(0,210,255,0.3)]' : 'hover:text-white'}`}
               >
-                {l}
+                {l.id}
               </button>
             ))}
             
             {/* DROPDOWN FOR OTHER LANGUAGES */}
             <div className="relative group">
-               <button className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase flex items-center gap-1 ${!['en', 'hi', 'ne'].includes(language) ? 'bg-vani-blue text-black' : 'hover:text-white'}`}>
-                  {['en', 'hi', 'ne'].includes(language) ? <Globe size={12} /> : language}
+              <button className={`px-3 py-1.5 rounded-md transition-all font-black text-[9px] uppercase flex items-center gap-1 ${!primaryLanguageIds.includes(language) ? 'bg-vani-blue text-black' : 'hover:text-white'}`}>
+                {primaryLanguageIds.includes(language) ? <Globe size={12} /> : language}
                   <ChevronDown size={10} />
                </button>
                
                <div className="absolute top-full right-0 mt-2 w-32 bg-[#0a0a0c] border border-white/10 rounded-xl shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all z-[100] overflow-hidden">
-                  {[
-                    { id: 'en-simple', label: 'Simple EN' },
-                    { id: 'mr', label: 'Marathi' },
-                    { id: 'pa', label: 'Punjabi' },
-                    { id: 'bho', label: 'Bhojpuri' },
-                    { id: 'te', label: 'Telugu' },
-                    { id: 'kn', label: 'Kannada' },
-                    { id: 'ur', label: 'Urdu' },
-                    { id: 'phd', label: 'Pahadi' },
-                    { id: 'ks', label: 'Kashmiri' },
-                    { id: 'doi', label: 'Dogri' },
-                    { id: 'ghw', label: 'Garhwali' },
-                    { id: 'kum', label: 'Kumaoni' }
-                  ].map(l => (
+                {secondaryLanguages.map(l => (
                     <button 
                       key={l.id} 
                       onClick={() => setLanguage(l.id as any)} 

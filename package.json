@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n:check": "node scripts/check-locales.mjs",
+    "i18n:check:strict": "node scripts/check-locales.mjs --strict"
   },
   "dependencies": {
     "axios": "^1.13.6",

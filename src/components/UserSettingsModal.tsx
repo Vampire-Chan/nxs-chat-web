@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Globe, Heart, Send, Hash, RefreshCcw, LockKeyhole, ExternalLink, CreditCard } from 'lucide-react';
 import { api } from '../services/api';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, VISIBLE_LANGUAGE_OPTIONS } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { getIdentityAvatar } from '../services/identity';
 import type { IUser } from '../services/api';
@@ -363,7 +363,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                      <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
                         <div><div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Globe size={20} className="text-green-400" /> {t('settings.language')}</div><p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.language_desc')}</p></div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-                           {[{ id: 'en', label: 'English' }, { id: 'en-simple', label: 'Simple' }, { id: 'hi', label: 'हिन्दी' }, { id: 'ne', label: 'नेपाली' }, { id: 'mr', label: 'मराठी' }, { id: 'pa', label: 'ਪੰਜਾਬੀ' }, { id: 'bho', label: 'भोजपुरी' }, { id: 'te', label: 'తెలుగు' }, { id: 'kn', label: 'ಕನ್ನಡ' }, { id: 'ur', label: 'اردو' }, { id: 'phd', label: 'Pahadi' }, { id: 'ks', label: 'Kashmiri' }, { id: 'doi', label: 'Dogri' }, { id: 'ghw', label: 'Garhwali' }, { id: 'kum', label: 'Kumaoni' }].map(l => (
+                           {VISIBLE_LANGUAGE_OPTIONS.map(l => (
                              <button key={l.id} onClick={() => setLanguage(l.id as any)} className={`py-3 md:py-4 rounded-xl md:rounded-2xl border font-black uppercase text-[9px] md:text-[10px] transition-all ${language === l.id ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>{l.label}</button>
                            ))}
                         </div>
@@ -487,7 +487,9 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
                                 <button onClick={async () => {
                                    if(confirm(t('settings.mfa_confirm'))) {
                                       try {
-                                         const res = await api.resetTOTP();
+                                         const token = window.prompt('Enter your current 6-digit authenticator code to continue:')?.trim() || '';
+                                         if (!token) return;
+                                         const res = await api.resetTOTP(token);
                                          setNewTOTP(res);
                                          addToast(t('settings.identity_synced'), 'success');
                                       } catch (e) { addToast(t('app.sync_failed'), 'error'); }

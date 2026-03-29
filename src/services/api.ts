@@ -181,7 +181,7 @@ export const api = {
   getSuggestedUsers: async () => { const res = await axios.get<IUser[]>(`${API_URL}/users/public/list`); return res.data; },
   getUserByHandle: async (handle: string) => { const res = await axios.get<{ id: string }>(`${API_URL}/users/handle/${handle}`); return res.data; },
   updateProfile: async (formData: FormData) => { const res = await axios.put<IUser>(`${API_URL}/users/me`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); return res.data; },
-  resetTOTP: async () => { const res = await axios.post<{ secret: string, qrCode: string }>(`${API_URL}/users/me/security/totp/reset`); return res.data; },
+  resetTOTP: async (token: string) => { const res = await axios.post<{ secret: string, qrCode: string }>(`${API_URL}/users/me/security/totp/reset`, { token }); return res.data; },
   generateRecoveryKeys: async () => { const res = await axios.post<{ keys: { code: string, isUsed: boolean }[] }>(`${API_URL}/users/me/security/keys`); return res.data; },
   syncIdentity: async (id: string) => { const res = await axios.post(`${API_URL}/users/vani/sync/${id}`); return res.data; },
   unfollowUser: async (id: string) => { const res = await axios.post(`${API_URL}/users/vani/unsync/${id}`); return res.data; },
@@ -191,7 +191,18 @@ export const api = {
   markNotificationsReadByChannel: async (channelId: string) => { const res = await axios.put(`${API_URL}/users/me/notifications/read/channel/${channelId}`); return res.data; },
   markNotificationsReadByPost: async (postId: string) => { const res = await axios.put(`${API_URL}/users/me/notifications/read/post/${postId}`); return res.data; },
   markNotificationReadById: async (id: string) => { const res = await axios.put(`${API_URL}/users/me/notifications/read/id/${id}`); return res.data; },
-  exportData: async () => { window.location.href = `${API_URL}/users/me/archive/export?token=${localStorage.getItem('token')}`; },
+  exportData: async () => {
+    const res = await axios.get(`${API_URL}/users/me/archive/export`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'vani-archive.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
   terminateIdentity: async () => { const res = await axios.delete(`${API_URL}/users/me/terminate`); return res.data; },
   toggleDisableAccount: async (status: boolean) => { const res = await axios.post(`${API_URL}/users/me/disable`, { status }); return res.data; },
   getMyDMs: async () => { const res = await axios.get<IChannel[]>(`${API_URL}/dms`); return res.data; },
@@ -230,7 +241,10 @@ export const api = {
   deletePost: async (postId: string) => { const res = await axios.delete(`${API_URL}/posts/${postId}`); return res.data; },
   addComment: async (postId: string, text: string, parentCommentId?: string) => { const res = await axios.post<any>(`${API_URL}/posts/${postId}/comment`, { text, parentCommentId }); return res.data; },
   uploadMedia: async (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => { 
-    const res = await axios.post<IMessage>(`${API_URL}/media/upload`, formData, { 
+    const rawChannelId = formData.get('channelId');
+    const channelId = rawChannelId ? encodeURIComponent(String(rawChannelId)) : '';
+    const uploadUrl = `${API_URL}/media/upload${channelId ? `?channelId=${channelId}` : ''}`;
+    const res = await axios.post<IMessage>(uploadUrl, formData, { 
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress 
     }); 

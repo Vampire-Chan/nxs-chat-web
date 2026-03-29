@@ -14,6 +14,18 @@ import { phd } from '../locales/phd';
 
 type Language = 'en' | 'en-simple' | 'hi' | 'ne' | 'mr' | 'pa' | 'bho' | 'te' | 'kn' | 'ur' | 'phd' | 'ks' | 'doi' | 'ghw' | 'kum';
 
+export const VISIBLE_LANGUAGE_OPTIONS: Array<{ id: Language; label: string }> = [
+  { id: 'en', label: 'English' },
+  { id: 'en-simple', label: 'Simple' },
+  { id: 'hi', label: 'हिन्दी' },
+  { id: 'ne', label: 'नेपाली' },
+  { id: 'mr', label: 'मराठी' },
+  { id: 'pa', label: 'ਪੰਜਾਬੀ' },
+  { id: 'bho', label: 'भोजपुरी' },
+  { id: 'te', label: 'తెలుగు' },
+  { id: 'ur', label: 'اردو' }
+];
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -46,6 +58,9 @@ const translations: Record<string, Record<string, string>> = {
   kum
 };
 
+const disabledLanguages = new Set<Language>(['kn', 'phd', 'ks', 'doi', 'ghw', 'kum']);
+const normalizeLanguage = (lang: Language): Language => (disabledLanguages.has(lang) ? 'en' : lang);
+
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguage] = useState<Language>('en');
 
@@ -53,8 +68,9 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     const initLanguage = async () => {
       const saved = localStorage.getItem('Yantravani_lang') as Language;
       if (saved && translations[saved]) {
-        setLanguage(saved);
-        if (saved === 'ur') document.documentElement.dir = 'rtl';
+        const normalized = normalizeLanguage(saved);
+        setLanguage(normalized);
+        if (normalized === 'ur') document.documentElement.dir = 'rtl';
         return;
       }
 
@@ -64,27 +80,27 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         const data = await res.json();
         
         if (data.country === 'NP') {
-          setLanguage('ne');
+          setLanguage(normalizeLanguage('ne'));
         } else if (data.country === 'IN') {
           const region = data.region;
           const city = data.city;
           
-          if (region === 'Jammu and Kashmir' || region === 'Ladakh') setLanguage('ur');
-          else if (region === 'Punjab' || region === 'Chandigarh') setLanguage('pa');
-          else if (region === 'Himachal Pradesh') setLanguage('phd');
+          if (region === 'Jammu and Kashmir' || region === 'Ladakh') setLanguage(normalizeLanguage('ur'));
+          else if (region === 'Punjab' || region === 'Chandigarh') setLanguage(normalizeLanguage('pa'));
+          else if (region === 'Himachal Pradesh') setLanguage(normalizeLanguage('phd'));
           else if (region === 'Uttarakhand') {
              const kumaonDistricts = ['Nainital', 'Almora', 'Pithoragarh', 'Champawat', 'Bageshwar', 'Udham Singh Nagar'];
-             if (city === 'Pithoragarh' || city === 'Champawat') setLanguage('ne');
-             else if (kumaonDistricts.includes(city)) setLanguage('kum');
-             else setLanguage('ghw');
-          } else if (region === 'Maharashtra') setLanguage('mr');
-          else if (region === 'Telangana' || region === 'Andhra Pradesh') setLanguage('te');
-          else if (region === 'Karnataka') setLanguage('kn');
+             if (city === 'Pithoragarh' || city === 'Champawat') setLanguage(normalizeLanguage('ne'));
+             else if (kumaonDistricts.includes(city)) setLanguage(normalizeLanguage('kum'));
+             else setLanguage(normalizeLanguage('ghw'));
+          } else if (region === 'Maharashtra') setLanguage(normalizeLanguage('mr'));
+          else if (region === 'Telangana' || region === 'Andhra Pradesh') setLanguage(normalizeLanguage('te'));
+          else if (region === 'Karnataka') setLanguage(normalizeLanguage('kn'));
           else if (region === 'Bihar' || region === 'Uttar Pradesh') {
              const bhojpuriCities = ['Varanasi', 'Patna', 'Gorakhpur', 'Gaya', 'Deoria', 'Ballia'];
-             if (bhojpuriCities.includes(city)) setLanguage('bho');
-             else setLanguage('hi');
-          } else setLanguage('en');
+             if (bhojpuriCities.includes(city)) setLanguage(normalizeLanguage('bho'));
+             else setLanguage(normalizeLanguage('hi'));
+          } else setLanguage(normalizeLanguage('en'));
         }
       } catch (e) {
         console.warn("Auto-detect failed, using default EN", e);
@@ -95,9 +111,10 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const changeLanguage = (lang: Language) => {
-    setLanguage(lang);
-    localStorage.setItem('Yantravani_lang', lang);
-    document.documentElement.dir = lang === 'ur' ? 'rtl' : 'ltr';
+    const normalized = normalizeLanguage(lang);
+    setLanguage(normalized);
+    localStorage.setItem('Yantravani_lang', normalized);
+    document.documentElement.dir = normalized === 'ur' ? 'rtl' : 'ltr';
   };
 
   const t = (key: string, variables?: Record<string, string | number>): string => {

@@ -23,7 +23,9 @@ export const VISIBLE_LANGUAGE_OPTIONS: Array<{ id: Language; label: string }> = 
   { id: 'pa', label: 'ਪੰਜਾਬੀ' },
   { id: 'bho', label: 'भोजपुरी' },
   { id: 'te', label: 'తెలుగు' },
-  { id: 'ur', label: 'اردو' }
+  { id: 'ur', label: 'اردو' },
+  { id: 'kn', label: 'ಕನ್ನಡ' },
+  { id: 'phd', label: 'पहाड़ी' }
 ];
 
 interface LanguageContextType {
@@ -58,7 +60,7 @@ const translations: Record<string, Record<string, string>> = {
   kum
 };
 
-const disabledLanguages = new Set<Language>(['kn', 'phd', 'ks', 'doi', 'ghw', 'kum']);
+const disabledLanguages = new Set<Language>(['ks', 'doi', 'ghw', 'kum']);
 const normalizeLanguage = (lang: Language): Language => (disabledLanguages.has(lang) ? 'en' : lang);
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {

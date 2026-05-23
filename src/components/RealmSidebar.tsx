@@ -18,6 +18,7 @@ interface Props {
   onSeeAllNotifications?: () => void;
   onLeaveRealm?: (id: string) => void;
   onDeleteRealm?: (id: string) => void;
+  onManageInvites?: (id: string) => void;
   onLogout?: () => void;
   onSearch: () => void;
   onSocial: () => void;
@@ -28,7 +29,7 @@ interface Props {
   isCreateOpen?: boolean;
 }
 
-export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, onSettings, onProfile, onSeeAllNotifications, onLeaveRealm, onDeleteRealm, onSearch, onSocial, position, refreshTrigger, isSearchOpen, isSettingsOpen, isCreateOpen }: Props) => {
+export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, onSettings, onProfile, onSeeAllNotifications, onLeaveRealm, onDeleteRealm, onManageInvites, onSearch, onSocial, position, refreshTrigger, isSearchOpen, isSettingsOpen, isCreateOpen }: Props) => {
   const { t } = useLanguage();
   const { accounts, switchAccount, logout } = useAuth();
   const [notifications, setNotifications] = useState<INotification[]>([]);
@@ -79,14 +80,7 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
     if (type === 'realm' && realmId) {
       const items = [
         { label: t('common.edit'), icon: <CheckCircle2 size={14} />, onClick: () => alert('Synced') },
-        { label: t('common.invite'), icon: <UserPlus size={14} />, onClick: async () => {
-            try {
-              const { code } = await api.createRealmInvite(realmId);
-              const url = `${window.location.origin}/app/join/${code}`;
-              navigator.clipboard.writeText(url);
-              alert("Invite link copied.");
-            } catch(e) { alert("Fail"); }
-        }},
+        { label: t('common.invite'), icon: <UserPlus size={14} />, onClick: () => onManageInvites?.(realmId) },
         { label: realms.find(r => r._id === realmId)?.owner === (user.id || user._id) ? t('common.collapse') : t('common.sever'), icon: <ShieldX size={14} />, variant: 'danger' as const, onClick: () => realms.find(r => r._id === realmId)?.owner === (user.id || user._id) ? onDeleteRealm?.(realmId) : onLeaveRealm?.(realmId) }
       ];
       setMenu({ x: e.clientX, y: e.clientY, items });

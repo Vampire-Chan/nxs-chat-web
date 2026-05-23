@@ -9,6 +9,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { api, API_URL } from './services/api';
 import type { IRealm, IChannel, IMessage, IPost, IUser } from './services/api';
 import { getIdentityAvatar } from './services/identity';
+import { getOrGenerateUserKeys, regenerateUserKeys, importPublicKey, deriveSharedKey, encryptMessage } from './services/e2ee';
 import { TopNavbar as CoreDock } from './components/RealmSidebar';
 import { ChannelSidebar } from './components/ChannelSidebar';
 import { ChatArea } from './components/ChatArea';
@@ -20,7 +21,7 @@ import { NotificationsPage } from './components/NotificationsPage';
 import { SearchModal } from './components/SearchModal';
 import { LaunchScreen } from './components/LaunchScreen';
 import { SocialCorner } from './components/SocialCorner';
-import { CreateRealmModal, CreatePostModal, CreateChannelModal, CreateGroupDMModal, RealmSettingsModal, GroupSettingsModal } from './components/Modals';
+import { CreateRealmModal, CreatePostModal, CreateChannelModal, CreateGroupDMModal, RealmSettingsModal, GroupSettingsModal, RealmInvitesModal } from './components/Modals';
 import { PostViewerModal } from './components/PostViewerModal';
 import { UserSettingsModal as IdentitySettingsModal } from './components/UserSettingsModal';
 import { LogoutModal } from './components/LogoutModal';
@@ -137,6 +138,9 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveStreamers, setLiveStreamers] = useState<IUser[]>([]);
   const [liveSignal, setLiveSignal] = useState<any>(null);
+  const [e2ePrivateKey, setE2ePrivateKey] = useState<CryptoKey | null>(null);
+  const [e2ePublicKeyJwk, setE2ePublicKeyJwk] = useState<string | null>(null);
+  const [activeChannelKey, setActiveChannelKey] = useState<CryptoKey | null>(null);
   
   const socketRef = useRef<Socket | null>(null);
   const activeChannelRef = useRef<IChannel | null>(null);
@@ -294,6 +298,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       loadRealms();
     });
     s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
+    s.on('online_users', (userIds: string[]) => { setOnlineUserIds(new Set(userIds)); });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
     s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });
     s.on('channel_metadata_update', (updated: IChannel) => { setDms(prev => prev.map(d => d._id === updated._id ? updated : d)); if (activeChannel?._id === updated._id) setActiveChannel(updated); });
@@ -306,6 +311,115 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const loadRealms = async () => { setIsSyncing(true); try { const d = await api.getMyRealms(); setRealms(d); } catch(e){} finally { setIsSyncing(false); } };
   const loadDMs = async () => { setIsSyncing(true); try { const d = await api.getMyDMs(); setDms(d); } catch(e){} finally { setIsSyncing(false); } };
+
+  // E2EE Initializer Effect
+  useEffect(() => {
+    const initE2E = async () => {
+      if (!user) return;
+      const userId = user.id || user._id;
+      try {
+        const { publicKeyJwk, privateKey } = await getOrGenerateUserKeys(userId);
+        setE2ePrivateKey(privateKey);
+        setE2ePublicKeyJwk(publicKeyJwk);
+
+        if (user.publicKey !== publicKeyJwk) {
+          console.log("Broadcasting E2E public key signature...");
+          await api.updatePublicKey(publicKeyJwk);
+          if (updateUserState) {
+            updateUserState(localStorage.getItem('token') || '', { ...user, publicKey: publicKeyJwk });
+          }
+        }
+      } catch (err) {
+        console.error("E2E key initialization error:", err);
+      }
+    };
+    initE2E();
+  }, [user]);
+
+  // Derive Shared Key for Active DM Channel
+  useEffect(() => {
+    const deriveKeyForActiveChannel = async () => {
+      if (!activeChannel || !e2ePrivateKey || !user) {
+        setActiveChannelKey(null);
+        return;
+      }
+      
+      const userId = user.id || user._id;
+
+      if (activeChannel.type === 'dm') {
+        const peer = activeChannel.members?.find(m => (m._id || m.id) !== userId);
+        if (peer) {
+          let peerPublicKey = peer.publicKey;
+          if (!peerPublicKey) {
+            try {
+              const res = await api.getUserPublicKey(peer._id || peer.id);
+              peerPublicKey = res.publicKey || undefined;
+            } catch (e) {
+              console.error("Failed to fetch peer public key from fallback endpoint:", e);
+            }
+          }
+          if (peerPublicKey) {
+            try {
+              const importedPeerPublicKey = await importPublicKey(peerPublicKey);
+              const derived = await deriveSharedKey(e2ePrivateKey, importedPeerPublicKey);
+              setActiveChannelKey(derived);
+              return;
+            } catch (err) {
+              console.error("Error deriving shared key for active DM channel:", err);
+            }
+          }
+        }
+      }
+      setActiveChannelKey(null);
+    };
+    deriveKeyForActiveChannel();
+  }, [activeChannel, e2ePrivateKey, user]);
+
+  const handleRegenerateKeys = async () => {
+    if (!user) return;
+    const userId = user.id || user._id;
+    try {
+      const { publicKeyJwk, privateKey } = await regenerateUserKeys(userId);
+      setE2ePrivateKey(privateKey);
+      setE2ePublicKeyJwk(publicKeyJwk);
+      await api.updatePublicKey(publicKeyJwk);
+      if (updateUserState) {
+        updateUserState(localStorage.getItem('token') || '', { ...user, publicKey: publicKeyJwk });
+      }
+      addToast(t('settings.keys_regenerated') || "E2E keys regenerated successfully", "success");
+    } catch (err) {
+      console.error("E2E key regeneration error:", err);
+      addToast("Failed to regenerate keys", "error");
+    }
+  };
+
+  const handleSendMessage = async (content: string, parentMessageId?: string) => {
+    if (!activeChannel) return;
+    
+    let messagePayload: any = {
+      channelId: activeChannel._id,
+      senderId: user!.id || user!._id,
+      senderUserObject: user,
+      parentMessageId: parentMessageId || null,
+      content: content,
+      isEncrypted: false
+    };
+
+    if (activeChannel.type === 'dm' && activeChannelKey) {
+      try {
+        const { ciphertext, iv } = await encryptMessage(activeChannelKey, content);
+        messagePayload.content = ciphertext;
+        messagePayload.isEncrypted = true;
+        messagePayload.iv = iv;
+      } catch (err) {
+        console.error("Failed to encrypt message:", err);
+        addToast("Encryption failure. Message not sent.", "error");
+        return;
+      }
+    }
+
+    socketRef.current?.emit('send_message', messagePayload);
+  };
 
   const handleSelectRealm = async (realm: IRealm | { _id: string }) => {
     setViewingUserId(null); if (isMobile) setIsSidebarOpen(false);
@@ -323,7 +437,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           try {
             const d = await api.getRealmDetails(realm._id);
             setActiveRealm(d);
-            const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement' || c.type.startsWith('mod_'));
+            const firstChannel = d.channels?.find((c: any) => ['text', 'announcement', 'media', 'gallery', 'matrix', 'feed', 'reels'].includes(c.type) || c.type.startsWith('mod_'));
             if (firstChannel) handleSelectChannel(firstChannel);
             localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'architect', activeRealm: d }));
           } catch (e) { addToast(t('settings.access_failed'), 'error'); }
@@ -334,7 +448,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         try {
           const d = await api.getRealmDetails(realm._id);
           setActiveRealm(d);
-          const firstChannel = d.channels?.find((c: any) => c.type === 'text' || c.type === 'announcement' || c.type.startsWith('mod_'));
+          const firstChannel = d.channels?.find((c: any) => ['text', 'announcement', 'media', 'gallery', 'matrix', 'feed', 'reels'].includes(c.type) || c.type.startsWith('mod_'));
           if (firstChannel) handleSelectChannel(firstChannel);
           localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: realm._id, activeRealm: d }));
         } catch (e) { addToast(t('settings.access_failed'), 'error'); }
@@ -459,6 +573,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [showGroupDMModal, setShowGroupDMModal] = useState(false);
   const [showRealmSettings, setShowRealmSettings] = useState(false);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [showInviteManager, setShowInviteManager] = useState(false);
+  const [inviteRealmId, setInviteRealmId] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -594,7 +710,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       </AnimatePresence>
 
       <CoreDock 
-        realms={realms} selectedRealmId={viewMode} onSelect={handleSelectRealm} onCreate={() => setShowRealmModal(true)} user={user} onSettings={() => setShowIdentitySettings(true)} onProfile={() => setViewMode('profile')} onSeeAllNotifications={() => setShowNotifications(true)} onLogout={() => setShowLogoutModal(true)} onSearch={() => setShowSearchModal(true)} onLeaveRealm={handleLeaveRealm} onDeleteRealm={handleDeleteRealm} onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} position={isMobile ? 'bottom' : dockPosition} refreshTrigger={matrixRefreshKey} isSearchOpen={showSearchModal} isSettingsOpen={showIdentitySettings} isCreateOpen={showRealmModal || showPostModal || showChannelModal || showGroupDMModal}
+        realms={realms} selectedRealmId={viewMode} onSelect={handleSelectRealm} onCreate={() => setShowRealmModal(true)} user={user} onSettings={() => setShowIdentitySettings(true)} onProfile={() => setViewMode('profile')} onSeeAllNotifications={() => setShowNotifications(true)} onLogout={() => setShowLogoutModal(true)} onSearch={() => setShowSearchModal(true)} onLeaveRealm={handleLeaveRealm} onDeleteRealm={handleDeleteRealm} onManageInvites={(realmId) => { setInviteRealmId(realmId); setShowInviteManager(true); }} onSocial={() => { setViewMode('social'); setSocialTab('friends'); setSocialTargetId(null); setActiveRealm(null); setActiveChannel(null); }} position={isMobile ? 'bottom' : dockPosition} refreshTrigger={matrixRefreshKey} isSearchOpen={showSearchModal} isSettingsOpen={showIdentitySettings} isCreateOpen={showRealmModal || showPostModal || showChannelModal || showGroupDMModal}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
@@ -630,11 +746,28 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                   />
                 ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
-                    key="chat" channelName={activeChannel.name || 'Link'} messages={messages} onSendMessage={(c, pId) => socketRef.current?.emit('send_message', { channelId: activeChannel._id, senderId: user!.id || user!._id, content: c, senderUserObject: user, parentMessageId: pId })} currentUser={user} channelId={activeChannel._id} onViewOtherProfile={handleViewOtherProfile} channelType={activeChannel.type} activeRealm={activeRealm} activeChannel={activeChannel} socket={socketRef.current} onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} onGroupSettings={() => setShowGroupSettings(true)} onOpenMedia={(type, url) => setActiveMedia({ type, url })} onStartCall={() => handleStartCall('voice')} 
-onStartVideo={() => handleStartCall('video')}
-                    oversightMode={oversightMode} setOversightMode={setOversightMode}
+                    key="chat" 
+                    channelName={activeChannel.name || 'Link'} 
+                    messages={messages} 
+                    onSendMessage={handleSendMessage} 
+                    currentUser={user} 
+                    channelId={activeChannel._id} 
+                    onViewOtherProfile={handleViewOtherProfile} 
+                    channelType={activeChannel.type} 
+                    activeRealm={activeRealm} 
+                    activeChannel={activeChannel} 
+                    socket={socketRef.current} 
+                    onRefreshMatrix={() => setMatrixRefreshKey(k => k + 1)} 
+                    onGroupSettings={() => setShowGroupSettings(true)} 
+                    onOpenMedia={(type, url) => setActiveMedia({ type, url })} 
+                    onStartCall={() => handleStartCall('voice')} 
+                    onStartVideo={() => handleStartCall('video')}
+                    oversightMode={oversightMode} 
+                    setOversightMode={setOversightMode}
+                    activeChannelKey={activeChannelKey}
+                    onRegenerateKeys={handleRegenerateKeys}
                   />
-                ) : (activeChannel?.type === 'feed' || viewMode === 'explore') ? (
+                ) : (['feed', 'reels', 'media', 'gallery', 'matrix'].includes(activeChannel?.type || '') || viewMode === 'explore') ? (
                   <FeedArea 
                     key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} onRetry={triggerRefresh} isSyncing={isSyncing} liveStreamers={liveStreamers}
                   />
@@ -666,6 +799,12 @@ onStartVideo={() => handleStartCall('video')}
       {showGroupDMModal && <CreateGroupDMModal onClose={() => setShowGroupDMModal(false)} onSubmit={async (u: string[], n: string) => { try { const g = await api.createGroupDM(u, n); await loadDMs(); setShowGroupDMModal(false); handleSelectChannel(g); addToast(t('settings.group_initialized'), 'success'); } catch(e){ addToast(t('settings.group_failed'), 'error'); } }} currentUser={user!} />}
       {showIdentitySettings && <IdentitySettingsModal user={user!} onClose={() => setShowIdentitySettings(false)} onSave={async (f: FormData) => { try { const u = await api.updateProfile(f); updateUserState(localStorage.getItem('token') || '', u); setShowIdentitySettings(false); addToast(t('settings.calibration_saved'), 'success'); } catch(e){ addToast(t('settings.save_failed'), 'error'); } }} dockPosition={dockPosition} setDockPosition={setDockPosition} kineticTransitions={kineticTransitions} setKineticTransitions={(v) => { setKineticTransitions(v); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'), kineticTransitions: v })); }} />}
       {showRealmSettings && activeRealm && <RealmSettingsModal realm={activeRealm} onClose={() => setShowRealmSettings(false)} onUpdate={async () => { const d = await api.getRealmDetails(activeRealm._id); setActiveRealm(d); }} />}
+      {showInviteManager && inviteRealmId && (realms.find(r => r._id === inviteRealmId) || activeRealm) && (
+        <RealmInvitesModal
+          realm={(realms.find(r => r._id === inviteRealmId) || activeRealm)!}
+          onClose={() => { setShowInviteManager(false); setInviteRealmId(null); }}
+        />
+      )}
       {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast((t as any)('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
     </div>
   );

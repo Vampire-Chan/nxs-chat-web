@@ -77,6 +77,7 @@ export interface IUser {
   creationUI?: 'auto' | 'bar' | 'button';
   recoveryKeys?: { code: string, isUsed: boolean }[];
   badges?: { type: string, label: string }[];
+  publicKey?: string;
   createdAt?: string;
 }
 
@@ -91,8 +92,13 @@ export interface IRole {
 export interface IChannel {
   _id: string;
   name: string;
-  type: 'text' | 'voice' | 'feed' | 'reels' | 'announcement' | 'dm' | 'group_dm' | 'mod_reports' | 'mod_messages' | 'mod_posts' | 'mod_users' | 'mod_stats';
+  type: 'category' | 'text' | 'voice' | 'media' | 'gallery' | 'matrix' | 'feed' | 'reels' | 'announcement' | 'dm' | 'group_dm' | 'mod_reports' | 'mod_messages' | 'mod_posts' | 'mod_users' | 'mod_stats';
   realm?: string;
+  parentCategory?: string | null;
+  position?: number;
+  topic?: string;
+  nsfw?: boolean;
+  permissionOverwrites?: Array<{ targetType: 'role' | 'member'; targetId: string; allow?: string[]; deny?: string[] }>;
   members?: IUser[];
   icon?: string;
   nicknames?: Record<string, string>;
@@ -123,6 +129,8 @@ export interface IMessage {
   mediaType?: 'image' | 'video' | 'audio' | 'file';
   reactions?: Record<string, string[]>;
   parentMessage?: IMessage | null;
+  isEncrypted?: boolean;
+  iv?: string;
 }
 
 export interface IPost {
@@ -154,6 +162,16 @@ export interface INotification {
   isRead: boolean;
   createdAt: string;
   metadata?: { postId?: string; channelId?: string; deviceName?: string; };
+}
+
+export interface IRealmInvite {
+  code: string;
+  uses: number;
+  maxUses: number;
+  expiresAt?: string | null;
+  createdAt?: string;
+  urlPath: string;
+  inviter?: Pick<IUser, '_id' | 'username' | 'avatar'>;
 }
 
 export const api = {
@@ -219,17 +237,27 @@ export const api = {
   joinRealm: async (id: string) => { const res = await axios.post(`${API_URL}/realms/${id}/join`); return res.data; },
   leaveRealm: async (id: string) => { const res = await axios.post(`${API_URL}/realms/${id}/leave`); return res.data; },
   deleteRealm: async (id: string) => { const res = await axios.delete(`${API_URL}/realms/${id}`); return res.data; },
-  createChannel: async (realmId: string, name: string, type: string) => { const res = await axios.post<IChannel>(`${API_URL}/realms/${realmId}/channels`, { name, type }); return res.data; },
-  createRealmInvite: async (realmId: string, maxUses = 0) => { const res = await axios.post<{ code: string }>(`${API_URL}/realms/${realmId}/invites`, { maxUses }); return res.data; },
+  createChannel: async (realmId: string, name: string, type: string, extras: { parentCategory?: string; position?: number; topic?: string; nsfw?: boolean } = {}) => { const res = await axios.post<IChannel>(`${API_URL}/realms/${realmId}/channels`, { name, type, ...extras }); return res.data; },
+  createCategory: async (realmId: string, name: string, position = 0) => { const res = await axios.post<IChannel>(`${API_URL}/realms/${realmId}/categories`, { name, position }); return res.data; },
+  createRealmInvite: async (
+    realmId: string,
+    options: { code?: string; maxUses?: number; expiresInHours?: number; expiresAt?: string } = {}
+  ) => {
+    const res = await axios.post<IRealmInvite>(`${API_URL}/realms/${realmId}/invites`, options);
+    return res.data;
+  },
+  listRealmInvites: async (realmId: string) => { const res = await axios.get<IRealmInvite[]>(`${API_URL}/realms/${realmId}/invites`); return res.data; },
+  revokeRealmInvite: async (realmId: string, code: string) => { const res = await axios.delete(`${API_URL}/realms/${realmId}/invites/${encodeURIComponent(code)}`); return res.data; },
   joinRealmWithInvite: async (code: string) => { const res = await axios.post<IRealm>(`${API_URL}/realms/join/${code}`); return res.data; },
   createRole: async (realmId: string, data: any) => { const res = await axios.post(`${API_URL}/realms/${realmId}/roles`, data); return res.data; },
+  updateRole: async (realmId: string, roleId: string, data: { name?: string; color?: string; permissions?: string[] }) => { const res = await axios.patch(`${API_URL}/realms/${realmId}/roles/${roleId}`, data); return res.data; },
   assignRole: async (realmId: string, userId: string, roleId: string) => { const res = await axios.post(`${API_URL}/realms/${realmId}/members/${userId}/role`, { roleId }); return res.data; },
   deleteRole: async (realmId: string, roleId: string) => { const res = await axios.delete(`${API_URL}/realms/${realmId}/roles/${roleId}`); return res.data; },
   getMessages: async (channelId: string) => { const res = await axios.get<IMessage[]>(`${API_URL}/channels/${channelId}/messages`); return res.data; },
   markChannelRead: async (id: string) => { const res = await axios.post(`${API_URL}/channels/${id}/read`); return res.data; },
   markChannelUnread: async (id: string) => { const res = await axios.post(`${API_URL}/channels/${id}/unread`); return res.data; },
   scheduleMessage: async (data: { channelId: string, content: string, scheduledFor: Date, parentMessageId?: string }) => { const res = await axios.post(`${API_URL}/channels/schedule`, data); return res.data; },
-  editMessage: async (id: string, content: string) => { const res = await axios.put<IMessage>(`${API_URL}/channels/messages/${id}`, { content }); return res.data; },
+  editMessage: async (id: string, content: string, isEncrypted?: boolean, iv?: string) => { const res = await axios.put<IMessage>(`${API_URL}/channels/messages/${id}`, { content, isEncrypted, iv }); return res.data; },
   deleteMessage: async (id: string) => { const res = await axios.delete(`${API_URL}/channels/messages/${id}`); return res.data; },
   getPosts: async (channelId: string) => { const res = await axios.get<IPost[]>(`${API_URL}/channels/${channelId}/posts`); return res.data; },
   getGlobalPosts: async (tag?: string) => { const res = await axios.get<IPost[]>(`${API_URL}/posts/all${tag ? `?tag=${tag}` : ''}`); return res.data; },
@@ -253,6 +281,14 @@ export const api = {
   globalSearch: async (query: string, filters: { type?: string, sortBy?: string, author?: string } = {}) => { 
     const params = new URLSearchParams({ q: query, ...filters });
     const res = await axios.get<{ users: IUser[], realms: IRealm[], posts: IPost[] }>(`${API_URL}/search?${params.toString()}`); 
+    return res.data; 
+  },
+  updatePublicKey: async (publicKey: string) => { 
+    const res = await axios.put(`${API_URL}/users/me/publicKey`, { publicKey }); 
+    return res.data; 
+  },
+  getUserPublicKey: async (userId: string) => { 
+    const res = await axios.get<{ publicKey: string | null }>(`${API_URL}/users/${userId}/publicKey`); 
     return res.data; 
   }
 };

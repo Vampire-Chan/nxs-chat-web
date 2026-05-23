@@ -42,6 +42,51 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   const localAudioCtx = useRef<AudioContext | null>(null);
   const hasJoinedRoom = useRef(false);
 
+  const currentUserRef = useRef(currentUser);
+  const tRef = useRef(t);
+  const addToastRef = useRef(addToast);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+    tRef.current = t;
+    addToastRef.current = addToast;
+  }, [currentUser, t, addToast]);
+
+  const intensityRafId = useRef<number | null>(null);
+
+  const startIntensityTracking = useCallback((stream: MediaStream) => {
+    if (intensityRafId.current) {
+      cancelAnimationFrame(intensityRafId.current);
+      intensityRafId.current = null;
+    }
+    if (localAudioCtx.current) {
+      localAudioCtx.current.close().catch(() => {});
+      localAudioCtx.current = null;
+    }
+
+    try {
+      const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
+      const ctx = new AudioCtx();
+      localAudioCtx.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const updateIntensity = () => {
+        if (userStream.current && userStream.current.active) {
+          analyser.getByteFrequencyData(data);
+          const volume = data.reduce((a, b) => a + b, 0) / data.length;
+          setMicIntensity(Math.min(volume * 2, 100));
+          intensityRafId.current = requestAnimationFrame(updateIntensity);
+        }
+      };
+      updateIntensity();
+    } catch (e) {
+      console.warn("Intensity tracking failed", e);
+    }
+  }, []);
+
   const fetchDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -66,8 +111,9 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
           peer.replaceTrack(oldTrack, newTrack, userStream.current);
         });
         setSelectedMic(deviceId);
+        startIntensityTracking(userStream.current);
       }
-    } catch (e) { addToast(t('chat.calibration_failed'), 'error'); }
+    } catch (e) { addToastRef.current(tRef.current('chat.calibration_failed'), 'error'); }
   };
 
   const switchCamera = async (deviceId: string) => {
@@ -89,7 +135,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         });
         setSelectedCamera(deviceId);
       }
-    } catch (e) { addToast(t('chat.calibration_failed'), 'error'); }
+    } catch (e) { addToastRef.current(tRef.current('chat.calibration_failed'), 'error'); }
   };
 
   const switchSpeaker = async (deviceId: string) => {
@@ -101,7 +147,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       }
     });
     setSelectedSpeaker(deviceId);
-    addToast(t('app.audio_output_routed'), 'success');
+    addToastRef.current(tRef.current('app.audio_output_routed'), 'success');
   };
 
   useEffect(() => {
@@ -124,30 +170,16 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       if (videoTrack) setSelectedCamera(videoTrack.getSettings().deviceId || '');
 
       // MIC INTENSITY TRACKING
-      try {
-        const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext);
-        const ctx = new AudioCtx();
-        localAudioCtx.current = ctx;
-        const source = ctx.createMediaStreamSource(s);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        const updateIntensity = () => {
-          if (userStream.current && userStream.current.active) {
-            analyser.getByteFrequencyData(data);
-            const volume = data.reduce((a, b) => a + b, 0) / data.length;
-            setMicIntensity(Math.min(volume * 2, 100));
-            requestAnimationFrame(updateIntensity);
-          }
-        };
-        updateIntensity();
-      } catch (e) { console.warn("Intensity tracking failed", e); }
+      startIntensityTracking(s);
       
       if (socket && !hasJoinedRoom.current) {
         socket.emit('join_voice', { 
           roomID: channelId, 
-          user: { username: currentUser.username, avatar: getIdentityAvatar(currentUser), id: currentUser.id || currentUser._id } 
+          user: { 
+            username: currentUserRef.current.username, 
+            avatar: getIdentityAvatar(currentUserRef.current), 
+            id: currentUserRef.current.id || currentUserRef.current._id 
+          } 
         });
         hasJoinedRoom.current = true;
       }
@@ -201,9 +233,9 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
       });
     } catch (err: any) {
       console.error("❌ Media Access Error:", err);
-      addToast(`${t('chat.audio_sync_failed')}: ${err.message}`, 'error');
+      addToastRef.current(`${tRef.current('chat.audio_sync_failed')}: ${err.message}`, 'error');
     }
-  }, [channelId, initialVideo, socket, addToast, currentUser, t]);
+  }, [channelId, initialVideo, socket, fetchDevices]);
 
   useEffect(() => {
     initMedia();
@@ -232,6 +264,10 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         localAudioCtx.current.close().catch(() => {});
         localAudioCtx.current = null;
       }
+      if (intensityRafId.current) {
+        cancelAnimationFrame(intensityRafId.current);
+        intensityRafId.current = null;
+      }
       
       if (socket) {
         socket.emit('leave_voice', { channelId });
@@ -240,6 +276,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         socket.off('receiving_returned_signal'); 
         socket.off('user_left_voice');
       }
+      hasJoinedRoom.current = false;
     };
   }, [initMedia, channelId, socket]);
 
@@ -258,16 +295,15 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   };
 
   function createPeer(u: string, c: string, s: MediaStream) {
-    const clonedStream = s.clone();
-    const p = new Peer({ initiator: true, stream: clonedStream, config: rtcConfig, trickle: true });
+    const p = new Peer({ initiator: true, stream: s, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('sending_signal', { 
       userToSignal: u, callerID: c, signal,
       user: { 
-        username: currentUser.username, 
-        avatar: getIdentityAvatar(currentUser), 
-        id: currentUser.id || currentUser._id,
-        gender: currentUser.gender,
-        showGender: currentUser.showGender
+        username: currentUserRef.current.username, 
+        avatar: getIdentityAvatar(currentUserRef.current), 
+        id: currentUserRef.current.id || currentUserRef.current._id,
+        gender: currentUserRef.current.gender,
+        showGender: currentUserRef.current.showGender
       }
     }));
     
@@ -284,8 +320,7 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   }
 
   function addPeer(i: any, c: string, s: MediaStream) {
-    const clonedStream = s.clone();
-    const p = new Peer({ initiator: false, stream: clonedStream, config: rtcConfig, trickle: true });
+    const p = new Peer({ initiator: false, stream: s, config: rtcConfig, trickle: true });
     p.on('signal', (signal: any) => socket.emit('returning_signal', { signal, callerID: c }));
     
     p.on('connect', () => {
@@ -307,9 +342,22 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
   };
 
   const toggleVideo = async () => {
-    if (isScreenSharing) { addToast(t('voice.stop_screenshare_first'), 'error'); return; }
+    if (isScreenSharing) { addToastRef.current(tRef.current('voice.stop_screenshare_first'), 'error'); return; }
     if (isVideoOn) {
-      userStream.current?.getVideoTracks().forEach(t => { t.stop(); userStream.current?.removeTrack(t); });
+      const videoTracks = userStream.current?.getVideoTracks() || [];
+      videoTracks.forEach(track => {
+        peersRef.current.forEach(({ peer }) => {
+          try {
+            if (userStream.current) {
+              peer.removeTrack(track, userStream.current);
+            }
+          } catch (e) {
+            console.error("Error removing video track from peer:", e);
+          }
+        });
+        track.stop();
+        userStream.current?.removeTrack(track);
+      });
       setIsVideoOn(false);
     } else {
       try {
@@ -319,21 +367,51 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
         setIsVideoOn(true);
         if (userVideoRef.current) userVideoRef.current.srcObject = userStream.current;
         peersRef.current.forEach(({ peer }) => { if (userStream.current) peer.addTrack(videoTrack, userStream.current); });
-      } catch { addToast(t('voice.camera_denied'), 'error'); }
+      } catch { addToastRef.current(tRef.current('voice.camera_denied'), 'error'); }
     }
   };
 
+  const stopScreenShare = useCallback(() => {
+    if (screenStream.current) {
+      screenStream.current.getTracks().forEach(track => {
+        peersRef.current.forEach(({ peer }) => {
+          try {
+            if (userStream.current) {
+              peer.removeTrack(track, userStream.current);
+            }
+          } catch (e) {
+            console.error("Error removing screen track from peer:", e);
+          }
+        });
+        track.stop();
+      });
+      screenStream.current = null;
+    }
+    setIsScreenSharing(false);
+    if (userVideoRef.current && userStream.current) {
+      userVideoRef.current.srcObject = userStream.current;
+    }
+  }, []);
+
   const toggleScreenShare = async () => {
-    if (isScreenSharing) { screenStream.current?.getTracks().forEach(t => t.stop()); setIsScreenSharing(false); }
-    else {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        screenStream.current = stream; setIsScreenSharing(true);
+        screenStream.current = stream;
+        setIsScreenSharing(true);
         if (userVideoRef.current) userVideoRef.current.srcObject = stream;
         const screenTrack = stream.getVideoTracks()[0];
-        screenTrack.onended = () => { setIsScreenSharing(false); };
-        peersRef.current.forEach(({ peer }) => { if (userStream.current) peer.addTrack(screenTrack, userStream.current); });
-      } catch { addToast(t('voice.screenshare_cancelled'), 'info'); }
+        screenTrack.onended = () => {
+          stopScreenShare();
+        };
+        peersRef.current.forEach(({ peer }) => {
+          if (userStream.current) {
+            peer.addTrack(screenTrack, userStream.current);
+          }
+        });
+      } catch { addToastRef.current(tRef.current('voice.screenshare_cancelled'), 'info'); }
     }
   };
 

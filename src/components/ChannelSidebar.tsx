@@ -27,7 +27,7 @@ export const ChannelSidebar = ({
   setOversightMode
 }: Props) => {
   const { t } = useLanguage();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ announcements: true, chat: true, voice: true, media: true, mod: true, talk: true });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ announcements: true, categories: true, chat: true, voice: true, media: true, mod: true, talk: true });
   const toggle = (key: string) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
   const isSystem = (realm as any)?.isSystem || realm?.name === "Architect_Nexus";
@@ -38,9 +38,10 @@ export const ChannelSidebar = ({
   
   // --- STANDARD CATEGORIES ---
   const announcements = channels.filter(c => c.type === 'announcement');
+  const categories = channels.filter(c => c.type === 'category');
   const chatChannels = channels.filter(c => c.type === 'text' && !isSystem);
   const voiceChannels = channels.filter(c => c.type === 'voice');
-  const mediaChannels = channels.filter(c => c.type === 'feed' || c.type === 'reels');
+  const richMediaChannels = channels.filter(c => ['media', 'gallery', 'matrix', 'feed', 'reels'].includes(c.type));
 
   return (
     <div className="flex-1 flex flex-col bg-discord-channel h-full border-r border-white/5">
@@ -98,8 +99,15 @@ export const ChannelSidebar = ({
               {expanded.announcements && announcements.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Megaphone size={14} className="text-vani-accent" />} />)}
            </div>
          )}
+
+         {!isSystem && (
+           <div className="space-y-1">
+              <CornerHeader label="Categories" onToggle={() => toggle('categories')} onAdd={onAddChannel} />
+              {expanded.categories && categories.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ChevronDown size={14} />} />)}
+           </div>
+         )}
          
-         {!isSystem && chatChannels.length > 0 && (
+         {!isSystem && (
            <div className="space-y-1">
               <CornerHeader label={t('channels.text')} onToggle={() => toggle('chat')} onAdd={onAddChannel} />
               {expanded.chat && chatChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<Hash size={16} />} />)}
@@ -113,10 +121,10 @@ export const ChannelSidebar = ({
            </div>
          )}
 
-         {mediaChannels.length > 0 && (
+         {richMediaChannels.length > 0 && (
            <div className="space-y-1">
-              <CornerHeader label={isSystem ? "MEDIA MATRIX" : t('channels.media')} onToggle={() => toggle('media')} />
-              {expanded.media && mediaChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ImageIcon size={16} />} />)}
+              <CornerHeader label={isSystem ? "MEDIA MATRIX" : t('channels.media')} onToggle={() => toggle('media')} onAdd={!isSystem ? onAddChannel : undefined} />
+              {expanded.media && richMediaChannels.map(c => <ChannelItem key={c._id} channel={c} active={selectedChannelId === c._id} onClick={() => onSelectChannel(c)} icon={<ImageIcon size={16} />} />)}
            </div>
          )}
       </div>

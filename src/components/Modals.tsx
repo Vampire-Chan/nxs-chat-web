@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Users, Check, Zap, Hash, Shield, Globe, Settings, UserPlus, Trash2, Camera, Image as ImageIcon, Save } from 'lucide-react';
+import { X, Users, Check, Zap, Hash, Shield, Globe, Settings, UserPlus, Trash2, Camera, Image as ImageIcon, Save, Copy, Link2, Clock3 } from 'lucide-react';
 import { api } from '../services/api';
-import type { IUser, IRealm, IChannel } from '../services/api';
+import type { IUser, IRealm, IChannel, IRealmInvite } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,16 +11,33 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
   const { t } = useLanguage();
   const { addToast } = useToast();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'members'>('overview');
+   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'members' | 'channels' | 'invites'>('overview');
   const [name, setName] = useState(realm.name);
   const [vanity, setVanity] = useState(realm.vanityHandle || '');
   const [iconBlob, setIconBlob] = useState<Blob | null>(null);
   const [bannerBlob, setBannerBlob] = useState<Blob | null>(null);
   const [iconPreview, setIconPreview] = useState(realm.icon || '');
   const [bannerPreview, setBannerPreview] = useState((realm as any).banner || '');
+   const [roleDrafts, setRoleDrafts] = useState<Record<string, string[]>>({});
 
   const iconRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
+
+   const permissionOptions = [
+      'ADMINISTRATOR',
+      'MANAGE_REALM',
+      'MANAGE_ROLES',
+      'MANAGE_CATEGORIES',
+      'MANAGE_CHANNELS',
+      'MANAGE_MESSAGES',
+      'MANAGE_MEDIA',
+      'VIEW_CHANNEL',
+      'SEND_MESSAGES',
+      'CREATE_POSTS',
+      'CONNECT',
+      'SPEAK',
+      'STREAM'
+   ];
 
   const handleCreateRole = async () => {
     const roleName = prompt(t('modals.role_name_prompt'));
@@ -39,6 +56,33 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
       addToast(t('modals.authority_assigned'), 'success');
     } catch (e) { addToast(t('modals.assignment_failed'), 'error'); }
   };
+
+   const getRolePermissions = (role: any) => {
+      if (roleDrafts[role._id]) return roleDrafts[role._id];
+      return role.permissions || [];
+   };
+
+   const toggleRolePermission = (role: any, permission: string) => {
+      const current = new Set(getRolePermissions(role));
+      if (current.has(permission)) current.delete(permission);
+      else current.add(permission);
+      setRoleDrafts(prev => ({ ...prev, [role._id]: Array.from(current) }));
+   };
+
+   const handleSaveRolePermissions = async (role: any) => {
+      try {
+         await api.updateRole(realm._id, role._id, { permissions: getRolePermissions(role) });
+         onUpdate();
+         setRoleDrafts(prev => {
+            const next = { ...prev };
+            delete next[role._id];
+            return next;
+         });
+         addToast('Role permissions updated.', 'success');
+      } catch (e) {
+         addToast('Failed to update role permissions.', 'error');
+      }
+   };
 
   const handleSaveOverview = async () => {
     const fd = new FormData();
@@ -62,6 +106,8 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
               <NavBtn label={t('modals.overview')} active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<Globe size={16} />} />
               <NavBtn label={t('modals.role_matrix')} active={activeTab === 'roles'} onClick={() => setActiveTab('roles')} icon={<Shield size={16} />} />
               <NavBtn label={t('modals.identity_list')} active={activeTab === 'members'} onClick={() => setActiveTab('members')} icon={<Users size={16} />} />
+              <NavBtn label="Channels" active={activeTab === 'channels'} onClick={() => setActiveTab('channels')} icon={<Hash size={16} />} />
+              <NavBtn label="Invites" active={activeTab === 'invites'} onClick={() => setActiveTab('invites')} icon={<Link2 size={16} />} />
            </div>
         </div>
 
@@ -121,12 +167,31 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
                 <button onClick={handleCreateRole} className="w-full bg-white/5 border border-dashed border-gray-700 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:border-vani-blue transition-all"><UserPlus size={16} /> {t('modals.forge_authority')}</button>
                 <div className="grid grid-cols-1 gap-3">
                    {(realm.roles || []).map(role => (
-                     <div key={role._id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex items-center justify-between group">
-                        <div className="flex items-center space-x-4">
-                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
-                           <span className="text-sm font-black text-white uppercase tracking-tight">{role.name}</span>
-                        </div>
-                        <button onClick={() => api.deleteRole(realm._id, role._id).then(onUpdate)} className="p-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
+                               <div key={role._id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl group">
+                                    <div className="flex items-center justify-between mb-4">
+                                       <div className="flex items-center space-x-4">
+                                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
+                                           <span className="text-sm font-black text-white uppercase tracking-tight">{role.name}</span>
+                                       </div>
+                                       <button onClick={() => api.deleteRole(realm._id, role._id).then(onUpdate)} className="p-2 text-gray-600 hover:text-red-500 transition-all disabled:opacity-30" disabled={(role as any).isSystem}><Trash2 size={16} /></button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                       {permissionOptions.map((perm) => {
+                                          const enabled = getRolePermissions(role).includes(perm);
+                                          return (
+                                             <button
+                                                key={perm}
+                                                onClick={() => toggleRolePermission(role, perm)}
+                                                className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all ${enabled ? 'bg-vani-blue/20 border-vani-blue text-vani-blue' : 'bg-black/30 border-white/10 text-gray-500 hover:text-white'}`}
+                                             >
+                                                {perm.replace(/_/g, ' ')}
+                                             </button>
+                                          );
+                                       })}
+                                    </div>
+
+                                    <button onClick={() => handleSaveRolePermissions(role)} className="mt-4 w-full bg-white/5 hover:bg-vani-blue/20 border border-white/10 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest">Save Permissions</button>
                      </div>
                    ))}
                 </div>
@@ -153,6 +218,40 @@ export const RealmSettingsModal = ({ realm, onClose, onUpdate }: { realm: IRealm
                 ))}
              </div>
            )}
+
+                {activeTab === 'channels' && (
+                   <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                         {[
+                            ['Categories', (realm.channels || []).filter(c => c.type === 'category').length],
+                            ['Text', (realm.channels || []).filter(c => c.type === 'text').length],
+                            ['Voice', (realm.channels || []).filter(c => c.type === 'voice').length],
+                            ['Media+', (realm.channels || []).filter(c => ['media', 'gallery', 'matrix', 'feed', 'reels'].includes(c.type)).length]
+                         ].map(([label, count]) => (
+                            <div key={String(label)} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4">
+                               <div className="text-[9px] uppercase font-black tracking-widest text-gray-500">{label}</div>
+                               <div className="text-2xl font-black text-white mt-1">{count}</div>
+                            </div>
+                         ))}
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 max-h-[360px] overflow-y-auto custom-scrollbar space-y-2">
+                         {(realm.channels || []).map(c => (
+                            <div key={c._id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/20">
+                               <span className="text-xs font-bold text-white uppercase tracking-tight">{c.name}</span>
+                               <span className="text-[9px] font-black text-vani-blue uppercase tracking-widest">{c.type}</span>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                )}
+
+                {activeTab === 'invites' && (
+                   <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-sm font-black uppercase tracking-wider text-white mb-2">Invite Controls</h4>
+                      <p className="text-xs text-gray-400 mb-4">Use the realm context menu Invite action to manage vanity/expiring invite links.</p>
+                      <div className="text-[10px] font-mono text-gray-500 uppercase">This tab confirms invite system availability and keeps settings scope discoverable.</div>
+                   </div>
+                )}
         </div>
       </motion.div>
     </div>
@@ -188,9 +287,13 @@ export const CreateChannelModal = ({ onClose, onSubmit }: any) => {
          <div className="p-8 border-b border-white/5 flex items-center justify-between"><h2 className="text-xl font-black text-white uppercase tracking-tighter">{t('modals.new_sector')}</h2><button onClick={onClose} className="p-2 text-gray-500 hover:text-white"><X size={20} /></button></div>
          <div className="p-8 space-y-6">
             <input className="w-full bg-[#050507] border border-gray-800 p-4 rounded-2xl text-white outline-none focus:border-vani-blue" placeholder={t('modals.sector_placeholder')} value={name} onChange={(e) => setName(e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+               <div onClick={() => setType('category')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'category' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Settings size={16} /> <span className="text-[10px] font-black uppercase">Category</span></div>
                <div onClick={() => setType('text')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'text' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Hash size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.text')}</span></div>
                <div onClick={() => setType('voice')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'voice' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Zap size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.voice')}</span></div>
+               <div onClick={() => setType('media')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'media' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><ImageIcon size={16} /> <span className="text-[10px] font-black uppercase">Media</span></div>
+               <div onClick={() => setType('gallery')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'gallery' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Camera size={16} /> <span className="text-[10px] font-black uppercase">Gallery</span></div>
+               <div onClick={() => setType('matrix')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'matrix' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Globe size={16} /> <span className="text-[10px] font-black uppercase">Matrix</span></div>
                <div onClick={() => setType('feed')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'feed' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Globe size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.broadcast')}</span></div>
                <div onClick={() => setType('announcement')} className={`p-4 rounded-2xl border cursor-pointer flex items-center space-x-3 transition-all ${type === 'announcement' ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-gray-800 text-gray-500'}`}><Shield size={16} /> <span className="text-[10px] font-black uppercase">{t('modals.alerts')}</span></div>
             </div>
@@ -199,6 +302,136 @@ export const CreateChannelModal = ({ onClose, onSubmit }: any) => {
       </motion.div>
     </div>
   );
+};
+
+export const RealmInvitesModal = ({ realm, onClose }: { realm: IRealm, onClose: () => void }) => {
+   const { t } = useLanguage();
+   const { addToast } = useToast();
+   const [invites, setInvites] = useState<IRealmInvite[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [creating, setCreating] = useState(false);
+   const [code, setCode] = useState('');
+   const [maxUses, setMaxUses] = useState('0');
+   const [expiresInHours, setExpiresInHours] = useState('24');
+
+   const loadInvites = async () => {
+      setLoading(true);
+      try {
+         const data = await api.listRealmInvites(realm._id);
+         setInvites(data);
+      } catch (e: any) {
+         addToast(e?.response?.data?.message || 'Failed to load invites.', 'error');
+      } finally {
+         setLoading(false);
+      }
+   };
+
+   useEffect(() => {
+      loadInvites();
+   }, [realm._id]);
+
+   const handleCreateInvite = async () => {
+      const normalizedCode = code.trim().toUpperCase();
+      if (normalizedCode && !/^[A-Z0-9_-]{4,24}$/.test(normalizedCode)) {
+         addToast('Invalid invite code format.', 'error');
+         return;
+      }
+
+      const parsedMaxUses = Number(maxUses);
+      const parsedExpiryHours = Number(expiresInHours);
+      const payload = {
+         code: normalizedCode || undefined,
+         maxUses: Number.isFinite(parsedMaxUses) && parsedMaxUses > 0 ? Math.floor(parsedMaxUses) : 0,
+         expiresInHours: Number.isFinite(parsedExpiryHours) && parsedExpiryHours > 0 ? parsedExpiryHours : 0
+      };
+
+      setCreating(true);
+      try {
+         const created = await api.createRealmInvite(realm._id, payload);
+         setInvites(prev => [created, ...prev]);
+         setCode('');
+         addToast(`Invite created: ${created.code}`, 'success');
+
+         const url = `${window.location.origin}${created.urlPath || `/app/join/${created.code}`}`;
+         await navigator.clipboard.writeText(url);
+         addToast('Invite link copied to clipboard.', 'info');
+      } catch (e: any) {
+         addToast(e?.response?.data?.message || 'Failed to create invite.', 'error');
+      } finally {
+         setCreating(false);
+      }
+   };
+
+   const handleCopy = async (invite: IRealmInvite) => {
+      try {
+         const url = `${window.location.origin}${invite.urlPath || `/app/join/${invite.code}`}`;
+         await navigator.clipboard.writeText(url);
+         addToast(`Copied ${invite.code}`, 'success');
+      } catch (e) {
+         addToast('Clipboard copy failed.', 'error');
+      }
+   };
+
+   const handleRevoke = async (invite: IRealmInvite) => {
+      if (!window.confirm(`Revoke invite ${invite.code}?`)) return;
+      try {
+         await api.revokeRealmInvite(realm._id, invite.code);
+         setInvites(prev => prev.filter(i => i.code !== invite.code));
+         addToast('Invite revoked.', 'success');
+      } catch (e: any) {
+         addToast(e?.response?.data?.message || 'Failed to revoke invite.', 'error');
+      }
+   };
+
+   return (
+      <div className="fixed inset-0 bg-black/90 z-[2000] flex items-center justify-center p-4 backdrop-blur-xl" onClick={onClose}>
+         <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl max-h-[88vh] bg-[#0a0a0c] border border-white/10 rounded-[36px] overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-white/10 flex items-center justify-between">
+               <div>
+                  <h2 className="text-lg font-black uppercase tracking-widest text-white flex items-center gap-2"><Link2 size={16} className="text-vani-blue" /> {t('common.invite')} Manager</h2>
+                  <p className="text-[10px] text-gray-500 font-mono uppercase mt-1">{realm.name}</p>
+               </div>
+               <button onClick={onClose} className="p-2 rounded-xl bg-white/5 hover:bg-red-500 transition-all"><X size={18} /></button>
+            </div>
+
+            <div className="p-6 border-b border-white/5 grid grid-cols-1 md:grid-cols-3 gap-3">
+               <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Custom code (optional)" className="bg-[#050507] border border-gray-800 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-vani-blue" />
+               <input value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="Max uses (0 = unlimited)" className="bg-[#050507] border border-gray-800 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-vani-blue" />
+               <input value={expiresInHours} onChange={(e) => setExpiresInHours(e.target.value)} placeholder="Expire in hours (0 = never)" className="bg-[#050507] border border-gray-800 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-vani-blue" />
+               <button disabled={creating} onClick={handleCreateInvite} className="md:col-span-3 bg-vani-gradient text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-60 transition-all hover:scale-[1.01]">{creating ? 'Creating...' : 'Create Invite'}</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
+               {loading && <div className="text-center text-gray-500 text-xs font-mono uppercase py-10">Loading invites...</div>}
+               {!loading && invites.length === 0 && <div className="text-center text-gray-500 text-xs font-mono uppercase py-10">No active invites.</div>}
+               {!loading && invites.map((invite) => {
+                  const expired = !!invite.expiresAt && new Date(invite.expiresAt).getTime() <= Date.now();
+                  const limited = invite.maxUses > 0;
+                  const exhausted = limited && invite.uses >= invite.maxUses;
+                  return (
+                     <div key={invite.code} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                           <div className="text-sm font-black text-white uppercase tracking-wider">{invite.code}</div>
+                           <div className="text-[10px] font-mono text-gray-400 uppercase mt-1 flex items-center gap-2">
+                              <span>{limited ? `${invite.uses}/${invite.maxUses} uses` : `${invite.uses} uses`}</span>
+                              <span className="opacity-40">|</span>
+                              <span className="flex items-center gap-1"><Clock3 size={12} /> {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString() : 'No expiry'}</span>
+                           </div>
+                           {(expired || exhausted) && (
+                              <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-red-400">{expired ? 'Expired' : 'Max uses reached'}</div>
+                           )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                           <button onClick={() => handleCopy(invite)} className="px-3 py-2 rounded-lg bg-white/5 hover:bg-vani-blue/20 text-vani-blue text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><Copy size={12} /> Copy</button>
+                           <button onClick={() => handleRevoke(invite)} className="px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><Trash2 size={12} /> Revoke</button>
+                        </div>
+                     </div>
+                  );
+               })}
+            </div>
+         </motion.div>
+      </div>
+   );
 };
 
 export const CreateGroupDMModal = ({ onClose, onSubmit, currentUser }: { onClose: () => void, onSubmit: any, currentUser: IUser }) => {

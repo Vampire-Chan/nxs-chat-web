@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
 import { api } from '../services/api';
 import { getIdentityAvatar } from '../services/identity';
-import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, Calendar, Clock } from 'lucide-react';
+import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, Calendar, Clock, Key } from 'lucide-react';
+import { decryptMessage } from '../services/e2ee';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -57,9 +58,11 @@ interface Props {
   onStartVideo?: () => void;
   oversightMode?: boolean;
   setOversightMode?: (val: boolean) => void;
+  activeChannelKey?: CryptoKey | null;
+  onRegenerateKeys?: () => Promise<void> | void;
 }
 
-export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo, oversightMode = true, setOversightMode }: Props) => {
+export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo, oversightMode = true, setOversightMode, activeChannelKey, onRegenerateKeys }: Props) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -590,6 +593,8 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                  renderMedia={renderMedia}
                  renderBadge={renderBadge}
                  t={t}
+                 activeChannelKey={activeChannelKey}
+                 onRegenerateKeys={onRegenerateKeys}
                />
              </div>
            );
@@ -747,7 +752,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   );
 };
 
-const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge, t }: any) => {
+const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge, t, activeChannelKey, onRegenerateKeys }: any) => {
   const x = useMotionValue(0);
   const swipeThreshold = 60;
   const opacity = useTransform(x, [0, swipeThreshold], [0, 1]);
@@ -841,12 +846,23 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
                  <div className="italic text-[10px] text-gray-600 uppercase tracking-widest py-1 flex items-center gap-2">
                    <Lock size={10} /> {t('chat.deleted')}
                  </div>
-               ) : (
-                 <>
-                   {msg.content && <div className="markdown-content">{renderContent(msg.content)}</div>}
-                   {renderMedia(msg)}
-                 </>
-               )}
+                ) : (
+                  <>
+                    {msg.content && (
+                      <div className="markdown-content">
+                        <DecryptedText
+                          text={msg.content}
+                          isEncrypted={msg.isEncrypted}
+                          iv={msg.iv}
+                          channelKey={activeChannelKey}
+                          onRegenerateKeys={onRegenerateKeys}
+                          renderContent={renderContent}
+                        />
+                      </div>
+                    )}
+                    {renderMedia(msg)}
+                  </>
+                )}
              </>
            )}
            
@@ -882,3 +898,110 @@ const ContextItem = ({ label, icon, onClick, variant }: any) => (
 const MediaBtn = ({ icon, label, onClick, color }: any) => (
   <button onClick={onClick} className={`p-4 bg-white/5 rounded-2xl flex flex-col items-center justify-center space-y-2 hover:bg-white/10 transition-all border border-transparent hover:border-white/5`}><div className={color}>{icon}</div><span className="text-[8px] font-black uppercase tracking-widest text-gray-500">{label}</span></button>
 );
+
+const DecryptedText = ({
+  text,
+  isEncrypted,
+  iv,
+  channelKey,
+  onRegenerateKeys,
+  renderContent
+}: {
+  text: string;
+  isEncrypted?: boolean;
+  iv?: string;
+  channelKey: CryptoKey | null;
+  onRegenerateKeys?: () => Promise<void> | void;
+  renderContent: (t: string) => React.ReactNode;
+}) => {
+  const [decryptedText, setDecryptedText] = useState<string | null>(null);
+  const [decryptError, setDecryptError] = useState<boolean>(false);
+  const [decrypting, setDecrypting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isEncrypted) {
+      setDecryptedText(text);
+      setDecryptError(false);
+      return;
+    }
+
+    if (!channelKey || !iv) {
+      setDecryptedText(null);
+      setDecryptError(true);
+      return;
+    }
+
+    let active = true;
+    const performDecryption = async () => {
+      setDecrypting(true);
+      try {
+        const decrypted = await decryptMessage(channelKey, text, iv);
+        if (active) {
+          setDecryptedText(decrypted);
+          setDecryptError(false);
+        }
+      } catch (err) {
+        console.error("Decryption failed:", err);
+        if (active) {
+          setDecryptedText(null);
+          setDecryptError(true);
+        }
+      } finally {
+        if (active) {
+          setDecrypting(false);
+        }
+      }
+    };
+
+    performDecryption();
+    return () => {
+      active = false;
+    };
+  }, [text, isEncrypted, iv, channelKey]);
+
+  if (!isEncrypted) {
+    return <>{renderContent(text)}</>;
+  }
+
+  if (decrypting) {
+    return (
+      <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-mono tracking-widest uppercase py-1 select-none">
+        <span className="w-2.5 h-2.5 rounded-full border border-gray-500 border-t-transparent animate-spin inline-block" />
+        <span>Scanning Cipher...</span>
+      </div>
+    );
+  }
+
+  if (decryptError) {
+    return (
+      <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 my-2 text-red-400 max-w-sm flex flex-col space-y-2 select-none">
+        <div className="flex items-center space-x-2 text-xs font-black uppercase tracking-tighter">
+          <AlertTriangle size={14} className="text-red-500" />
+          <span>[Key Missing: Decryption Locked]</span>
+        </div>
+        <p className="text-[10px] text-gray-500 uppercase tracking-tight leading-tight">
+          This message is encrypted. If you are on a new device, your local E2EE private key is missing.
+        </p>
+        {onRegenerateKeys && (
+          <button
+            onClick={onRegenerateKeys}
+            className="flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-[9px] font-black uppercase tracking-wider text-red-400 transition-all w-fit pointer-events-auto"
+          >
+            <Key size={10} />
+            <span>Regenerate Keys</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group/e2e">
+      {decryptedText !== null && renderContent(decryptedText)}
+      <div className="absolute -top-4 right-0 flex items-center space-x-1 opacity-0 group-hover/e2e:opacity-100 transition-opacity bg-black/85 px-1.5 py-0.5 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-wider text-green-400 pointer-events-none select-none">
+        <ShieldCheck size={10} />
+        <span>E2EE SECURE</span>
+      </div>
+    </div>
+  );
+};

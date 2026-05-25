@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Globe, Heart, Send, Hash, RefreshCcw, LockKeyhole, ExternalLink, CreditCard } from 'lucide-react';
+import { X, User, Shield, Lock, History as HistoryIcon, Zap, Settings, Image as ImageIcon, Camera, ArrowLeft, ChevronRight, Layout, Monitor, Smartphone, Globe, Heart, Send, Hash, RefreshCcw, LockKeyhole, ExternalLink, CreditCard, Calendar } from 'lucide-react';
 import { api } from '../services/api';
 import { useLanguage, VISIBLE_LANGUAGE_OPTIONS } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -17,6 +17,186 @@ interface Props {
   setKineticTransitions?: (val: boolean) => void;
 }
 
+// ----------------------------------------------------------------------------
+// Helper Logic & Styles
+// ----------------------------------------------------------------------------
+
+const calculateAge = (dobString: string): number => {
+  if (!dobString) return 0;
+  const birthDate = new Date(dobString);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const getThemeColors = (tab: 'profile' | 'security' | 'privacy' | 'interface' | 'archive' | 'sovereignty' | 'donate') => {
+  switch (tab) {
+    case 'profile':
+      return {
+        accent: 'text-[#00d2ff]',
+        accentBg: 'bg-[#00d2ff]',
+        glow: 'glow-blue',
+        border: 'border-[#00d2ff]/20',
+        focusBorder: 'focus:border-[#00d2ff]/40',
+        activeNav: 'bg-[#00d2ff]/10 text-[#00d2ff] border-l-2 border-[#00d2ff]',
+        iconColor: 'text-[#00d2ff]',
+        badgeText: '[ PROTOCOL: ACTIVE ]'
+      };
+    case 'interface':
+      return {
+        accent: 'text-pink-400',
+        accentBg: 'bg-pink-500',
+        glow: 'glow-pink',
+        border: 'border-pink-500/20',
+        focusBorder: 'focus:border-pink-500/40',
+        activeNav: 'bg-pink-500/10 text-pink-400 border-l-2 border-pink-500',
+        iconColor: 'text-pink-400',
+        badgeText: '[ CONFIG: STABLE ]'
+      };
+    case 'security':
+      return {
+        accent: 'text-green-400',
+        accentBg: 'bg-green-500',
+        glow: 'glow-green',
+        border: 'border-green-500/20',
+        focusBorder: 'focus:border-green-500/40',
+        activeNav: 'bg-green-500/10 text-green-400 border-l-2 border-green-500',
+        iconColor: 'text-green-400',
+        badgeText: '[ ACCESS: SECURED ]'
+      };
+    case 'privacy':
+      return {
+        accent: 'text-purple-400',
+        accentBg: 'bg-purple-500',
+        glow: 'glow-purple',
+        border: 'border-purple-500/20',
+        focusBorder: 'focus:border-purple-500/40',
+        activeNav: 'bg-purple-500/10 text-purple-400 border-l-2 border-purple-500',
+        iconColor: 'text-purple-400',
+        badgeText: '[ NODAL CLOAK: ACTIVE ]'
+      };
+    case 'archive':
+      return {
+        accent: 'text-yellow-400',
+        accentBg: 'bg-yellow-500',
+        glow: 'glow-yellow',
+        border: 'border-yellow-500/20',
+        focusBorder: 'focus:border-yellow-500/40',
+        activeNav: 'bg-yellow-500/10 text-yellow-400 border-l-2 border-yellow-500',
+        iconColor: 'text-yellow-400',
+        badgeText: '[ HISTOGRAM: DECRYPTED ]'
+      };
+    case 'sovereignty':
+      return {
+        accent: 'text-vani-accent',
+        accentBg: 'bg-[#ff0055]',
+        glow: 'glow-accent',
+        border: 'border-[#ff0055]/20',
+        focusBorder: 'focus:border-[#ff0055]/40',
+        activeNav: 'bg-[#ff0055]/10 text-white border-l-2 border-[#ff0055]',
+        iconColor: 'text-[#ff0055]',
+        badgeText: '[ OVERLORD: ON-LINE ]'
+      };
+    case 'donate':
+      return {
+        accent: 'text-red-400',
+        accentBg: 'bg-red-500',
+        glow: 'glow-red',
+        border: 'border-red-500/20',
+        focusBorder: 'focus:border-red-500/40',
+        activeNav: 'bg-red-500/10 text-red-400 border-l-2 border-red-500',
+        iconColor: 'text-red-400',
+        badgeText: '[ CONTRIBUTE: APPRECIATED ]'
+      };
+  }
+};
+
+const TechCard = ({ title, subtitle, icon, children, glowClass, borderClass, themeColor, statusText }: any) => (
+  <div className={`relative bg-[#07070a]/40 backdrop-blur-md border ${borderClass || 'border-white/5'} rounded-2xl p-6 lg:p-8 ${glowClass || ''} overflow-hidden group`}>
+    <div className="absolute top-2 left-2 text-white/5 select-none pointer-events-none font-mono text-[9px]">+</div >
+    <div className="absolute top-2 right-2 text-white/5 select-none pointer-events-none font-mono text-[9px]">+</div >
+    <div className="absolute bottom-2 left-2 text-white/5 select-none pointer-events-none font-mono text-[9px]">+</div >
+    <div className="absolute bottom-2 right-2 text-white/5 select-none pointer-events-none font-mono text-[9px]">+</div >
+    
+    <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/5 pb-4 mb-6 gap-4">
+       <div className="flex items-center gap-3">
+          {icon && <span className={themeColor}>{icon}</span>}
+          <div>
+             <div className="text-sm font-black text-white uppercase tracking-wider font-mono">{title}</div>
+             {subtitle && <p className="text-[9px] text-gray-500 font-medium uppercase tracking-tight mt-0.5">{subtitle}</p>}
+          </div>
+       </div>
+       {statusText && (
+          <div className={`text-[8px] font-black font-mono tracking-widest px-3 py-1 rounded border ${borderClass} bg-black/40 ${themeColor} self-start md:self-auto`}>
+             {statusText}
+          </div>
+       )}
+    </div>
+    {children}
+  </div>
+);
+
+const TechInput = ({ label, value, onChange, type = "text", disabled = false, placeholder, error, themeColor, borderClass, focusBorderClass }: any) => (
+  <div className="space-y-2">
+     <label className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-1.5 font-mono">
+        <span>[ {label} ]</span>
+        {disabled && <LockKeyhole size={10} className={themeColor || "text-vani-blue"} />}
+     </label>
+     <div className="relative flex items-center w-full">
+        <input 
+          type={type} 
+          className={`w-full bg-[#050507]/60 border ${borderClass || 'border-white/5'} ${focusBorderClass || 'focus:border-vani-blue/50'} p-4 rounded-xl text-white outline-none font-mono font-medium transition-all ${disabled ? 'cursor-not-allowed opacity-50' : ''}`} 
+          value={value} 
+          onChange={onChange}
+          disabled={disabled}
+          placeholder={placeholder}
+        />
+     </div>
+     {error && <p className="text-[8px] font-black text-red-500 uppercase tracking-widest ml-2 font-mono">{error}</p>}
+  </div>
+);
+
+const TechSelect = ({ label, value, onChange, options, disabled = false, themeColor, borderClass, focusBorderClass }: any) => (
+  <div className="space-y-2">
+     <label className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-1.5 font-mono">
+        <span>[ {label} ]</span>
+        {disabled && <LockKeyhole size={10} className={themeColor || "text-vani-blue"} />}
+     </label>
+     <div className="relative flex items-center w-full">
+        <select 
+          className={`w-full bg-[#050507]/60 border ${borderClass || 'border-white/5'} ${focusBorderClass || 'focus:border-vani-blue/50'} p-4 rounded-xl text-white outline-none font-mono font-bold transition-all appearance-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} 
+          value={value} 
+          onChange={onChange}
+          disabled={disabled}
+        >
+           {options.map((opt: any) => (
+             <option key={opt.value} value={opt.value} className="bg-[#0a0a0c] text-white">{opt.label}</option>
+           ))}
+        </select>
+     </div>
+  </div>
+);
+
+const TechSwitch = ({ label, description, active, onToggle, activeBgClass }: any) => (
+  <div className="flex items-center justify-between p-4 bg-white/[0.01] hover:bg-white/[0.02] transition-colors rounded-xl border border-white/5">
+     <div>
+        <div className="text-[10px] font-black text-white uppercase tracking-widest font-mono">{label}</div>
+        {description && <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight mt-0.5">{description}</div>}
+     </div>
+     <button onClick={onToggle} className={`w-12 h-6 rounded-full relative transition-all shrink-0 ${active ? (activeBgClass || 'bg-vani-blue') : 'bg-gray-800'}`}>
+        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${active ? 'left-7' : 'left-1'}`} />
+     </button>
+  </div>
+);
+
+// ----------------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------------
+
 export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDockPosition, kineticTransitions, setKineticTransitions }: Props) => {
   const { language, setLanguage, t } = useLanguage();
   const { addToast } = useToast();
@@ -27,6 +207,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   const [displayName, setDisplayName] = useState(user.displayName || '');
   const [bio, setBio] = useState(user.bio || '');
   const [gender, setGender] = useState(user.gender || 'none');
+  const [dob, setDob] = useState(user.dob ? new Date(user.dob).toISOString().split('T')[0] : '');
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
   const [bannerBlob, setBannerBlob] = useState<Blob | null>(null);
   const [avatarPreview, setAvatarPreview] = useState(getIdentityAvatar(user));
@@ -62,6 +243,7 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
       setDisplayName(user.displayName || '');
       setBio(user.bio || '');
       setGender(user.gender || 'none');
+      setDob(user.dob ? new Date(user.dob).toISOString().split('T')[0] : '');
       setAvatarPreview(getIdentityAvatar(user));
       setBannerPreview(user.banner || '');
       setIsPrivate(user.isPrivate || false);
@@ -82,6 +264,16 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
     if (activeTab === 'archive') fetchTxs();
   }, [activeTab]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleSave = async (customKeys?: any[]) => {
     setLoading(true);
     const fd = new FormData();
@@ -98,6 +290,18 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
 
       if (gender !== (user.gender || 'none')) {
          fd.append('gender', gender);
+      }
+
+      let autoSwitchedLang = false;
+      const initialDob = user.dob ? new Date(user.dob).toISOString().split('T')[0] : '';
+      if (dob && dob !== initialDob) {
+         fd.append('dob', dob);
+         
+         const age = calculateAge(dob);
+         if (age >= 30 && language === 'en') {
+            setLanguage('en-simple');
+            autoSwitchedLang = true;
+         }
       }
 
       if (isPrivate !== !!user.isPrivate) {
@@ -122,6 +326,9 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
 
       try {
          await onSave(fd);
+         if (autoSwitchedLang) {
+            addToast('Auto-switched to Simple English based on age calibration (30+)', 'info');
+         }
       } finally {
          setLoading(false);
       }
@@ -171,408 +378,440 @@ export const UserSettingsModal = ({ user, onClose, onSave, dockPosition, setDock
   ];
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const theme = getThemeColors(activeTab);
 
   return (
-    <div className="fixed inset-0 bg-black z-[2500] flex items-center justify-center lg:p-10 lg:bg-black/95 lg:backdrop-blur-2xl" onClick={onClose}>
-      <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="w-full h-full lg:max-w-6xl lg:h-[85vh] bg-[#0a0a0c] lg:border border-white/5 lg:rounded-[48px] shadow-2xl flex flex-col lg:flex-row overflow-hidden">
+    <div className="fixed inset-0 bg-[#0a0a0c] z-[2500] flex bg-grid-pattern" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }} onClick={(e) => e.stopPropagation()} className="w-full h-full bg-[#0a0a0c]/90 flex flex-col lg:flex-row overflow-hidden">
         
-        <div className={`w-full lg:w-80 bg-discord-sidebar/50 border-r border-white/5 flex flex-col shrink-0 ${isMobile && !isMobileMenuOpen ? 'hidden' : 'flex'}`}>
-           <div className="p-6 lg:p-10 border-b border-white/5 flex justify-between items-center">
-              <h2 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-3"><Settings size={24} className="text-vani-blue animate-spin-slow" /> {t('nav.settings')}</h2>
-              <button onClick={onClose} className="lg:hidden p-2 bg-white/5 rounded-xl text-white"><X size={20} /></button>
-           </div>
-           <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-2">
-              {navItems.map(item => (
-                <button key={item.id} onClick={() => { setActiveTab(item.id as any); if(isMobile) setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all group ${activeTab === item.id && (isMobile ? !isMobileMenuOpen : true) ? 'bg-vani-gradient text-white' : 'text-gray-500 hover:bg-white/5'}`}>
-                   <div className="flex items-center space-x-4"><span className={activeTab === item.id && (isMobile ? !isMobileMenuOpen : true) ? 'text-white' : item.color}>{item.icon}</span><span className="text-[11px] font-black uppercase tracking-widest">{item.label}</span></div>
-                   <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              ))}
+        {/* Left Sidebar Region */}
+        <div className={`w-full lg:w-[35%] xl:w-[30%] bg-[#08080a]/90 backdrop-blur-md border-r border-white/5 flex justify-end shrink-0 ${isMobile && !isMobileMenuOpen ? 'hidden' : 'flex'}`}>
+           <div className="w-full lg:w-[280px] xl:w-80 flex flex-col h-full lg:py-12">
+              <div className="p-6 lg:p-4 border-b lg:border-none border-white/5 flex justify-between items-center">
+                 <h2 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-3"><Settings size={24} className="text-vani-blue animate-spin-slow" /> {t('nav.settings')}</h2>
+                 <button onClick={onClose} className="lg:hidden p-2 bg-white/5 rounded-xl text-white"><X size={20} /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 lg:p-2 space-y-2">
+                 {navItems.map(item => {
+                   const isSelected = activeTab === item.id && (isMobile ? !isMobileMenuOpen : true);
+                   const itemTheme = getThemeColors(item.id as any);
+                   return (
+                     <button 
+                       key={item.id} 
+                       onClick={() => { setActiveTab(item.id as any); if(isMobile) setIsMobileMenuOpen(false); }} 
+                       className={`w-full flex items-center justify-between px-5 py-4 lg:py-3.5 rounded-xl transition-all group relative overflow-hidden ${isSelected ? itemTheme.activeNav + ' font-bold' : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'}`}
+                     >
+                        <div className="flex items-center space-x-4">
+                           <span className={isSelected ? itemTheme.iconColor : item.color}>{item.icon}</span>
+                           <span className="text-[10px] font-black uppercase tracking-[0.15em] font-mono">{item.label}</span>
+                        </div>
+                        <ChevronRight size={14} className={`transition-all duration-200 ${isSelected ? 'translate-x-0 opacity-100' : '-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0'}`} />
+                     </button>
+                   );
+                 })}
+              </div>
            </div>
         </div>
 
-        <div className={`flex-1 flex flex-col overflow-hidden bg-discord-dark/20 ${isMobile && isMobileMenuOpen ? 'hidden' : 'flex'}`}>
-           <div className="p-6 lg:p-10 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
-              <div className="flex items-center gap-4">
-                 <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl text-white"><ArrowLeft size={20} /></button>
-                 <h3 className="text-xl lg:text-2xl font-black text-white uppercase tracking-tighter">
-                    {navItems.find(i => i.id === activeTab)?.label.split(' ')[0] || activeTab}_{t('settings.matrix_matrix')}
-                 </h3>
+        {/* Right Content Region */}
+        <div className={`flex-1 flex flex-col overflow-hidden bg-[#0d0d11]/85 backdrop-blur-sm relative ${isMobile && isMobileMenuOpen ? 'hidden' : 'flex'}`}>
+           {/* Subtle background glow effect */}
+           <div className={`absolute top-1/4 right-1/4 w-[500px] h-[500px] rounded-full filter blur-[150px] opacity-[0.03] pointer-events-none transition-all duration-500 ${activeTab === 'sovereignty' ? 'bg-[#ff0055]' : activeTab === 'security' ? 'bg-[#4ade80]' : activeTab === 'privacy' ? 'bg-[#c084fc]' : activeTab === 'archive' ? 'bg-[#facc15]' : activeTab === 'interface' ? 'bg-pink-500' : 'bg-[#00d2ff]'}`} />
+
+           <div className="border-b lg:border-none border-white/5 bg-white/[0.01] lg:bg-transparent z-10">
+              <div className="max-w-3xl xl:max-w-4xl w-full mx-auto px-6 lg:px-12 py-6 lg:py-12 flex justify-between items-center">
+                 <div className="flex items-center gap-4">
+                    <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl text-white"><ArrowLeft size={20} /></button>
+                    <div>
+                       <span className={`text-[8px] font-black uppercase tracking-[0.2em] font-mono ${theme.accent}`}>{theme.badgeText}</span>
+                       <h3 className="text-xl lg:text-3xl font-black text-white uppercase tracking-tighter mt-1">
+                          {navItems.find(i => i.id === activeTab)?.label.split(' ')[0] || activeTab}_{t('settings.matrix_matrix')}
+                       </h3>
+                    </div>
+                 </div>
+                 <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500 transition-all text-white flex items-center gap-2 group shadow-lg border border-white/5 hover:border-red-500/30">
+                    <X size={20} className="group-hover:rotate-90 transition-transform duration-200" />
+                    <span className="hidden md:inline text-[9px] font-black tracking-widest text-gray-400 group-hover:text-white uppercase font-mono">ESC</span>
+                 </button>
               </div>
-              <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500 transition-all text-white"><X size={20} /></button>
            </div>
 
-           <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12">
-              <AnimatePresence mode="wait">
-                {activeTab === 'profile' && (
-                  <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8 lg:space-y-12">
-                     <div className="relative mb-16 lg:mb-24">
-                        <div className="h-32 md:h-40 lg:h-48 bg-gray-900 rounded-[24px] lg:rounded-[40px] overflow-hidden border border-white/5 group cursor-pointer" onClick={() => bannerRef.current?.click()}>
-                           {bannerPreview ? <img src={bannerPreview} className="w-full h-full object-cover opacity-40" /> : <div className="w-full h-full bg-vani-gradient opacity-10" />}
-                           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/20"><ImageIcon size={40} className="text-white" /></div>
-                        </div>
-                        <div className="absolute -bottom-10 lg:-bottom-14 left-6 lg:left-14 p-1.5 bg-[#0a0a0c] rounded-[28px] lg:rounded-[36px] shadow-2xl" onClick={(e) => { e.stopPropagation(); avatarRef.current?.click(); }}>
-                           <div className="w-20 h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 rounded-[20px] md:rounded-[24px] lg:rounded-[32px] bg-gray-800 border-4 border-[#0a0a0c] overflow-hidden relative">
-                              {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-vani-gradient" />}
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/40"><Camera size={32} className="text-white" /></div>
+           <div className="flex-1 overflow-y-auto custom-scrollbar z-10">
+              <div className="max-w-3xl xl:max-w-4xl w-full mx-auto px-6 lg:px-12 pb-24">
+                 <AnimatePresence mode="wait">
+                   {activeTab === 'profile' && (
+                     <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8 lg:space-y-12">
+                        <div className="relative mb-16 lg:mb-24">
+                           <div className="h-32 md:h-40 lg:h-48 bg-gray-900 rounded-[24px] lg:rounded-[40px] overflow-hidden border border-white/5 group cursor-pointer" onClick={() => bannerRef.current?.click()}>
+                              {bannerPreview ? <img src={bannerPreview} className="w-full h-full object-cover opacity-40" /> : <div className="w-full h-full bg-vani-gradient opacity-10" />}
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/20"><ImageIcon size={40} className="text-white" /></div>
                            </div>
-                        </div>
-                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10">
-                        <div className="space-y-3"><label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4">{t('profile.displayname')}</label><input className="w-full bg-[#050507] border border-white/5 p-4 md:p-5 rounded-2xl md:rounded-3xl text-white outline-none focus:border-vani-blue/50 font-bold" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
-                        <div className="space-y-3">
-                           <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4 flex items-center gap-2">
-                              {t('profile.gender')}
-                              {user.gender && user.gender !== 'none' && <LockKeyhole size={10} className="text-vani-blue" />}
-                           </label>
-                           <select 
-                             className={`w-full bg-[#050507] border border-white/5 p-4 md:p-5 rounded-2xl md:rounded-3xl text-white outline-none focus:border-vani-blue/50 font-bold appearance-none ${user.gender && user.gender !== 'none' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} 
-                             value={gender} 
-                             onChange={(e) => setGender(e.target.value as any)}
-                             disabled={!!(user.gender && user.gender !== 'none')}
-                           >
-                              <option value="male">{t('profile.gender_male')}</option>
-                              <option value="female">{t('profile.gender_female')}</option>
-                              <option value="other">{t('profile.gender_other')}</option>
-                              <option value="none">{t('profile.gender_none')}</option>
-                           </select>
-                           {user.gender && user.gender !== 'none' && (
-                             <p className="text-[7px] font-black text-vani-blue uppercase tracking-widest ml-4">{t('profile.gender_locked')}</p>
-                           )}
-                        </div>
-                     </div>
-                     <div className="grid grid-cols-1 gap-6 lg:gap-10">
-                        <div className="space-y-3"><label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-4">{t('profile.bio')}</label><textarea className="w-full bg-[#050507] border border-white/5 p-4 md:p-5 rounded-2xl md:rounded-3xl text-white outline-none focus:border-vani-blue/50 font-medium h-32 md:h-40 resize-none" value={bio} onChange={(e) => setBio(e.target.value)} /></div>
-                        <button onClick={() => handleSave()} disabled={loading} className="bg-vani-gradient text-white py-4 md:py-5 rounded-2xl md:rounded-[24px] font-black uppercase text-[10px] md:text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all">{loading ? t('common.scanning') : t('common.save')}</button>
-                     </div>
-                  </motion.div>
-                )}
-
-                {activeTab === 'donate' && (
-                  <motion.div key="donate" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8 lg:space-y-12">
-                     <div className="text-center space-y-4">
-                        <div className="w-16 h-16 md:w-20 md:h-20 bg-red-500/10 rounded-[28px] md:rounded-[32px] flex items-center justify-center mx-auto mb-6 text-red-500 border border-red-500/20 shadow-2xl"><Heart size={32} className="md:w-10 md:h-10" fill="currentColor" /></div>
-                        <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter">{t('donate.title')}</h3>
-                        <p className="text-gray-500 text-[10px] md:text-xs max-w-md mx-auto leading-relaxed uppercase tracking-widest font-mono">{t('donate.subtitle')}</p>
-                     </div>
-
-                     <div className="flex justify-center space-x-3 md:space-x-4">
-                        <button onClick={() => { setPaymentMethod('upi'); setDonateCurrency('INR'); }} className={`px-6 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black uppercase tracking-widest text-[9px] md:text-[10px] transition-all flex items-center gap-2 md:gap-3 ${paymentMethod === 'upi' ? 'bg-vani-blue text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]' : 'bg-white/5 text-gray-500'}`}><Zap size={14} className="md:w-4 md:h-4" /> UPI</button>
-                        <button onClick={() => { setPaymentMethod('paypal'); setDonateCurrency('USD'); }} className={`px-6 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black uppercase tracking-widest text-[9px] md:text-[10px] transition-all flex items-center gap-2 md:gap-3 ${paymentMethod === 'paypal' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'bg-white/5 text-gray-500'}`}><Globe size={14} className="md:w-4 md:h-4" /> PayPal</button>
-                     </div>
-
-                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
-                        {/* LEFT: PAYMENT DETAILS */}
-                        <div className="space-y-8">
-                           <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-3xl md:rounded-[40px] space-y-8">
-                              {paymentMethod === 'upi' ? (
-                                <div className="space-y-6 text-center">
-                                   <div className="p-4 bg-white rounded-2xl md:rounded-[32px] shadow-2xl inline-block"><img src={upiQr} alt="UPI QR" className="w-40 h-40 md:w-48 md:h-48" /></div>
-                                   <div className="bg-black/40 p-3 md:p-4 rounded-xl border border-white/5 font-mono text-[10px] md:text-xs text-vani-blue select-all break-all">{upiId}</div>
-                                   <div className="grid grid-cols-3 gap-2">
-                                      {['50', '500', '5000'].map(v => <button key={v} onClick={() => setDonateAmount(v)} className={`py-3 rounded-xl border font-black text-[9px] md:text-[10px] transition-all ${donateAmount === v ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>₹{v}</button>)}
-                                   </div>
-                                </div>
-                              ) : (
-                                <div className="space-y-6 text-center">
-                                   <div className="w-20 h-20 md:w-24 md:h-24 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto text-purple-500"><Globe size={40} className="md:w-12 md:h-12" /></div>
-                                   <div className="bg-black/40 p-3 md:p-4 rounded-xl border border-white/5 font-mono text-[10px] md:text-xs text-purple-400 select-all break-all">{paypalId}</div>
-                                   <div className="grid grid-cols-3 gap-2">
-                                      {['5', '10', '20'].map(v => <button key={v} onClick={() => setDonateAmount(v)} className={`py-3 rounded-xl border font-black text-[9px] md:text-[10px] transition-all ${donateAmount === v ? 'bg-purple-500/10 border-purple-500 text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>${v}</button>)}
-                                   </div>
-                                   <a href={paypalUrl} target="_blank" className="w-full bg-vani-gradient py-4 rounded-xl md:rounded-2xl block text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-xl">Go to PayPal</a>
-                                </div>
-                              )}
-                              <div className="space-y-2">
-                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-4">{t('settings.magnitude_override')}</label>
-                                 <input type="number" className="w-full bg-[#050507] border border-white/5 p-4 rounded-2xl text-white outline-none focus:border-vani-blue/50 font-bold" value={donateAmount} onChange={(e) => setDonateAmount(e.target.value)} />
+                           <div className="absolute -bottom-10 lg:-bottom-14 left-6 lg:left-14 p-1.5 bg-[#0a0a0c] rounded-[28px] lg:rounded-[36px] shadow-2xl group cursor-pointer" onClick={(e) => { e.stopPropagation(); avatarRef.current?.click(); }}>
+                              <div className="w-20 h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 rounded-[20px] md:rounded-[24px] lg:rounded-[32px] bg-gray-800 border-4 border-[#0a0a0c] overflow-hidden relative">
+                                 {avatarPreview ? (
+                                   <>
+                                     <div className="scanner-line animate-pulse" />
+                                     <img src={avatarPreview} className="w-full h-full object-cover animate-none" />
+                                   </>
+                                 ) : (
+                                   <div className="w-full h-full bg-vani-gradient" />
+                                 )}
+                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/40"><Camera size={32} className="text-white" /></div>
                               </div>
                            </div>
                         </div>
 
-                        {/* RIGHT: VERIFICATION FORM */}
-                        <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-3xl md:rounded-[40px] space-y-8">
-                           <div>
-                              <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Shield size={20} className="text-green-400" /> {t('settings.proof_of_link')}</div>
-                              <p className="text-[10px] text-gray-500 font-medium mt-1">{t('settings.proof_desc')}</p>
+                        <TechCard title="Biological Matrix" subtitle="Calibrate your node identifier, birthday, and physical descriptors." icon={<User size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.PROFILE: VERIFIED">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                             <TechInput label={t('profile.displayname')} value={displayName} onChange={(e: any) => setDisplayName(e.target.value)} borderClass={theme.border} focusBorderClass={theme.focusBorder} themeColor={theme.accent} />
+                             <TechInput label={t('profile.dob')} type="date" value={dob} onChange={(e: any) => setDob(e.target.value)} disabled={!!user.dob} borderClass={theme.border} focusBorderClass={theme.focusBorder} themeColor={theme.accent} />
+                             <TechSelect 
+                               label={t('profile.gender')} 
+                               value={gender} 
+                               onChange={(e: any) => setGender(e.target.value as any)} 
+                               disabled={!!(user.gender && user.gender !== 'none')} 
+                               options={[
+                                 { value: 'male', label: t('profile.gender_male') },
+                                 { value: 'female', label: t('profile.gender_female') },
+                                 { value: 'other', label: t('profile.gender_other') },
+                                 { value: 'none', label: t('profile.gender_none') }
+                               ]} 
+                               borderClass={theme.border}
+                               focusBorderClass={theme.focusBorder}
+                               themeColor={theme.accent}
+                             />
+                          </div>
+                          
+                          {(user.gender && user.gender !== 'none') || user.dob ? (
+                            <div className="mb-6 p-4 rounded-xl bg-white/[0.01] border border-white/5 space-y-2">
+                               {user.gender && user.gender !== 'none' && (
+                                 <p className="text-[9px] font-mono text-gray-500 flex items-center gap-2">
+                                    <LockKeyhole size={12} className={theme.accent} /> {t('profile.gender_locked')}
+                                 </p>
+                               )}
+                               {user.dob && (
+                                 <p className="text-[9px] font-mono text-gray-500 flex items-center gap-2">
+                                    <LockKeyhole size={12} className={theme.accent} /> {t('profile.dob_locked') || "Date of Creation (Birthday) is locked."}
+                                 </p>
+                               )}
+                            </div>
+                          ) : null}
+
+                          <div className="space-y-6">
+                             <div className="space-y-2">
+                                <label className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2 font-mono">[ {t('profile.bio')} ]</label>
+                                <textarea className={`w-full bg-[#050507]/60 border ${theme.border} ${theme.focusBorder} p-4 rounded-xl text-white outline-none font-mono font-medium h-32 resize-none transition-all`} value={bio} onChange={(e) => setBio(e.target.value)} />
+                             </div>
+                             <button onClick={() => handleSave()} disabled={loading} className="w-full bg-vani-gradient text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 font-mono">
+                               {loading ? t('common.scanning') : t('common.save')}
+                             </button>
+                          </div>
+                        </TechCard>
+                     </motion.div>
+                   )}
+
+                   {activeTab === 'interface' && (
+                     <motion.div key="interface" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                        <TechCard title={t('settings.appearance')} subtitle={t('settings.appearance_desc')} icon={<Layout size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.UI: STABLE">
+                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {[{ id: 'auto', label: 'Auto', icon: <Layout size={20} /> }, { id: 'bar', label: 'Bar', icon: <Monitor size={20} /> }, { id: 'button', label: 'Float', icon: <Smartphone size={20} /> }].map(opt => (
+                                <div key={opt.id} onClick={() => setCreationUI(opt.id as any)} className={`p-5 rounded-xl border cursor-pointer transition-all ${creationUI === opt.id ? 'bg-pink-500/10 border-pink-500 text-white shadow-[0_0_15px_rgba(244,114,182,0.2)]' : 'bg-black/30 border-white/5 text-gray-500 hover:border-white/10'}`}><div className="mb-3">{opt.icon}</div><div className="text-[10px] font-black uppercase tracking-widest font-mono">{opt.label}</div></div>
+                              ))}
                            </div>
-                           
+                        </TechCard>
+
+                        <TechCard title={t('settings.system_metrics')} subtitle={t('settings.system_metrics_desc')} icon={<Zap size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.ALIGN: OK">
                            <div className="space-y-6">
-                              <div className="space-y-2">
-                                 <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-2">{t('settings.transaction_id')}</label>
-                                 <div className="relative flex items-center group">
-                                    <div className="absolute left-4 text-gray-600 group-focus-within:text-vani-blue transition-colors"><Hash size={16} /></div>
-                                    <input type="text" className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white outline-none focus:border-vani-blue/50 transition-all placeholder-gray-800" placeholder="XXXX-XXXX-XXXX" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} />
+                              <div className="space-y-3">
+                                 <label className="text-[8px] font-black text-gray-600 uppercase tracking-widest ml-2 font-mono">[ {t('settings.dock_alignment')} ]</label>
+                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {['top', 'bottom', 'left', 'right'].map(pos => (
+                                      <button key={pos} onClick={() => setDockPosition(pos as any)} className={`py-2.5 rounded-xl border text-[9px] font-black uppercase transition-all font-mono ${dockPosition === pos ? 'bg-pink-500/10 border-pink-500 text-white shadow-[0_0_15px_rgba(244,114,182,0.2)]' : 'bg-black/30 border-white/5 text-gray-500 hover:text-white hover:border-white/10'}`}>{pos}</button>
+                                    ))}
                                  </div>
                               </div>
-
-                              <div className="p-4 bg-vani-blue/5 border border-vani-blue/10 rounded-2xl">
-                                 <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">{t('settings.verification_protocol')}</p>
-                              </div>
-
-                              <button onClick={handleSubmitTransaction} disabled={isSubmittingTx} className="w-full bg-vani-gradient text-white py-4 md:py-5 rounded-xl md:rounded-[24px] font-black uppercase text-[9px] md:text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-2 md:gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50">
-                                 {isSubmittingTx ? <RefreshCcw size={16} className="md:w-[18px] md:h-[18px] animate-spin" /> : <Send size={16} className="md:w-[18px] md:h-[18px]" />}
-                                 {isSubmittingTx ? t('common.loading') : t('settings.transmit_signal')}
-                              </button>
-                           </div>
-                        </div>
-                     </div>
-                  </motion.div>
-                )}
-
-                {activeTab === 'interface' && (
-                  <motion.div key="interface" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8 md:space-y-10">
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><ImageIcon size={20} className="text-pink-400" /> {t('settings.appearance')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.appearance_desc')}</p>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                           {[{ id: 'auto', label: 'Auto', icon: <Layout size={20} /> }, { id: 'bar', label: 'Bar', icon: <Monitor size={20} /> }, { id: 'button', label: 'Float', icon: <Smartphone size={20} /> }].map(opt => (
-                             <div key={opt.id} onClick={() => setCreationUI(opt.id as any)} className={`p-4 md:p-6 rounded-2xl md:rounded-3xl border cursor-pointer transition-all ${creationUI === opt.id ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/[0.02] border-white/5 text-gray-500'}`}><div className="mb-3 md:mb-4">{opt.icon}</div><div className="text-[10px] md:text-xs font-black uppercase tracking-widest">{opt.label}</div></div>
-                           ))}
-                        </div>
-                     </div>
-
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Zap size={20} className="text-yellow-400" /> {t('settings.system_metrics')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.system_metrics_desc')}</p>
-                        </div>
-                        <div className="space-y-6">
-                           <div className="space-y-3">
-                              <label className="text-[8px] font-black text-gray-600 uppercase tracking-widest ml-2">{t('settings.dock_alignment')}</label>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                 {['top', 'bottom', 'left', 'right'].map(pos => (
-                                   <button key={pos} onClick={() => setDockPosition(pos as any)} className={`py-2 rounded-xl border text-[9px] font-black uppercase transition-all ${dockPosition === pos ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>{pos}</button>
-                                 ))}
-                              </div>
-                           </div>
-                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                              <div>
-                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('settings.kinetic_transitions')}</div>
-                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.kinetic_desc')}</div>
-                              </div>
-                              <button onClick={() => setKineticTransitions?.(!kineticTransitions)} className={`w-12 h-6 rounded-full relative transition-all ${kineticTransitions ? 'bg-vani-blue' : 'bg-gray-800'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${kineticTransitions ? 'left-7' : 'left-1'}`} />
-                              </button>
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div><div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Globe size={20} className="text-green-400" /> {t('settings.language')}</div><p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.language_desc')}</p></div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-                           {VISIBLE_LANGUAGE_OPTIONS.map(l => (
-                             <button key={l.id} onClick={() => setLanguage(l.id as any)} className={`py-3 md:py-4 rounded-xl md:rounded-2xl border font-black uppercase text-[9px] md:text-[10px] transition-all ${language === l.id ? 'bg-vani-blue/10 border-vani-blue text-white' : 'bg-white/5 border-transparent text-gray-500'}`}>{l.label}</button>
-                           ))}
-                        </div>
-                     </div>
-                     <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-4 md:py-5 rounded-2xl md:rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">{t('common.save')}</button>
-                  </motion.div>
-                )}
-
-                {activeTab === 'archive' && (
-                  <motion.div key="archive" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><HistoryIcon size={20} className="text-yellow-400" /> {t('settings.billing')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.ledger_desc')}</p>
-                        </div>
-                        
-                        <div className="space-y-3 md:space-y-4">
-                             {transactions?.length > 0 ? (
-                             transactions.map((tx, i) => (
-                               <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-[28px] hover:bg-white/[0.04] transition-all gap-4 sm:gap-0">
-                                  <div className="flex items-center gap-3 md:gap-4">
-                                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-[20px] flex items-center justify-center ${tx.status === 'approved' ? 'bg-green-500/10 text-green-500' : tx.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                                        {tx.status === 'approved' ? <Shield size={18} className="md:w-5 md:h-5" /> : tx.status === 'rejected' ? <X size={18} className="md:w-5 md:h-5" /> : <Zap size={18} className="md:w-5 md:h-5" />}
-                                     </div>
-                                     <div>
-                                        <div className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-widest">{tx.method} OVERRIDE</div>
-                                        <div className="text-[8px] md:text-[9px] text-gray-500 font-bold uppercase tracking-tight flex items-center gap-2">
-                                             {tx.transactionId ? tx.transactionId.substring(0, 10) : 'N/A'}...
-                                             <span className="w-1 h-1 rounded-full bg-gray-800" />
-                                             {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'N/A'}
-                                        </div>
-                                     </div>
-                                  </div>
-                                  <div className="text-left sm:text-right w-full sm:w-auto">
-                                     <div className="text-[11px] md:text-[12px] font-black text-white uppercase tracking-tighter">Magnitude {tx.amount}</div>
-                                     <div className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest ${tx.status === 'approved' ? 'text-green-500' : tx.status === 'rejected' ? 'text-red-500' : 'text-yellow-500'}`}>{tx.status}</div>
-                                  </div>
-                               </div>
-                             ))
-                           ) : (
-                             <div className="py-16 md:py-20 text-center space-y-4">
-                                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/5 rounded-2xl md:rounded-[24px] flex items-center justify-center mx-auto text-gray-700"><CreditCard size={24} className="md:w-8 md:h-8" /></div>
-                                <div className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">{t('settings.ledger_empty')}</div>
-                             </div>
-                           )}
-                        </div>
-
-                        <div className="p-4 md:p-6 bg-vani-blue/5 border border-vani-blue/10 rounded-2xl md:rounded-[28px] space-y-3 md:space-y-4">
-                           <div className="text-[10px] md:text-[11px] font-black text-vani-blue uppercase tracking-widest flex items-center gap-2"><Zap size={14} className="md:w-4 md:h-4" /> {t('settings.data_portability')}</div>
-                           <p className="text-[9px] md:text-[10px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider">{t('settings.data_portability_desc')}</p>
-                           <button onClick={() => api.exportData()} className="flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 bg-vani-blue text-black rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all w-full sm:w-auto justify-center"><ExternalLink size={12} className="md:w-[14px] md:h-[14px]" /> {t('settings.request_export')}</button>
-                        </div>
-                     </div>
-                  </motion.div>
-                )}
-
-                {activeTab === 'security' && (
-                  <motion.div key="security" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Shield size={20} className="text-green-400" /> {t('settings.identity_matrix')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.identity_matrix_desc')}</p>
-                        </div>
-                        
-                        <div className="space-y-6">
-                           <div className="p-5 md:p-6 bg-yellow-500/5 border border-yellow-500/10 rounded-2xl md:rounded-[24px] space-y-4">
-                              <div className="flex items-center gap-3 text-yellow-500"><LockKeyhole size={18} className="md:w-5 md:h-5" /> <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">{t('settings.saviour_protocol')}</span></div>
-                              <p className="text-[9px] md:text-[10px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider">{t('settings.saviour_desc')}</p>
                               
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
-                                 {backupKeys.length > 0 ? (
-                                   backupKeys.map((k, i) => (
-                                     <div key={i} className={`p-3 rounded-lg md:rounded-xl border font-mono text-[9px] md:text-[10px] flex items-center justify-between ${k.isUsed ? 'bg-red-500/10 border-red-500/20 text-red-500 line-through' : 'bg-black/40 border-white/5 text-green-400'}`}>
-                                       {k.code}
-                                       {k.isUsed ? <X size={12} /> : <Shield size={12} />}
-                                     </div>
-                                   ))
+                              <TechSwitch 
+                                label={t('settings.kinetic_transitions')} 
+                                description={t('settings.kinetic_desc')} 
+                                active={kineticTransitions} 
+                                onToggle={() => setKineticTransitions?.(!kineticTransitions)} 
+                                activeBgClass={theme.accentBg}
+                              />
+                           </div>
+                        </TechCard>
+
+                        <TechCard title={t('settings.language')} subtitle={t('settings.language_desc')} icon={<Globe size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.LOCALE: CALIBRATED">
+                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                              {VISIBLE_LANGUAGE_OPTIONS.map(l => (
+                                <button key={l.id} onClick={() => setLanguage(l.id as any)} className={`py-3 rounded-xl border font-black uppercase text-[10px] transition-all font-mono ${language === l.id ? 'bg-pink-500/10 border-pink-500 text-white shadow-[0_0_15px_rgba(244,114,182,0.2)]' : 'bg-black/30 border-white/5 text-gray-500 hover:text-white hover:border-white/10'}`}>{l.label}</button>
+                              ))}
+                           </div>
+                        </TechCard>
+
+                        <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl transition-all hover:scale-[1.01] active:scale-95 font-mono">{t('common.save')}</button>
+                     </motion.div>
+                   )}
+
+                   {activeTab === 'security' && (
+                     <motion.div key="security" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                        <TechCard title={t('settings.identity_matrix')} subtitle={t('settings.identity_matrix_desc')} icon={<Shield size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SEC.PROTOCOL: OK">
+                           <div className="space-y-6">
+                              <div className="p-5 bg-yellow-500/5 border border-yellow-500/10 rounded-xl space-y-4">
+                                 <div className="flex items-center gap-3 text-yellow-500 font-mono">
+                                    <LockKeyhole size={18} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{t('settings.saviour_protocol')}</span>
+                                 </div>
+                                 <p className="text-[9px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider font-mono">{t('settings.saviour_desc')}</p>
+                                 
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {backupKeys.length > 0 ? (
+                                      backupKeys.map((k, i) => (
+                                        <div key={i} className={`p-3.5 rounded-xl border font-mono text-[10px] flex items-center justify-between ${k.isUsed ? 'bg-red-500/5 border-red-500/20 text-red-500 line-through' : 'bg-black/40 border-white/5 text-green-400'}`}>
+                                          <span>{k.code}</span>
+                                          {k.isUsed ? <X size={12} /> : <Shield size={12} />}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="col-span-full py-4 text-center text-gray-600 text-[9px] font-black uppercase tracking-widest font-mono">{t('settings.no_keys')}</div>
+                                    )}
+                                 </div>
+
+                                 <button onClick={async () => {
+                                    try {
+                                       const res = await api.generateRecoveryKeys();
+                                       setBackupKeys(res.keys);
+                                       addToast(t('settings.keys_generated'), 'success');
+                                    } catch (e) { addToast(t('app.sync_failed'), 'error'); }
+                                 }} className="w-full py-3.5 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white transition-all border border-white/5 font-mono">{t('settings.generate_keys')}</button>
+                              </div>
+
+                              <TechSwitch 
+                                label={t('settings.biometric_lock')} 
+                                description={t('settings.biometric_desc')} 
+                                active={false} 
+                                onToggle={() => {}} 
+                                activeBgClass={theme.accentBg}
+                              />
+
+                              <div className="p-5 bg-white/[0.01] border border-white/5 rounded-xl space-y-6 relative overflow-hidden">
+                                 {newTOTP && <div className="scanner-line-green" />}
+                                 <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4 gap-4">
+                                    <div className="flex items-center gap-3">
+                                       <RefreshCcw size={16} className={theme.accent} />
+                                       <div>
+                                          <div className="text-[10px] font-black text-white uppercase tracking-widest font-mono">{t('settings.totp_keys')}</div>
+                                          <p className="text-[8px] text-gray-500 font-bold uppercase tracking-tight mt-0.5 font-mono">{t('settings.totp_desc')}</p>
+                                       </div>
+                                    </div>
+                                 </div>
+
+                                 {newTOTP ? (
+                                   <div className="space-y-4 text-center">
+                                      <div className="p-4 bg-white rounded-xl inline-block shadow-2xl">
+                                         <img src={newTOTP.qrCode} alt="TOTP QR" className="w-32 h-32" />
+                                      </div>
+                                      <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-mono text-[9px] text-[#4ade80] select-all uppercase break-all">
+                                         Secret: {newTOTP.secret}
+                                      </div>
+                                      <p className="text-[8px] text-red-400 font-black uppercase tracking-widest font-mono">⚠️ {t('settings.sync_authenticator')}</p>
+                                   </div>
                                  ) : (
-                                   <div className="col-span-full py-4 text-center text-gray-600 text-[9px] font-black uppercase tracking-widest">{t('settings.no_keys')}</div>
+                                   <button onClick={async () => {
+                                      if(confirm(t('settings.mfa_confirm'))) {
+                                         try {
+                                            const token = window.prompt('Enter your current 6-digit authenticator code to continue:')?.trim() || '';
+                                            if (!token) return;
+                                            const res = await api.resetTOTP(token);
+                                            setNewTOTP(res);
+                                            addToast(t('settings.identity_synced'), 'success');
+                                         } catch (e) { addToast(t('app.sync_failed'), 'error'); }
+                                      }
+                                   }} className="w-full py-3.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-green-400 transition-all font-mono">
+                                      {t('settings.regenerate_mfa')}
+                                   </button>
                                  )}
                               </div>
-
-                              <button onClick={async () => {
-                                 try {
-                                    const res = await api.generateRecoveryKeys();
-                                    setBackupKeys(res.keys);
-                                    addToast(t('settings.keys_generated'), 'success');
-                                 } catch (e) { addToast(t('app.sync_failed'), 'error'); }
-                              }} className="w-full py-3.5 md:py-4 bg-white/5 hover:bg-white/10 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white transition-all">{t('settings.generate_keys')}</button>
                            </div>
+                        </TechCard>
+                     </motion.div>
+                   )}
 
-                           <div className="flex items-center justify-between p-5 md:p-6 bg-white/5 rounded-2xl md:rounded-[24px] border border-white/5">
-                              <div>
-                                 <div className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-widest">{t('settings.biometric_lock')}</div>
-                                 <div className="text-[8px] md:text-[9px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.biometric_desc')}</div>
-                              </div>
-                              <button className="w-12 h-6 rounded-full bg-gray-800 relative cursor-not-allowed">
-                                 <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white/20" />
-                              </button>
+                   {activeTab === 'privacy' && (
+                     <motion.div key="privacy" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                        <TechCard title={t('settings.privacy_matrix')} subtitle={t('settings.privacy_matrix_desc')} icon={<Lock size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="PRIV.CLOAK: ACTIVE">
+                           <div className="space-y-4">
+                              <TechSwitch 
+                                label={t('settings.cloaked_identity')} 
+                                description={t('settings.cloaked_desc')} 
+                                active={isPrivate} 
+                                onToggle={() => setIsPrivate(!isPrivate)} 
+                                activeBgClass={theme.accentBg}
+                              />
+                              <TechSwitch 
+                                label={t('profile.temporal_signature')} 
+                                description={t('settings.temporal_desc')} 
+                                active={showAge} 
+                                onToggle={() => setShowAge(!showAge)} 
+                                activeBgClass={theme.accentBg}
+                              />
+                              <TechSwitch 
+                                label={t('profile.show_gender')} 
+                                description={t('profile.show_gender_desc')} 
+                                active={showGender} 
+                                onToggle={() => setShowGender(!showGender)} 
+                                activeBgClass={theme.accentBg}
+                              />
                            </div>
+                        </TechCard>
+                        <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl transition-all hover:scale-[1.01] active:scale-95 font-mono">{t('common.save')}</button>
+                     </motion.div>
+                   )}
 
-                           <div className="p-5 md:p-6 bg-vani-blue/5 border border-vani-blue/10 rounded-2xl md:rounded-[24px] space-y-6">
-                              <div>
-                                 <div className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                    <RefreshCcw size={14} className="md:w-4 md:h-4 text-vani-blue" /> {t('settings.totp_keys')}
-                                 </div>
-                                 <p className="text-[9px] md:text-[10px] text-gray-500 font-medium mt-1 uppercase tracking-tight">{t('settings.totp_desc')}</p>
-                              </div>
-
-                              {newTOTP ? (
-                                <div className="space-y-4 text-center">
-                                   <div className="p-4 bg-white rounded-xl md:rounded-[24px] inline-block shadow-2xl">
-                                      <img src={newTOTP.qrCode} alt="TOTP QR" className="w-32 h-32 md:w-40 md:h-40" />
-                                   </div>
-                                   <div className="bg-black/40 p-3 rounded-lg md:rounded-xl border border-white/5 font-mono text-[9px] md:text-[10px] text-vani-blue select-all uppercase break-all">
-                                      Secret: {newTOTP.secret}
-                                   </div>
-                                   <p className="text-[8px] text-red-400 font-black uppercase tracking-widest">⚠️ {t('settings.sync_authenticator')}</p>
+                   {activeTab === 'archive' && (
+                     <motion.div key="archive" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                        <TechCard title={t('settings.billing')} subtitle={t('settings.ledger_desc')} icon={<HistoryIcon size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.LEDGER: DECRYPTED">
+                           <div className="space-y-4">
+                              {transactions?.length > 0 ? (
+                                <div className="overflow-hidden border border-white/5 rounded-xl">
+                                   <table className="w-full text-left border-collapse font-mono text-[10px]">
+                                      <thead>
+                                         <tr className="bg-white/[0.02] border-b border-white/5 text-gray-500 uppercase tracking-wider">
+                                            <th className="p-4 font-black">METHOD</th>
+                                            <th className="p-4 font-black">TRANSACTION ID</th>
+                                            <th className="p-4 font-black">DATE</th>
+                                            <th className="p-4 font-black text-right">MAGNITUDE</th>
+                                            <th className="p-4 font-black text-center">STATUS</th>
+                                         </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-white/5">
+                                         {transactions.map((tx, i) => (
+                                           <tr key={i} className="hover:bg-white/[0.01] transition-colors">
+                                              <td className="p-4 font-black text-white">{tx.method?.toUpperCase()}</td>
+                                              <td className="p-4 text-gray-400 select-all">{tx.transactionId ? tx.transactionId.substring(0, 14) : 'N/A'}</td>
+                                              <td className="p-4 text-gray-500">{tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'N/A'}</td>
+                                              <td className="p-4 font-black text-white text-right">₹{tx.amount}</td>
+                                              <td className="p-4 text-center">
+                                                 <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${tx.status === 'approved' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : tx.status === 'rejected' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
+                                                    {tx.status}
+                                                 </span>
+                                              </td>
+                                           </tr>
+                                         ))}
+                                      </tbody>
+                                   </table>
                                 </div>
                               ) : (
-                                <button onClick={async () => {
-                                   if(confirm(t('settings.mfa_confirm'))) {
-                                      try {
-                                         const token = window.prompt('Enter your current 6-digit authenticator code to continue:')?.trim() || '';
-                                         if (!token) return;
-                                         const res = await api.resetTOTP(token);
-                                         setNewTOTP(res);
-                                         addToast(t('settings.identity_synced'), 'success');
-                                      } catch (e) { addToast(t('app.sync_failed'), 'error'); }
-                                   }
-                                }} className="w-full py-3.5 md:py-4 bg-vani-blue/10 hover:bg-vani-blue/20 border border-vani-blue/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-vani-blue transition-all">
-                                   {t('settings.regenerate_mfa')}
-                                </button>
+                                <div className="py-16 text-center space-y-4 bg-white/[0.01] border border-white/5 rounded-xl">
+                                   <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mx-auto text-gray-700"><CreditCard size={24} /></div>
+                                   <div className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] font-mono">{t('settings.ledger_empty')}</div>
+                                </div>
                               )}
+                              
+                              <div className="p-5 bg-white/[0.01] border border-white/5 rounded-xl space-y-3 mt-4">
+                                 <div className="text-[10px] font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2 font-mono"><Zap size={14} /> {t('settings.data_portability')}</div>
+                                 <p className="text-[9px] text-gray-500 font-medium leading-relaxed uppercase tracking-wider font-mono">{t('settings.data_portability_desc')}</p>
+                                 <button onClick={() => api.exportData()} className="flex items-center gap-2 px-5 py-3 bg-yellow-500 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all font-mono w-full sm:w-auto justify-center"><ExternalLink size={12} /> {t('settings.request_export')}</button>
+                              </div>
                            </div>
-                        </div>
-                     </div>
-                  </motion.div>
-                )}
+                        </TechCard>
+                     </motion.div>
+                   )}
 
-                {activeTab === 'privacy' && (
-                  <motion.div key="privacy" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6 md:space-y-8">
-                        <div>
-                           <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Lock size={20} className="text-purple-400" /> {t('settings.privacy_matrix')}</div>
-                           <p className="text-[10px] text-gray-500 font-medium max-w-xs mt-1">{t('settings.privacy_matrix_desc')}</p>
-                        </div>
+                   {activeTab === 'sovereignty' && (
+                     <motion.div key="sovereignty" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                        <TechCard title={t('ui.session_protocols')} subtitle="Manage your signal routes, severe active nodes, or sever your identity matrix." icon={<Zap size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="CORE.OVERLORD: CALIBRATED">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              <button onClick={() => window.location.reload()} className="p-4 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 border border-white/5 transition-all font-mono">{t('ui.reroute')}</button>
+                              <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-500 transition-all font-mono">{t('logout.btn_logout')}</button>
+                              <button onClick={async () => {
+                                 if(confirm(t('settings.severance_confirm'))) {
+                                    try {
+                                       await api.terminateIdentity();
+                                       localStorage.clear();
+                                       window.location.href = '/login';
+                                    } catch (e) { addToast(t('app.sever_failed'), 'error'); }
+                                 }
+                              }} className="p-4 bg-red-900/15 hover:bg-red-900/25 border border-red-900/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-900 transition-all col-span-full font-mono">{t('settings.permanent_severance')}</button>
+                           </div>
+                        </TechCard>
                         
-                        <div className="space-y-5 md:space-y-6">
-                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                              <div>
-                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('settings.cloaked_identity')}</div>
-                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.cloaked_desc')}</div>
-                              </div>
-                              <button onClick={() => setIsPrivate(!isPrivate)} className={`w-12 h-6 rounded-full relative transition-all ${isPrivate ? 'bg-purple-500' : 'bg-gray-800'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isPrivate ? 'left-7' : 'left-1'}`} />
-                              </button>
+                        <TechCard title={t('settings.neural_camouflage')} subtitle={t('settings.camouflage_desc')} icon={<Shield size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent}>
+                           <div className="flex items-center justify-between">
+                              <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight font-mono">Status: {isDisabled ? 'ACTIVE CAMOUFLAGE ON-LINE' : 'SIGNALS UNCLOAKED'}</div>
+                              <button onClick={handleToggleDisable} className={`w-14 h-8 rounded-full relative transition-all shrink-0 ${isDisabled ? 'bg-vani-accent' : 'bg-gray-800'}`}><div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${isDisabled ? 'left-7' : 'left-1'}`} /></button>
+                           </div>
+                        </TechCard>
+                     </motion.div>
+                   )}
+
+                   {activeTab === 'donate' && (
+                     <motion.div key="donate" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                        <div className="text-center space-y-3 py-4">
+                           <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto text-red-500 border border-red-500/20 shadow-2xl"><Heart size={30} fill="currentColor" /></div>
+                           <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter font-mono">{t('donate.title')}</h3>
+                           <p className="text-gray-500 text-[10px] max-w-md mx-auto leading-relaxed uppercase tracking-widest font-mono">{t('donate.subtitle')}</p>
+                        </div>
+
+                        <div className="flex justify-center space-x-3.5 font-mono">
+                           <button onClick={() => { setPaymentMethod('upi'); setDonateCurrency('INR'); }} className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2.5 ${paymentMethod === 'upi' ? 'bg-[#00d2ff] text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]' : 'bg-white/5 text-gray-500'}`}><Zap size={14} /> UPI</button>
+                           <button onClick={() => { setPaymentMethod('paypal'); setDonateCurrency('USD'); }} className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2.5 ${paymentMethod === 'paypal' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'bg-white/5 text-gray-500'}`}><Globe size={14} /> PayPal</button>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                           {/* LEFT: PAYMENT DETAILS */}
+                           <div className="space-y-8">
+                              <TechCard title="Transaction Vector" subtitle="Choose your preset amount or enter a custom overrides value." icon={<CreditCard size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent}>
+                                 {paymentMethod === 'upi' ? (
+                                   <div className="space-y-6 text-center">
+                                      <div className="p-4 bg-white rounded-2xl shadow-2xl inline-block relative overflow-hidden group">
+                                         <div className="scanner-line" />
+                                         <img src={upiQr} alt="UPI QR" className="w-40 h-40" />
+                                      </div>
+                                      <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-mono text-[9px] text-[#00d2ff] select-all break-all">{upiId}</div>
+                                      <div className="grid grid-cols-3 gap-2">
+                                         {['50', '500', '5000'].map(v => <button key={v} onClick={() => setDonateAmount(v)} className={`py-3 rounded-xl border font-black text-[10px] transition-all font-mono ${donateAmount === v ? 'bg-[#00d2ff]/10 border-[#00d2ff] text-white shadow-[0_0_10px_rgba(0,210,255,0.1)]' : 'bg-white/5 border-transparent text-gray-500'}`}>₹{v}</button>)}
+                                      </div>
+                                   </div>
+                                 ) : (
+                                   <div className="space-y-6 text-center font-mono">
+                                      <div className="w-20 h-20 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto text-purple-500"><Globe size={36} /></div>
+                                      <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-mono text-[9px] text-purple-400 select-all break-all">{paypalId}</div>
+                                      <div className="grid grid-cols-3 gap-2">
+                                         {['5', '10', '20'].map(v => <button key={v} onClick={() => setDonateAmount(v)} className={`py-3 rounded-xl border font-black text-[10px] transition-all ${donateAmount === v ? 'bg-purple-500/10 border-purple-500 text-white shadow-[0_0_10px_rgba(168,85,247,0.1)]' : 'bg-white/5 border-transparent text-gray-500'}`}>${v}</button>)}
+                                      </div>
+                                      <a href={paypalUrl} target="_blank" className="w-full bg-vani-gradient py-4 rounded-xl block text-[10px] font-black uppercase tracking-widest text-white shadow-xl text-center hover:scale-[1.01] transition-all">Go to PayPal Vector</a>
+                                   </div>
+                                 )}
+                                 
+                                 <div className="mt-6">
+                                    <TechInput label={t('settings.magnitude_override')} type="number" value={donateAmount} onChange={(e: any) => setDonateAmount(e.target.value)} borderClass={theme.border} focusBorderClass={theme.focusBorder} themeColor={theme.accent} />
+                                 </div>
+                              </TechCard>
                            </div>
 
-                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                              <div>
-                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('profile.temporal_signature')}</div>
-                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('settings.temporal_desc')}</div>
-                              </div>
-                              <button onClick={() => setShowAge(!showAge)} className={`w-12 h-6 rounded-full relative transition-all ${showAge ? 'bg-vani-blue' : 'bg-gray-800'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${showAge ? 'left-7' : 'left-1'}`} />
-                              </button>
-                           </div>
+                           {/* RIGHT: VERIFICATION FORM */}
+                           <div className="space-y-8">
+                              <TechCard title={t('settings.proof_of_link')} subtitle={t('settings.proof_desc')} icon={<Shield size={18} />} borderClass={theme.border} glowClass={theme.glow} themeColor={theme.accent} statusText="SYS.VERIFY: STANDBY">
+                                 <div className="space-y-6">
+                                    <TechInput label={t('settings.transaction_id')} placeholder="XXXX-XXXX-XXXX" value={transactionId} onChange={(e: any) => setTransactionId(e.target.value)} borderClass={theme.border} focusBorderClass={theme.focusBorder} themeColor={theme.accent} />
 
-                           <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                              <div>
-                                 <div className="text-[10px] font-black text-white uppercase tracking-widest">{t('profile.show_gender')}</div>
-                                 <div className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">{t('profile.show_gender_desc')}</div>
-                              </div>
-                              <button onClick={() => setShowGender(!showGender)} className={`w-12 h-6 rounded-full relative transition-all ${showGender ? 'bg-vani-blue' : 'bg-gray-800'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${showGender ? 'left-7' : 'left-1'}`} />
-                              </button>
+                                    <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
+                                       <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed font-mono">{t('settings.verification_protocol')}</p>
+                                    </div>
+
+                                    <button onClick={handleSubmitTransaction} disabled={isSubmittingTx} className="w-full bg-vani-gradient text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center justify-center gap-2.5 transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 font-mono">
+                                       {isSubmittingTx ? <RefreshCcw size={16} className="animate-spin" /> : <Send size={16} />}
+                                       {isSubmittingTx ? t('common.loading') : t('settings.transmit_signal')}
+                                    </button>
+                                 </div>
+                              </TechCard>
                            </div>
                         </div>
-                     </div>
-                     <button onClick={() => handleSave()} className="w-full bg-vani-gradient text-white py-4 md:py-5 rounded-2xl md:rounded-[24px] font-black uppercase text-[10px] tracking-widest shadow-2xl">{t('common.save')}</button>
-                  </motion.div>
-                )}
-
-                {activeTab === 'sovereignty' && (
-                  <motion.div key="sovereignty" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 md:space-y-8">
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] space-y-6">
-                        <div className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2"><Zap size={20} className="text-yellow-400" /> {t('ui.session_protocols')}</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                           <button onClick={() => window.location.reload()} className="p-4 bg-white/5 hover:bg-white/10 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400">{t('ui.reroute')}</button>
-                           <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-red-500">{t('logout.btn_logout')}</button>
-                           <button onClick={async () => {
-                              if(confirm(t('settings.severance_confirm'))) {
-                                 try {
-                                    await api.terminateIdentity();
-                                    localStorage.clear();
-                                    window.location.href = '/login';
-                                 } catch (e) { addToast(t('app.sever_failed'), 'error'); }
-                              }
-                           }} className="p-4 bg-red-900/10 hover:bg-red-900/20 border border-red-900/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-red-900 col-span-full">{t('settings.permanent_severance')}</button>
-                        </div>
-                     </div>
-                     <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] flex items-center justify-between gap-4">
-                        <div><div className="text-lg font-black text-white uppercase tracking-tight">{t('settings.neural_camouflage')}</div><p className="text-[10px] text-gray-500 font-medium mt-1">{t('settings.camouflage_desc')}</p></div>
-                        <button onClick={handleToggleDisable} className={`w-14 h-8 rounded-full relative transition-all shrink-0 ${isDisabled ? 'bg-vani-accent' : 'bg-gray-800'}`}><div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${isDisabled ? 'left-7' : 'left-1'}`} /></button>
-                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                     </motion.div>
+                   )}
+                 </AnimatePresence>
+              </div>
            </div>
         </div>
 

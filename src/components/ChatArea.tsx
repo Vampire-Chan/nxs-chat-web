@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IUser, IMessage, IRealm, IChannel } from '../services/api';
-import { api } from '../services/api';
+import { api, calculateFileHash, calculatePerceptualHash } from '../services/api';
 import { getIdentityAvatar } from '../services/identity';
 import { Plus, Smile, Sparkles, Phone, Video, Lock, ShieldCheck, Zap, Trash2, Mic, Camera, Image as ImageIcon, File as FileIcon, X, Send, Play, Pause, Settings, Forward, Edit3, AlertTriangle, MoreVertical, Reply, Calendar, Clock, Key } from 'lucide-react';
-import { decryptMessage } from '../services/e2ee';
+import { decryptMessage, encryptMessage } from '../services/e2ee';
 import { CUSTOM_EMOJI_MAP } from './CustomIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ProfileMiniCard } from './ProfileMiniCard';
 import { NeuralSuggester } from './NeuralSuggester';
 import { NeuralDatePicker, NeuralTimePicker } from './NeuralPicker';
 import { useToast } from '../context/ToastContext';
@@ -60,9 +59,10 @@ interface Props {
   setOversightMode?: (val: boolean) => void;
   activeChannelKey?: CryptoKey | null;
   onRegenerateKeys?: () => Promise<void> | void;
+  userStatuses: Record<string, 'online' | 'idle' | 'dnd' | 'offline'>;
 }
 
-export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo, oversightMode = true, setOversightMode, activeChannelKey, onRegenerateKeys }: Props) => {
+export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage, currentUser, channelId, onViewOtherProfile, channelType, activeRealm, activeChannel, socket, onRefreshMatrix, onGroupSettings, onOpenMedia, onStartCall, onStartVideo, oversightMode = true, setOversightMode, activeChannelKey, onRegenerateKeys, userStatuses }: Props) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -79,8 +79,6 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
   const [editInput, setEditInput] = useState('');
   const [msgContextMenu, setMsgContextMenu] = useState<{ x: number, y: number, msgId: string, isMe: boolean } | null>(null);
   const [replyingTo, setReplyingTo] = useState<IMessage | null>(null);
-  
-  const [activeMiniCard, setActiveMiniCard] = useState<{ user: IUser, position: { x: number, y: number } } | null>(null);
   const [suggestion, setSuggestion] = useState<{ query: string, type: 'mention' | 'tag', index: number } | null>(null);
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string, position: { x: number, y: number } } | null>(null);
   
@@ -127,8 +125,10 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
   useEffect(() => {
     if (channelId && currentUser) {
-      api.markChannelRead(channelId).then(() => onRefreshMatrix?.()).catch(() => {});
-      api.markNotificationsReadByChannel(channelId).then(() => onRefreshMatrix?.()).catch(() => {});
+      Promise.all([
+        api.markChannelRead(channelId),
+        api.markNotificationsReadByChannel(channelId)
+      ]).then(() => onRefreshMatrix?.()).catch(() => {});
     }
   }, [channelId, messages.length]);
 
@@ -164,10 +164,39 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
 
   const confirmUpload = async () => {
     if (!previewFile) return;
-    const fd = new FormData(); fd.append('file', previewFile.file); fd.append('channelId', channelId); fd.append('mediaType', previewFile.type);
-    if (previewCaption) fd.append('content', previewCaption);
     try {
       setUploadProgress(0);
+
+      // DEDUP: Hash the file and check if it already exists on the server
+      const hash = await calculateFileHash(previewFile.file);
+      const pHash = await calculatePerceptualHash(previewFile.file);
+      const check = await api.checkMediaHash(hash, pHash || undefined);
+
+      if (check.exists && check.url) {
+        // File already exists — send message with existing URL via socket, skip upload
+        const socket = (window as any).__vani_socket;
+        if (socket) {
+          socket.emit('send_message', {
+            channelId,
+            content: previewCaption || '',
+            mediaUrl: check.url,
+            mediaType: previewFile.type
+          });
+        }
+        setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
+        addToast(t('chat.transmission_success'), 'success');
+        return;
+      }
+
+      // No duplicate found — proceed with normal upload, include hash and pHash for server registration
+      const fd = new FormData();
+      fd.append('file', previewFile.file);
+      fd.append('channelId', channelId);
+      fd.append('mediaType', previewFile.type);
+      fd.append('fileHash', hash);
+      if (pHash) fd.append('pHash', pHash);
+      if (previewCaption) fd.append('content', previewCaption);
+
       await api.uploadMedia(fd, (pe) => setUploadProgress(Math.round((pe.loaded * 100) / (pe.total || pe.loaded))));
       setPreviewFile(null); setPreviewCaption(''); setUploadProgress(null);
       addToast(t('chat.transmission_success'), 'success');
@@ -252,11 +281,29 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
         return addToast(t('chat.temporal_lock'), 'error');
       }
 
+      let contentToSend = input;
+      let isEncrypted = false;
+      let iv: string | undefined = undefined;
+
+      if (activeChannelKey) {
+        try {
+          const enc = await encryptMessage(activeChannelKey, input);
+          contentToSend = enc.ciphertext;
+          isEncrypted = true;
+          iv = enc.iv;
+        } catch (err) {
+          console.error("Failed to encrypt scheduled message:", err);
+          return addToast("Encryption failure. Message not scheduled.", "error");
+        }
+      }
+
       await api.scheduleMessage({
         channelId,
-        content: input,
+        content: contentToSend,
         scheduledFor,
-        parentMessageId: replyingTo?._id
+        parentMessageId: replyingTo?._id,
+        isEncrypted,
+        iv
       });
       setInput('');
       setReplyingTo(null);
@@ -548,7 +595,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
            const hasReactions = msg.reactions && Object.values(msg.reactions).some((u: any) => u.length > 0);
 
            return (
-             <div key={msg._id || i} className="relative group/msg-outer">
+             <div key={msg._id || i} className="relative group/msg-outer" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}>
                {msg.parentMessage && (
                  <div className="flex items-center ml-12 mb-[-4px] relative z-0">
                     <div className="absolute -left-6 bottom-0 w-6 h-4 border-l-2 border-t-2 border-white/10 rounded-tl-xl" />
@@ -583,7 +630,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
                  onContext={onMessageContextMenu}
                  onLongPressStart={handleLongPressStart}
                  onLongPressEnd={handleLongPressEnd}
-                 onViewProfile={setActiveMiniCard}
+                 userStatuses={userStatuses}
                  onReply={() => setReplyingTo(msg)}
                  editInput={editInput}
                  setEditInput={setEditInput}
@@ -701,6 +748,7 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
              </motion.button>
              
              <textarea 
+               id="chat-message-input"
                placeholder={t('chat.placeholder')} 
                className="bg-transparent flex-1 focus:outline-none text-gray-200 placeholder-gray-600 py-2.5 text-sm font-medium resize-none max-h-32 min-h-[24px] leading-tight custom-scrollbar" 
                rows={1}
@@ -747,12 +795,11 @@ export const ChatArea = ({ channelName, messages: initialMessages, onSendMessage
           <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-3 flex items-center justify-center space-x-3 text-gray-600 grayscale grayscale-100"><Lock size={14} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">{t('chat.announcement_only')}</span></div>
         )}
       </div>
-      {activeMiniCard && <ProfileMiniCard user={activeMiniCard.user} isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser?.id || currentUser?._id)} isFollowing={currentUser?.following?.some((f:any) => (f._id || f) === (activeMiniCard.user._id || activeMiniCard.user.id)) || false} onViewFull={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onStartDM={() => { onViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }} onFollow={async () => { try { await api.syncIdentity(activeMiniCard.user._id || activeMiniCard.user.id); addToast(t('settings.sync_request_buffered'), 'success'); } catch(e){} }} onClose={() => setActiveMiniCard(null)} position={activeMiniCard.position} />}
     </div>
   );
 };
 
-const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, onViewProfile, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge, t, activeChannelKey, onRegenerateKeys }: any) => {
+const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor, isEditing, hasReactions, currentUser, onReact, onStartEdit, onContext, onLongPressStart, onLongPressEnd, userStatuses, onReply, editInput, setEditInput, onFinishEdit, setEditingMessageId, renderContent, renderMedia, renderBadge, t, activeChannelKey, onRegenerateKeys }: any) => {
   const x = useMotionValue(0);
   const swipeThreshold = 60;
   const opacity = useTransform(x, [0, swipeThreshold], [0, 1]);
@@ -802,22 +849,35 @@ const MessageItem = ({ msg, isSequence, isMe, isDeleted, displayName, roleColor,
         </div>
       )}
 
-      {!isSequence ? (
-        <div 
-          onClick={(e) => { 
-            if (isDeleted) return;
-            const rect = e.currentTarget.getBoundingClientRect(); 
-            onViewProfile({ user: msg.sender, position: { x: rect.left + 50, y: Math.min(rect.top, window.innerHeight - 400) } }); 
-          }} 
-          className={`w-9 h-9 rounded-xl bg-gray-800 flex-shrink-0 mt-1 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
-        >
-          <img src={getIdentityAvatar(msg.sender)} className="w-full h-full object-cover" />
-        </div>
-      ) : <div className="w-9 flex-shrink-0" />}
+      {!isSequence ? (() => {
+        const senderStatus = userStatuses?.[(msg.sender?._id || msg.sender?.id || '').toString()] || 'offline';
+        return (
+          <div className="relative w-9 h-9 flex-shrink-0 mt-1">
+            <div 
+              onClick={(e) => { 
+                if (isDeleted) return;
+                (window as any).__vani_show_mini_profile?.(e, msg.sender);
+              }} 
+              className={`w-full h-full rounded-xl bg-gray-800 overflow-hidden border border-gray-800 transition-all ${!isDeleted ? 'cursor-pointer hover:border-vani-blue' : ''}`}
+            >
+              <img src={getIdentityAvatar(msg.sender)} className="w-full h-full object-cover" />
+            </div>
+            {!isDeleted && (
+              <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[#0d0d11] rounded-full ${
+                senderStatus === 'dnd' ? 'bg-red-500' : senderStatus === 'idle' ? 'bg-yellow-500' : senderStatus === 'offline' ? 'bg-gray-500' : 'bg-green-500'
+              }`} />
+            )}
+          </div>
+        );
+      })() : <div className="w-9 flex-shrink-0" />}
         <div className="min-w-0 flex-1 relative">
            {!isSequence && (
              <div className="flex items-center space-x-2 mb-0.5">
-               <span style={{ color: roleColor }} className="font-black uppercase tracking-tighter text-[11px] cursor-pointer hover:underline text-white">
+               <span 
+                 onClick={(e) => (window as any).__vani_show_mini_profile?.(e, msg.sender)}
+                 style={{ color: roleColor }} 
+                 className="font-black uppercase tracking-tighter text-[11px] cursor-pointer hover:underline text-white"
+               >
                  {displayName}
                </span>
                {msg.sender && renderBadge(msg.sender)}

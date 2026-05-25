@@ -9,6 +9,8 @@ import { getIdentityName, getIdentityAvatar } from '../services/identity';
 import { PostViewerModal } from './PostViewerModal';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { MarkdownRenderer } from './MarkdownRenderer';
+
 
 interface Props {
   posts: IPost[];
@@ -101,16 +103,15 @@ export const FeedArea = ({ posts: initialPosts, onOpenCreateModal, currentUser, 
         }
       }).catch(() => setTrendingTags(['Yantravani', 'matrix', 'cyberpunk', 'web3', 'identity', 'privacy']));
 
-      setPopularPosts(initialPosts.slice(0, 5));
+      const sortedByEngagement = [...initialPosts].sort((a, b) => {
+        const aEng = (a.likes?.length || 0) + (a.comments?.length || 0) * 2;
+        const bEng = (b.likes?.length || 0) + (b.comments?.length || 0) * 2;
+        return bEng - aEng;
+      });
+      setPopularPosts(sortedByEngagement.slice(0, 5));
       
-      api.getNotifications().then(notifs => {
-        const events = notifs.slice(0, 5).map((n: any) => ({
-          id: n._id,
-          type: n.type,
-          user: n.sender?.username || 'ANON_NODE',
-          timestamp: new Date(n.createdAt)
-        }));
-        setPulseEvents(events);
+      api.getPulseEvents().then(pulseData => {
+        setPulseEvents(pulseData);
       }).catch(() => {
         setPulseEvents([
           { id: '1', type: 'system', user: 'Architect', timestamp: new Date() }
@@ -444,31 +445,13 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
 
   const renderContent = (text: string) => {
     if (!text) return null;
-    return text.split(/(\s+)/).map((part, i) => {
-      if (part.startsWith('#') && part.length > 1) {
-        const tag = part.substring(1).replace(/[^\w]/g, '');
-        return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
-      }
-      if (part.startsWith('@') && part.length > 1) {
-        const username = part.substring(1).replace(/[^\w]/g, '');
-        return (
-          <span 
-            key={i} 
-            onClick={async (e) => { 
-              e.stopPropagation(); 
-              try {
-                const res = await api.getUserByHandle(username);
-                if (res.id) onViewProfile?.(res.id);
-              } catch (e) { console.error("Identity resolution failed"); }
-            }} 
-            className="text-vani-accent hover:underline cursor-pointer"
-          >
-            @{username}
-          </span>
-        );
-      }
-      return part;
-    });
+    return (
+      <MarkdownRenderer
+        content={text}
+        onSelectTag={onSelectTag}
+        onViewProfile={onViewProfile}
+      />
+    );
   };
 
   const sourceRealm = post.sourceRealm as IRealm | undefined;
@@ -503,16 +486,17 @@ const PostCard = ({ post, currentUser, onDoubleTap, isHearting, onOpen, isGlobal
       initial={{ opacity: 0, y: 30 }} 
       whileInView={{ opacity: 1, y: 0 }} 
       viewport={{ once: true }} 
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 600px' }}
       className={`bg-discord-channel rounded-[32px] lg:rounded-[40px] overflow-hidden shadow-2xl border transition-all duration-500 ${isActive ? 'border-vani-blue ring-4 ring-vani-blue/10' : (isMe ? 'border-vani-blue/30' : 'border-gray-800')} group`}
     >
       <div className="p-4 lg:p-5 flex items-center justify-between bg-white/[0.01]">
         <div className="flex items-center space-x-3 lg:space-x-4">
-          <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl lg:rounded-2xl bg-gray-800 overflow-hidden border border-gray-700 shadow-lg group-hover:scale-105 transition-transform">
+          <div onClick={(e) => (window as any).__vani_show_mini_profile?.(e, post.author)} className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl lg:rounded-2xl bg-gray-800 overflow-hidden border border-gray-700 shadow-lg group-hover:scale-105 transition-transform cursor-pointer">
             <img src={getIdentityAvatar(post.author)} alt="a" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
-              <div className="font-black tracking-tight text-xs lg:text-sm uppercase text-white truncate max-w-[120px] lg:max-w-none">{getIdentityName(post.author)}</div>
+              <div onClick={(e) => (window as any).__vani_show_mini_profile?.(e, post.author)} className="font-black tracking-tight text-xs lg:text-sm uppercase text-white truncate max-w-[120px] lg:max-w-none cursor-pointer hover:underline">{getIdentityName(post.author)}</div>
               {isGlobal && sourceRealm && (
                 <div className="flex items-center space-x-1.5 px-1.5 py-0.5 bg-white/5 rounded-md border border-white/5 shrink-0">
                   <span className="text-[7px] lg:text-[8px] text-gray-500 font-black uppercase tracking-tighter">{t('feed.in')}</span>

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '../services/api';
 import type { IPost, IUser } from '../services/api';
 import { Heart, MessageCircle, Send, Music, Zap } from 'lucide-react';
+import { MarkdownRenderer } from './MarkdownRenderer';
+
 
 interface Props {
   posts: IPost[];
@@ -137,11 +139,11 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
       {/* Bottom Content */}
       <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gray-800 border-2 border-vani-blue overflow-hidden shadow-lg">
+            <div onClick={(e) => (window as any).__vani_show_mini_profile?.(e, post.author)} className="w-10 h-10 rounded-xl bg-gray-800 border-2 border-vani-blue overflow-hidden shadow-lg cursor-pointer hover:border-white transition-all">
                <img src={post.author.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author.username}`} className="w-full h-full object-cover" />
             </div>
             <div>
-               <h4 className="font-black text-white uppercase tracking-tight text-sm flex items-center">
+               <h4 onClick={(e) => (window as any).__vani_show_mini_profile?.(e, post.author)} className="font-black text-white uppercase tracking-tight text-sm flex items-center cursor-pointer hover:underline">
                   {post.author.username}
                   <Zap size={12} className="text-vani-blue ml-2 fill-vani-blue" />
                </h4>
@@ -150,7 +152,16 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
             <button onClick={handleSync} className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black px-4 py-1.5 rounded-lg border border-white/10 transition-all ml-2 uppercase tracking-widest">Sync</button>
          </div>
 
-         <p className="text-sm text-gray-200 line-clamp-2 font-medium mb-4 pr-12">{post.caption}</p>
+         <div className="text-sm text-gray-200 line-clamp-2 font-medium mb-4 pr-12">
+            <MarkdownRenderer
+              content={post.caption}
+              onViewProfile={(userId) => {
+                api.getUserProfile(userId).then(res => {
+                  (window as any).__vani_show_mini_profile?.(null, res);
+                }).catch(err => console.error(err));
+              }}
+            />
+         </div>
 
          <div className="flex items-center space-x-3 text-gray-400">
             <Music size={12} />
@@ -172,12 +183,21 @@ const ReelItem = ({ post, currentUser }: { post: IPost, currentUser: IUser }) =>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {comments.map((c: any, i: number) => (
               <div key={i} className="flex items-start space-x-2">
-                <div className="w-6 h-6 rounded-full bg-gray-700 overflow-hidden flex-shrink-0">
+                <div onClick={(e) => { if (c.user) (window as any).__vani_show_mini_profile?.(e, c.user); }} className="w-6 h-6 rounded-full bg-gray-700 overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-vani-blue transition-all">
                   <img src={c.user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.username || 'anon'}`} className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black text-vani-blue">{c.user?.username || 'Unknown'}</span>
-                  <p className="text-xs text-gray-300">{c.text}</p>
+                  <span onClick={(e) => { if (c.user) (window as any).__vani_show_mini_profile?.(e, c.user); }} className="text-[10px] font-black text-vani-blue cursor-pointer hover:underline">{c.user?.username || 'Unknown'}</span>
+                  <div className="text-xs text-gray-300">
+                    <MarkdownRenderer
+                      content={c.text}
+                      onViewProfile={(userId) => {
+                        api.getUserProfile(userId).then(res => {
+                          (window as any).__vani_show_mini_profile?.(null, res);
+                        }).catch(err => console.error(err));
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

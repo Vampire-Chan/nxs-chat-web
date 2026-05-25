@@ -4,6 +4,8 @@ import { X, Heart, MessageCircle, Send, Trash2, Edit3, Share2, AlertTriangle } f
 import type { IPost, IUser } from '../services/api';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { MarkdownRenderer } from './MarkdownRenderer';
+
 
 interface Props {
   post: IPost;
@@ -47,36 +49,24 @@ export const PostViewerModal = ({ post, onClose, currentUser, onUpdate, onSelect
 
   const renderCaption = (text: string) => {
     if (!text) return null;
-    return text.split(/(\s+)/).map((part, i) => {
-      if (part.startsWith('#') && part.length > 1) {
-        const tag = part.substring(1).replace(/[^\w]/g, '');
-        return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
-      }
-      if (part.startsWith('@') && part.length > 1) {
-        const username = part.substring(1).replace(/[^\w]/g, '');
-        return (
-          <span key={i} onClick={async (e) => { 
-            e.stopPropagation(); 
-            try {
-              const res = await api.getUserByHandle(username);
-              if (res.id) onViewProfile?.(res.id);
-            } catch (e) { console.error("Identity resolution failed"); }
-          }} className="text-vani-accent hover:underline cursor-pointer">@{username}</span>
-        );
-      }
-      return part;
-    });
+    return (
+      <MarkdownRenderer
+        content={text}
+        onSelectTag={onSelectTag}
+        onViewProfile={onViewProfile}
+      />
+    );
   };
 
   const renderComment = (text: string) => {
     if (!text) return null;
-    return text.split(/(\s+)/).map((part, i) => {
-      if (part.startsWith('#') && part.length > 1) {
-        const tag = part.substring(1).replace(/[^\w]/g, '');
-        return <span key={i} onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag); }} className="text-vani-blue hover:underline cursor-pointer">#{tag}</span>;
-      }
-      return part;
-    });
+    return (
+      <MarkdownRenderer
+        content={text}
+        onSelectTag={onSelectTag}
+        onViewProfile={onViewProfile}
+      />
+    );
   };
 
   const handleLike = async () => {

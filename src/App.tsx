@@ -9,7 +9,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { api, API_URL } from './services/api';
 import type { IRealm, IChannel, IMessage, IPost, IUser } from './services/api';
 import { getIdentityAvatar } from './services/identity';
-import { getOrGenerateUserKeys, regenerateUserKeys, importPublicKey, deriveSharedKey, encryptMessage } from './services/e2ee';
+import { getOrGenerateUserKeys, regenerateUserKeys, importPublicKey, deriveSharedKey, encryptMessage, generateChannelKey, exportSymmetricKey, importSymmetricKey, encryptChannelKeyForPeer, decryptChannelKeyFromPeer } from './services/e2ee';
 import { TopNavbar as CoreDock } from './components/RealmSidebar';
 import { ChannelSidebar } from './components/ChannelSidebar';
 import { ChatArea } from './components/ChatArea';
@@ -18,6 +18,8 @@ import { ReelsArea } from './components/ReelsArea';
 import { DMSidebar } from './components/DMSidebar';
 import { ProfileNode } from './components/ProfileNode';
 import { NotificationsPage } from './components/NotificationsPage';
+import { PostDrafterPage } from './components/PostDrafterPage';
+
 import { SearchModal } from './components/SearchModal';
 import { LaunchScreen } from './components/LaunchScreen';
 import { SocialCorner } from './components/SocialCorner';
@@ -28,8 +30,9 @@ import { LogoutModal } from './components/LogoutModal';
 import { ArchitectRealm } from './components/ArchitectRealm';
 import { VoiceChannel } from './components/VoiceChannel';
 import { MediaPlayer } from './components/MediaPlayer';
+import { ProfileMiniCard } from './components/ProfileMiniCard';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, WifiOff, Zap } from 'lucide-react';
+import { Menu, X, Search as SearchIcon, MessageSquare, Phone, Video, WifiOff, Zap, Shield } from 'lucide-react';
 import HelpPage from './pages/HelpPage';
 
 import LandingPage from './pages/LandingPage';
@@ -130,7 +133,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   const [activeChannel, setActiveChannel] = useState<IChannel | null>(savedState.activeChannel || null);
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [posts, setPosts] = useState<IPost[]>([]);
-  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [userStatuses, setUserStatuses] = useState<Record<string, 'online' | 'idle' | 'dnd' | 'offline'>>({});
+  const [activeMiniCard, setActiveMiniCard] = useState<{ user: IUser, position: { x: number, y: number } } | null>(null);
   const [matrixRefreshKey, setMatrixRefreshKey] = useState(0);
   const [activeMedia, setActiveMedia] = useState<{ type: 'image' | 'video' | 'audio', url: string } | null>(null);
   const [incomingCall, setIncomingCall] = useState<any>(null);
@@ -166,7 +170,37 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       window.addEventListener('vani_server_status', handleStatus);
       return () => window.removeEventListener('vani_server_status', handleStatus);
     }, []);
-  
+
+    useEffect(() => {
+      const handleShowMiniProfile = (e: any) => {
+        setActiveMiniCard({
+          user: e.detail.user,
+          position: { x: e.detail.x, y: e.detail.y }
+        });
+      };
+      window.addEventListener('vani_show_mini_profile', handleShowMiniProfile);
+      
+      (window as any).__vani_show_mini_profile = (e: React.MouseEvent, targetUser: IUser) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+        
+        window.dispatchEvent(new CustomEvent('vani_show_mini_profile', {
+          detail: {
+            user: targetUser,
+            x: clickX,
+            y: clickY + 10
+          }
+        }));
+      };
+      return () => {
+        window.removeEventListener('vani_show_mini_profile', handleShowMiniProfile);
+        delete (window as any).__vani_show_mini_profile;
+      };
+    }, []);
+
     const [dockPosition, setDockPosition] = useState<'top' | 'bottom' | 'left' | 'right'>(isMobile ? 'bottom' : (savedState.dockPosition || 'top'));
   const [sidebarWidth, setSidebarWidth] = useState(savedState.sidebarWidth || 240);
   const [isResizing, setIsResizing] = useState(false);
@@ -174,6 +208,32 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
   
   // GLOBAL OVERSIGHT TOGGLE
   const [oversightMode, setOversightMode] = useState(true);
+  const [isChatInputFocused, setIsChatInputFocused] = useState(false);
+
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.id === 'chat-message-input') {
+        setIsChatInputFocused(true);
+      }
+    };
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.id === 'chat-message-input') {
+        setTimeout(() => {
+          if (document.activeElement?.id !== 'chat-message-input') {
+            setIsChatInputFocused(false);
+          }
+        }, 50);
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); };
@@ -264,6 +324,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     const socketUrl = import.meta.env.VITE_API_URL || (isLocal ? `http://${hostname}:5000` : '');
     const s = io(socketUrl, { auth: { token }, query: { userId }, reconnection: true });
     socketRef.current = s;
+    (window as any).__vani_socket = s;
     s.on('new_notification', (notif: any) => { setLiveSignal(notif); setTimeout(() => setLiveSignal(null), 5000); });
     s.on('receive_message', (msg: any) => { 
       const msgChannelId = msg.channel?._id || msg.channel;
@@ -297,8 +358,18 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       setDms(prev => prev.map(d => ({ ...d, members: d.members?.map(member => (member._id || member.id) === updatedUser.userId ? { ...member, ...updatedUser, _id: updatedUser.userId } : member) })));
       loadRealms();
     });
-    s.on('user_status_change', ({ userId, status }: any) => { setOnlineUserIds(prev => { const n = new Set(prev); if (status === 'online') n.add(userId); else n.delete(userId); return n; }); });
-    s.on('online_users', (userIds: string[]) => { setOnlineUserIds(new Set(userIds)); });
+    s.on('user_status_change', ({ userId, status }: any) => {
+      setUserStatuses(prev => ({ ...prev, [userId]: status }));
+    });
+    s.on('online_users', (userIds: string[] | Record<string, 'online' | 'idle' | 'dnd' | 'offline'>) => {
+      if (Array.isArray(userIds)) {
+        const statuses: Record<string, 'online' | 'idle' | 'dnd' | 'offline'> = {};
+        userIds.forEach(uid => { statuses[uid] = 'online'; });
+        setUserStatuses(statuses);
+      } else {
+        setUserStatuses(userIds);
+      }
+    });
     s.on('message_reaction_update', ({ messageId, reactions }: any) => { setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m)); });
     s.on('message_updated', (updated: IMessage) => { setMessages(prev => prev.map(m => m._id === updated._id ? updated : m)); });
     s.on('channel_metadata_update', (updated: IChannel) => { setDms(prev => prev.map(d => d._id === updated._id ? updated : d)); if (activeChannel?._id === updated._id) setActiveChannel(updated); });
@@ -336,7 +407,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
     initE2E();
   }, [user]);
 
-  // Derive Shared Key for Active DM Channel
+  // Derive Shared Key for Active DM / Group / Realm Channel
   useEffect(() => {
     const deriveKeyForActiveChannel = async () => {
       if (!activeChannel || !e2ePrivateKey || !user) {
@@ -344,15 +415,16 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         return;
       }
       
-      const userId = user.id || user._id;
+      const userId = (user.id || user._id).toString();
 
+      // 1. Direct 1-to-1 DMs (standard ECDH)
       if (activeChannel.type === 'dm') {
-        const peer = activeChannel.members?.find(m => (m._id || m.id) !== userId);
+        const peer = activeChannel.members?.find(m => (m._id || m.id).toString() !== userId);
         if (peer) {
           let peerPublicKey = peer.publicKey;
           if (!peerPublicKey) {
             try {
-              const res = await api.getUserPublicKey(peer._id || peer.id);
+              const res = await api.getUserPublicKey((peer._id || peer.id).toString());
               peerPublicKey = res.publicKey || undefined;
             } catch (e) {
               console.error("Failed to fetch peer public key from fallback endpoint:", e);
@@ -369,11 +441,160 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             }
           }
         }
+        setActiveChannelKey(null);
+        return;
       }
+
+      // 2. Group Chats (group_dm) and Realm Channels
+      const isTextChannel = ['text', 'group_dm', 'mod_messages', 'mod_reports', 'mod_users', 'mod_stats'].includes(activeChannel.type);
+      if (isTextChannel) {
+        try {
+          const encryptedKeys = activeChannel.encryptedKeys || {};
+          const myEntry = encryptedKeys[userId];
+
+          // Case A: We already have an encrypted key entry for ourselves
+          if (myEntry) {
+            const { ciphertext, iv, senderId } = myEntry;
+            let senderPublicKey: string | undefined = undefined;
+
+            if (senderId.toString() === userId) {
+              senderPublicKey = e2ePublicKeyJwk || undefined;
+            } else {
+              // Find sender in channel or realm members
+              const members = activeChannel.type === 'group_dm'
+                ? activeChannel.members || []
+                : activeRealm?.members || [];
+              const senderUser = members.find(m => (m._id || m.id).toString() === senderId.toString());
+              senderPublicKey = senderUser?.publicKey;
+              if (!senderPublicKey) {
+                const res = await api.getUserPublicKey(senderId.toString());
+                senderPublicKey = res.publicKey || undefined;
+              }
+            }
+
+            if (senderPublicKey) {
+              const importedSenderKey = await importPublicKey(senderPublicKey);
+              const decryptedSymmetricKey = await decryptChannelKeyFromPeer(
+                e2ePrivateKey,
+                importedSenderKey,
+                ciphertext,
+                iv
+              );
+              setActiveChannelKey(decryptedSymmetricKey);
+              return;
+            }
+          }
+
+          // Case B: No keys generated for this channel yet (encryptedKeys is empty/no keys at all)
+          const totalKeys = Object.keys(encryptedKeys).length;
+          if (totalKeys === 0) {
+            console.log("Initializing E2EE channel key...");
+            const newChannelKey = await generateChannelKey();
+            const channelKeyJwk = await exportSymmetricKey(newChannelKey);
+            const newEncryptedKeysPayload: any = {};
+
+            // Determine all members
+            const members = activeChannel.type === 'group_dm'
+              ? activeChannel.members || []
+              : activeRealm?.members || [];
+
+            // We must encrypt for ourselves
+            try {
+              const myPublicKey = await importPublicKey(e2ePublicKeyJwk!);
+              const { ciphertext, iv } = await encryptChannelKeyForPeer(e2ePrivateKey, myPublicKey, channelKeyJwk);
+              newEncryptedKeysPayload[userId] = { ciphertext, iv };
+            } catch (err) {
+              console.error("Failed to encrypt key for self:", err);
+            }
+
+            // Encrypt for all other members who have a public key
+            for (const member of members) {
+              const memberId = (member._id || member.id).toString();
+              if (memberId === userId || !member.publicKey) continue;
+              try {
+                const peerPublicKey = await importPublicKey(member.publicKey);
+                const { ciphertext, iv } = await encryptChannelKeyForPeer(e2ePrivateKey, peerPublicKey, channelKeyJwk);
+                newEncryptedKeysPayload[memberId] = { ciphertext, iv };
+              } catch (err) {
+                console.error(`Failed to encrypt key for member ${memberId}:`, err);
+              }
+            }
+
+            if (Object.keys(newEncryptedKeysPayload).length > 0) {
+              const updatedChannel = await api.updateChannelEncryptedKeys(activeChannel._id, newEncryptedKeysPayload);
+              // Update local active channel state
+              setActiveChannel(prev => prev && prev._id === updatedChannel._id ? { ...prev, encryptedKeys: updatedChannel.encryptedKeys } : prev);
+            }
+            setActiveChannelKey(newChannelKey);
+            return;
+          }
+        } catch (err) {
+          console.error("Error setting up group/realm E2EE key:", err);
+        }
+      }
+
       setActiveChannelKey(null);
     };
     deriveKeyForActiveChannel();
-  }, [activeChannel, e2ePrivateKey, user]);
+  }, [activeChannel, e2ePrivateKey, user, activeRealm, e2ePublicKeyJwk]);
+
+  // Dynamic E2EE Key Sync for Group DMs & Realms
+  useEffect(() => {
+    const syncChannelKeysForNewMembers = async () => {
+      if (!activeChannelKey || !activeChannel || !user || !e2ePrivateKey) return;
+      if (activeChannel.type === 'dm') return; // Not needed for 1-to-1 DMs
+
+      const isTextChannel = ['text', 'group_dm', 'mod_messages', 'mod_reports', 'mod_users', 'mod_stats'].includes(activeChannel.type);
+      if (!isTextChannel) return;
+
+      const userId = (user.id || user._id).toString();
+      const encryptedKeys = activeChannel.encryptedKeys || {};
+
+      // Determine members of this channel
+      const members = activeChannel.type === 'group_dm'
+        ? activeChannel.members || []
+        : activeRealm?.members || [];
+
+      // Find members who have public keys but no encrypted channel key entry
+      const missingMembers = members.filter(m => {
+        const memberId = (m._id || m.id).toString();
+        return !encryptedKeys[memberId] && m.publicKey;
+      });
+
+      if (missingMembers.length === 0) return;
+
+      console.log(`Syncing missing E2EE keys for ${missingMembers.length} member(s)...`);
+      try {
+        const channelKeyJwk = await exportSymmetricKey(activeChannelKey);
+        const newEncryptedKeysPayload: any = {};
+
+        for (const member of missingMembers) {
+          const memberId = (member._id || member.id).toString();
+          try {
+            const peerPublicKey = await importPublicKey(member.publicKey!);
+            const { ciphertext, iv } = await encryptChannelKeyForPeer(e2ePrivateKey, peerPublicKey, channelKeyJwk);
+            newEncryptedKeysPayload[memberId] = { ciphertext, iv };
+          } catch (err) {
+            console.error(`Failed to encrypt key during sync for member ${memberId}:`, err);
+          }
+        }
+
+        if (Object.keys(newEncryptedKeysPayload).length > 0) {
+          const updatedChannel = await api.updateChannelEncryptedKeys(activeChannel._id, newEncryptedKeysPayload);
+          setActiveChannel(prev => prev && prev._id === updatedChannel._id ? { ...prev, encryptedKeys: updatedChannel.encryptedKeys } : prev);
+        }
+      } catch (err) {
+        console.error("Failed to execute group E2EE key sync:", err);
+      }
+    };
+
+    // Add a small delay/debounce to avoid conflicts on simultaneous joins/bootstraps
+    const timer = setTimeout(() => {
+      syncChannelKeysForNewMembers();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [activeChannelKey, activeChannel?.encryptedKeys, activeChannel?.members, activeRealm?.members, user, e2ePrivateKey]);
 
   const handleRegenerateKeys = async () => {
     if (!user) return;
@@ -405,7 +626,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
       isEncrypted: false
     };
 
-    if (activeChannel.type === 'dm' && activeChannelKey) {
+    if (activeChannelKey) {
       try {
         const { ciphertext, iv } = await encryptMessage(activeChannelKey, content);
         messagePayload.content = ciphertext;
@@ -580,7 +801,28 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const handleViewOtherProfile = (id: string) => { setViewingUserId(id); setViewMode('view-profile'); setActiveRealm(null); setActiveChannel(null); if (isMobile) setIsSidebarOpen(false); };
   const handleViewSocials = (tab: any, userId: string) => { setSocialTab(tab); setSocialTargetId(userId); setViewMode('social'); setActiveRealm(null); setActiveChannel(null); };
-  const handleFollowUser = async (id: string) => { try { const isFollowing = user?.following?.some((f: any) => (f._id || f) === id); const isFriend = user?.friends?.some((f: any) => (f._id || f) === id); const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id); if (isFollowing || isFriend) await api.unfollowUser(id); else if (!isPending) await api.syncIdentity(id); else return; const u = await api.getUserProfile(user!.id || user!._id); updateUserState(localStorage.getItem('token') || '', u); setMatrixRefreshKey(k => k + 1); addToast(isFollowing ? t('settings.link_severed') : t('settings.identity_synced'), 'success'); } catch(e:any){ addToast(e.response?.data?.message || t('app.sync_error'), 'error'); } };
+  const handleFollowUser = async (id: string) => {
+    try {
+      const isFollowing = user?.following?.some((f: any) => (f._id || f) === id);
+      const isFriend = user?.friends?.some((f: any) => (f._id || f) === id);
+      const isPending = user?.outboundRequests?.some((f: any) => (f._id || f) === id);
+      
+      let wasSevered = false;
+      if (isFollowing || isFriend || isPending) {
+        await api.unfollowUser(id);
+        wasSevered = true;
+      } else {
+        await api.syncIdentity(id);
+      }
+      
+      const u = await api.getUserProfile(user!.id || user!._id);
+      updateUserState(localStorage.getItem('token') || '', u);
+      setMatrixRefreshKey(k => k + 1);
+      addToast(wasSevered ? t('settings.link_severed') : t('settings.identity_synced'), 'success');
+    } catch(e:any){
+      addToast(e.response?.data?.message || t('app.sync_error'), 'error');
+    }
+  };
   const handleStartDM = async (id: string) => { try { const dm = await api.startDM(id); await loadDMs(); setViewMode('home'); setViewingUserId(null); handleSelectChannel(dm); } catch(e) { addToast(t('settings.link_init_failed'), 'error'); } };
   
   const handleLeaveRealm = async (id: string) => { if (!window.confirm(t('app.sever_link_confirm'))) return; try { await api.leaveRealm(id); loadRealms(); if (activeRealm?._id === id) { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); } addToast(t('app.sever_success'), 'success'); } catch (e) { addToast(t('app.sever_failed'), 'error'); } };
@@ -590,7 +832,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
 
   const triggerRefresh = async () => { setIsSyncing(true); try { if (viewMode === 'explore') { const d = await api.getGlobalPosts(); setPosts(d); } else if (activeChannel) { const ps = await api.getPosts(activeChannel._id); setPosts(ps); } await Promise.all([loadDMs(), loadRealms()]); } catch (e) { addToast(t('settings.sync_failed'), 'error'); } finally { setIsSyncing(false); } };
 
-  const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'profile';
+  const showSidebar = viewMode !== 'architect' && viewMode !== 'view-profile' && viewMode !== 'social' && viewMode !== 'explore' && viewMode !== 'profile' && viewMode !== 'draft-post';
   const showDmsAsMain = isMobile && viewMode === 'home' && !activeChannel;
   const hideHamburger = (viewMode === 'home' && !activeChannel) || viewMode === 'profile' || viewMode === 'social' || viewMode === 'explore' || viewMode === 'view-profile' || activeChannel?.type === 'feed' || activeChannel?.type === 'reels';
 
@@ -610,20 +852,19 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         {(serverStatus || !isOnline || liveSignal || (incomingCall && !isCallerInActiveDM)) && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none flex flex-col items-center">
              <motion.div 
-               initial={{ width: 12, height: 12, borderRadius: 100, opacity: 0 }}
+               initial={{ scale: 0.9, opacity: 0, y: -20 }}
                animate={{ 
-                 width: 'auto', 
-                 height: 'auto', 
-                 borderRadius: 32, 
+                 scale: 1,
                  opacity: 1,
+                 y: 0,
                  transition: { 
-                   width: { delay: 0.2, duration: 0.4, type: 'spring', bounce: 0.4 },
-                   height: { delay: 0.2, duration: 0.4 },
-                   opacity: { duration: 0.2 }
+                   type: 'spring', 
+                   damping: 25, 
+                   stiffness: 200
                  }
                }}
-               exit={{ width: 12, height: 12, borderRadius: 100, opacity: 0 }}
-               className="bg-black/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto overflow-hidden flex items-center p-1.5"
+               exit={{ scale: 0.9, opacity: 0, y: -20 }}
+               className="bg-black/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto overflow-hidden flex items-center p-1.5 rounded-[32px]"
              >
                 {/* CONTENT WRAPPER */}
                 <motion.div 
@@ -719,7 +960,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
             <motion.div initial={isMobile ? { x: '-100%' } : { width: 0 }} animate={isMobile ? { x: 0 } : { width: sidebarWidth }} exit={isMobile ? { x: '-100%' } : { width: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`flex-shrink-0 flex relative z-40 bg-discord-channel ${isMobile ? 'absolute inset-0 w-[85%] shadow-2xl' : 'border-r border-gray-900'}`}>
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isMobile && <div className="h-16 flex items-center justify-between px-4 bg-discord-sidebar border-b border-white/5"><span className="text-[10px] font-black uppercase text-white tracking-widest">{t('common.navigator')}</span><button onClick={() => setIsSidebarOpen(false)}><X size={18} /></button></div>}
-                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRetry={loadDMs} isSyncing={isSyncing} onRefresh={loadDMs} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} oversightMode={oversightMode} setOversightMode={setOversightMode} />}
+                {viewMode === 'home' ? <DMSidebar dms={dms} selectedDmId={activeChannel?._id || null} onSelectDm={handleSelectChannel} user={user} userStatuses={userStatuses} onInitGroup={() => setShowGroupDMModal(true)} onRetry={loadDMs} isSyncing={isSyncing} onRefresh={loadDMs} /> : <ChannelSidebar realm={activeRealm} channels={activeRealm?.channels || []} selectedChannelId={activeChannel?._id || null} onSelectChannel={handleSelectChannel} user={user!} onAddChannel={() => setShowChannelModal(true)} onSettings={() => setShowRealmSettings(true)} onLeaveRealm={handleLeaveRealm} onDeleteRealm={handleDeleteRealm} onManageInvites={(realmId) => { setInviteRealmId(realmId); setShowInviteManager(true); }} oversightMode={oversightMode} setOversightMode={setOversightMode} />}
               </div>
               {!isMobile && <div onMouseDown={startResizing} className="absolute top-0 -right-0.5 w-1 h-full cursor-col-resize z-40 hover:bg-vani-blue/30 transition-colors" />}
             </motion.div>
@@ -729,8 +970,8 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
         <main className="flex-1 overflow-hidden relative flex flex-col bg-discord-dark">
           <motion.div className="flex-1 flex flex-col overflow-hidden" onPanEnd={handleDragEnd}>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId} initial={kineticTransitions ? { opacity: 0, x: 20, filter: 'blur(10px)' } : { opacity: 1 }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={kineticTransitions ? { opacity: 0, x: -20, filter: 'blur(10px)' } : { opacity: 1 }} transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }} className="flex-1 flex flex-col overflow-hidden">
-                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} onlineUserIds={onlineUserIds} onInitGroup={() => setShowGroupDMModal(true)} onRefresh={loadDMs} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" oversightMode={oversightMode} setOversightMode={setOversightMode} /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? (
+              <motion.div key={viewMode + (activeChannel?._id || '') + (activeRealm?._id || '') + viewingUserId} initial={kineticTransitions ? { opacity: 0, x: 20 } : { opacity: 1 }} animate={{ opacity: 1, x: 0 }} exit={kineticTransitions ? { opacity: 0, x: -20 } : { opacity: 1 }} transition={kineticTransitions ? { type: 'spring', damping: 25, stiffness: 200 } : { duration: 0 }} className="flex-1 flex flex-col overflow-hidden">
+                {showDmsAsMain ? <DMSidebar key="dms-main" dms={dms} selectedDmId={null} onSelectDm={handleSelectChannel} user={user} userStatuses={userStatuses} onInitGroup={() => setShowGroupDMModal(true)} onRefresh={loadDMs} /> : viewMode === 'draft-post' ? <PostDrafterPage key="drafter" currentUser={user!} channelId={activeChannel?._id || 'global'} onBack={() => { setViewMode('home'); }} onComplete={async () => { triggerRefresh(); }} /> : viewMode === 'architect' ? <ArchitectRealm key="architect" oversightMode={oversightMode} setOversightMode={setOversightMode} onViewProfile={handleViewOtherProfile} onBackToHome={() => { setViewMode('home'); setActiveRealm(null); setActiveChannel(null); loadDMs(); const savedState = JSON.parse(localStorage.getItem('Yantravani_view_state') || '{}'); localStorage.setItem('Yantravani_view_state', JSON.stringify({ ...savedState, viewMode: 'home', activeRealm: null, activeChannel: null })); }} /> : viewMode === 'social' ? <SocialCorner key="social" currentUser={user!} onStartDM={handleViewOtherProfile} initialTab={socialTab} targetUserId={socialTargetId} userStatuses={userStatuses} /> : viewMode === 'profile' ? <ProfileNode key="profile" user={user!} isOwnProfile={true} onEdit={() => setShowIdentitySettings(true)} currentUser={user} onFollow={handleFollowUser} onViewSocials={handleViewSocials} onSelectTag={handleTagSelect} onViewProfile={handleViewOtherProfile} /> : viewMode === 'view-profile' && viewingUserId ? (
                   <OtherProfileView 
                     key="other" 
                     userId={viewingUserId} 
@@ -744,7 +985,7 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                     onEdit={() => setShowIdentitySettings(true)}
                     onCall={(type) => handleGlobalCall(viewingUserId, type)}
                   />
-                ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
+                ) : activeChannel?.type === 'reels' ? <ReelsArea key="reels" posts={posts} onOpenCreateModal={() => setViewMode('draft-post')} currentUser={user!} /> : activeChannel?.type === 'voice' ? <VoiceChannel key="voice" channelId={activeChannel._id} socket={socketRef.current!} currentUser={user!} onLeave={() => setActiveChannel(null)} initialVideo={(activeChannel as any).initialVideo} /> : (activeChannel?.type === 'text' || activeChannel?.type === 'dm' || activeChannel?.type === 'group_dm' || activeChannel?.type.startsWith('mod_')) ? (
                   <ChatArea 
                     key="chat" 
                     channelName={activeChannel.name || 'Link'} 
@@ -766,10 +1007,11 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
                     setOversightMode={setOversightMode}
                     activeChannelKey={activeChannelKey}
                     onRegenerateKeys={handleRegenerateKeys}
+                    userStatuses={userStatuses}
                   />
                 ) : (['feed', 'reels', 'media', 'gallery', 'matrix'].includes(activeChannel?.type || '') || viewMode === 'explore') ? (
                   <FeedArea 
-                    key="feed" posts={posts} onOpenCreateModal={() => setShowPostModal(true)} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} onRetry={triggerRefresh} isSyncing={isSyncing} liveStreamers={liveStreamers}
+                    key="feed" posts={posts} onOpenCreateModal={() => setViewMode('draft-post')} currentUser={user!} channelId={activeChannel?._id || 'global'} onViewProfile={handleViewOtherProfile} onSelectTag={handleTagSelect} onRetry={triggerRefresh} isSyncing={isSyncing} liveStreamers={liveStreamers}
                   />
                 ) : (
                   <div key="empty" className="flex-1 bg-discord-dark flex flex-col items-center justify-center text-gray-600 p-10 text-center"><div className="w-20 h-20 bg-vani-gradient opacity-10 rounded-[32px] mb-6 rotate-12" /><p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('common.awaiting')}</p></div>
@@ -805,7 +1047,58 @@ function Dashboard({ user, updateUserState }: DashboardProps) {
           onClose={() => { setShowInviteManager(false); setInviteRealmId(null); }}
         />
       )}
-      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast((t as any)('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} />}
+      {showSearchModal && <SearchModal onClose={() => setShowSearchModal(false)} onSelectUser={handleViewOtherProfile} onSelectRealm={async (r: IRealm) => { try { await api.joinRealm(r._id); await loadRealms(); handleSelectRealm(r); setShowSearchModal(false); addToast((t as any)('app.joined_realm', { name: r.name }), 'success'); } catch (e) { addToast(t('settings.access_failed'), 'error'); } }} currentUser={user!} userStatuses={userStatuses} />}
+
+      {/* FLOATING ADMIN/CHAT MODE SWITCH BUTTON */}
+      {user && (user.isAdmin || user.badges?.some(b => b.type === 'developer' || b.type === 'architect')) && !isChatInputFocused && (
+        viewMode === 'architect' ? (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={async () => {
+              const systemRealm = realms.find(r => (r as any).isSystem || r.name === "Architect_Nexus");
+              if (systemRealm) {
+                setViewMode(systemRealm._id);
+                try {
+                  const d = await api.getRealmDetails(systemRealm._id);
+                  setActiveRealm(d);
+                  const generalCh = d.channels?.find((ch: any) => ch.name === 'hq-general' || ch.type === 'text' || ch.type.startsWith('mod_'));
+                  if (generalCh) handleSelectChannel(generalCh);
+                } catch (e) {}
+              }
+            }}
+            className="fixed bottom-6 right-6 z-[3000] px-5 py-3.5 bg-[#0a0a0c]/80 backdrop-blur-md border-2 border-vani-blue text-vani-blue font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-[0_0_20px_rgba(0,210,255,0.3)] flex items-center gap-2.5 transition-all hover:bg-vani-blue hover:text-black font-mono cursor-pointer hover:border-transparent animate-pulse"
+          >
+            <MessageSquare size={16} />
+            <span>[ SWITCH_TO_CHAT ]</span>
+          </motion.button>
+        ) : (viewMode === realms.find(r => (r as any).isSystem || r.name === "Architect_Nexus")?._id || activeRealm?.isSystem) ? (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setViewMode('architect');
+              setActiveRealm(null);
+              setActiveChannel(null);
+            }}
+            className="fixed bottom-6 right-6 z-[3000] px-5 py-3.5 bg-[#0a0a0c]/80 backdrop-blur-md border-2 border-vani-accent text-vani-accent font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-[0_0_20px_rgba(255,0,85,0.3)] flex items-center gap-2.5 transition-all hover:bg-vani-accent hover:text-white font-mono cursor-pointer hover:border-transparent animate-pulse"
+          >
+            <Shield size={16} />
+            <span>[ ACCESS_OVERSIGHT ]</span>
+          </motion.button>
+        ) : null
+      )}
+      {activeMiniCard && (
+        <ProfileMiniCard 
+          user={activeMiniCard.user}
+          currentUser={user!}
+          onViewFull={() => { handleViewOtherProfile(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }}
+          onStartDM={() => { handleStartDM(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }}
+          onFollow={() => { handleFollowUser(activeMiniCard.user._id || activeMiniCard.user.id); }}
+          onClose={() => setActiveMiniCard(null)}
+          position={activeMiniCard.position}
+        />
+      )}
     </div>
   );
 }

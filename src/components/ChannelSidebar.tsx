@@ -1,7 +1,31 @@
-import { Plus, Hash, Volume2, Image as ImageIcon, Megaphone, Settings, ChevronDown, Shield } from 'lucide-react';
+import { Plus, Hash, Volume2, Image as ImageIcon, Megaphone, Settings, ChevronDown, Shield, UserPlus, LogOut, ShieldX } from 'lucide-react';
 import type { IRealm, IChannel, IUser } from '../services/api';
 import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { ContextMenu } from './ContextMenu';
+
+export const hasRealmPermission = (realm: IRealm | null, userId: string | undefined, permission: string): boolean => {
+  if (!realm || !userId) return false;
+  if (realm.owner === userId) return true;
+
+  // Get the user's role in this realm
+  const userRoleMapping = realm.memberRoles?.find(mr => (mr.user as any) === userId || (mr.user as any)?._id === userId);
+
+  // Apply everyone role if exists
+  const everyoneRole = realm.roles?.find(r => r.key === 'everyone');
+  const permissions = new Set<string>(everyoneRole?.permissions || []);
+
+  if (userRoleMapping) {
+    const assignedRole = realm.roles?.find(r => r._id === userRoleMapping.roleId);
+    if (assignedRole) {
+      assignedRole.permissions.forEach(p => permissions.add(p));
+    }
+  }
+
+  if (permissions.has('ADMINISTRATOR')) return true;
+  return permissions.has(permission);
+};
+
 
 interface Props {
   realm: IRealm | null;
@@ -11,6 +35,9 @@ interface Props {
   user: IUser;
   onAddChannel: () => void;
   onSettings?: () => void;
+  onLeaveRealm?: (id: string) => void;
+  onDeleteRealm?: (id: string) => void;
+  onManageInvites?: (id: string) => void;
   oversightMode?: boolean;
   setOversightMode?: (val: boolean) => void;
 }
@@ -23,12 +50,83 @@ export const ChannelSidebar = ({
   user, 
   onAddChannel, 
   onSettings,
+  onLeaveRealm,
+  onDeleteRealm,
+  onManageInvites,
   oversightMode,
   setOversightMode
 }: Props) => {
   const { t } = useLanguage();
+  const userId = user.id || user._id;
+  const canManageRealm = realm && (
+    realm.owner === userId ||
+    hasRealmPermission(realm, userId, 'MANAGE_REALM') ||
+    hasRealmPermission(realm, userId, 'MANAGE_ROLES') ||
+    hasRealmPermission(realm, userId, 'MANAGE_CHANNELS') ||
+    hasRealmPermission(realm, userId, 'MANAGE_CATEGORIES')
+  );
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ announcements: true, categories: true, chat: true, voice: true, media: true, mod: true, talk: true });
   const toggle = (key: string) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const [dropdownMenu, setDropdownMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
+
+  const handleArrowClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!realm) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left;
+    const y = rect.bottom + window.scrollY + 8;
+
+    const isOwner = realm.owner === userId;
+    const canCreateChannel = isOwner || hasRealmPermission(realm, userId, 'MANAGE_CHANNELS');
+    const canCreateCategory = isOwner || hasRealmPermission(realm, userId, 'MANAGE_CATEGORIES');
+
+    const items = [];
+
+    if (canCreateChannel) {
+      items.push({
+        label: t('modals.new_sector') || 'Create Channel',
+        icon: <Plus size={14} />,
+        onClick: () => onAddChannel()
+      });
+    }
+
+    if (canCreateCategory) {
+      items.push({
+        label: 'Create Category',
+        icon: <Plus size={14} />,
+        onClick: () => onAddChannel()
+      });
+    }
+
+    items.push({
+      label: t('common.invite') || 'Invite Friends',
+      icon: <UserPlus size={14} />,
+      onClick: () => onManageInvites?.(realm._id)
+    });
+
+    items.push({ type: 'divider' });
+
+    if (isOwner) {
+      items.push({
+        label: t('common.collapse') || 'Delete Realm',
+        icon: <ShieldX size={14} />,
+        variant: 'danger' as const,
+        onClick: () => onDeleteRealm?.(realm._id)
+      });
+    } else {
+      items.push({
+        label: t('common.sever') || 'Leave Realm',
+        icon: <LogOut size={14} />,
+        variant: 'danger' as const,
+        onClick: () => onLeaveRealm?.(realm._id)
+      });
+    }
+
+    setDropdownMenu({ x, y, items });
+  };
 
   const isSystem = (realm as any)?.isSystem || realm?.name === "Architect_Nexus";
 
@@ -57,7 +155,9 @@ export const ChannelSidebar = ({
         </div>
       )}
 
-      <div onClick={onSettings} className="relative h-24 flex flex-col justify-end p-4 border-b border-white/5 shadow-sm group cursor-pointer overflow-hidden transition-all">
+      <div 
+        className="relative h-24 flex flex-col justify-end p-4 border-b border-white/5 shadow-sm group overflow-hidden cursor-default"
+      >
          {realm?.banner && (
            <div className="absolute inset-0 z-0">
              <img src={realm.banner} className="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity" />
@@ -69,9 +169,22 @@ export const ChannelSidebar = ({
               <h2 className="text-sm font-black text-white uppercase tracking-tighter truncate max-w-[140px] drop-shadow-lg">{realm?.name || t('ui.loading_node')}</h2>
               <div className="text-[8px] font-black text-vani-blue uppercase tracking-[0.2em] drop-shadow-md">{(realm?.tier || t('common.standard')).toUpperCase()}_REALM</div>
            </div>
-           <div className="flex items-center space-x-2">
-              {realm?.owner === (user.id || user._id) && <Settings size={14} className="text-gray-400 group-hover:text-white drop-shadow-md" />}
-              <ChevronDown size={16} className="text-gray-400 group-hover:text-white drop-shadow-md" />
+           <div className="flex items-center space-x-1.5">
+              {canManageRealm && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onSettings?.(); }} 
+                  className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer"
+                  title={t('nav.settings')}
+                >
+                  <Settings size={14} className="drop-shadow-md" />
+                </button>
+              )}
+              <button 
+                onClick={handleArrowClick} 
+                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer"
+              >
+                <ChevronDown size={16} className="drop-shadow-md" />
+              </button>
            </div>
          </div>
       </div>
@@ -128,6 +241,15 @@ export const ChannelSidebar = ({
            </div>
          )}
       </div>
+
+      {dropdownMenu && (
+        <ContextMenu 
+          x={dropdownMenu.x} 
+          y={dropdownMenu.y} 
+          items={dropdownMenu.items} 
+          onClose={() => setDropdownMenu(null)} 
+        />
+      )}
     </div>
   );
 };

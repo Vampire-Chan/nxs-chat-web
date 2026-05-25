@@ -8,7 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 interface PulseEvent {
   id: string;
-  type: 'like' | 'comment' | 'sync' | 'broadcast';
+  type: 'like' | 'comment' | 'sync' | 'broadcast' | 'reply' | 'follow' | 'sync_request' | 'system' | 'login' | 'mention';
   user: string;
   target?: string;
   timestamp: Date;
@@ -112,11 +112,11 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
             {/* Post Header */}
             <div className="h-16 px-4 border-b border-gray-900 flex items-center justify-between shadow-sm bg-white/[0.01]">
                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-800">
+                  <div onClick={(e) => (window as any).__vani_show_mini_profile?.(e, selectedPost.author)} className="w-8 h-8 rounded-lg overflow-hidden border border-gray-800 cursor-pointer hover:border-vani-blue transition-all">
                      <img src={getIdentityAvatar(selectedPost.author)} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex flex-col">
-                     <span className="font-black text-white uppercase tracking-tighter text-[10px]">{getIdentityName(selectedPost.author)}</span>
+                     <span onClick={(e) => (window as any).__vani_show_mini_profile?.(e, selectedPost.author)} className="font-black text-white uppercase tracking-tighter text-[10px] cursor-pointer hover:underline">{getIdentityName(selectedPost.author)}</span>
                      <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">{t('feed.active_transmission')}</span>
                   </div>
                </div>
@@ -158,7 +158,7 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                         <div key={i} className={`flex space-x-3 group ${c.parentCommentId ? 'ml-8' : ''}`}>
                            <div className="relative shrink-0">
                               <div 
-                                onClick={() => !isAuthorPrivate && onViewProfile?.(c.user?._id || c.user?.id)}
+                                onClick={(e) => { if (!isAuthorPrivate && c.user) (window as any).__vani_show_mini_profile?.(e, c.user); }}
                                 className={`w-7 h-7 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden border border-white/5 cursor-pointer ${isAuthorPrivate ? 'filter blur-[4px] grayscale' : ''}`}
                               >
                                  <img src={getIdentityAvatar(c.user)} className="w-full h-full object-cover" />
@@ -170,14 +170,14 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                            <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-2">
                                  <div 
-                                   onClick={() => onViewProfile?.(c.user?._id || c.user?.id)}
+                                   onClick={(e) => { if (!isAuthorPrivate && c.user) (window as any).__vani_show_mini_profile?.(e, c.user); }}
                                    className="text-[9px] font-black text-white uppercase tracking-tight truncate cursor-pointer hover:text-vani-blue transition-colors"
                                  >
                                    {isAuthorPrivate ? 'Encrypted_Node' : getIdentityName(c.user)}
                                  </div>
                                  {parentComment && (
                                    <div 
-                                     onClick={() => onViewProfile?.(parentComment.user?._id || parentComment.user?.id)}
+                                     onClick={(e) => { if (parentComment.user) (window as any).__vani_show_mini_profile?.(e, parentComment.user); }}
                                      className="text-[7px] text-gray-600 font-mono flex items-center space-x-1 cursor-pointer hover:text-vani-accent"
                                    >
                                       <Send size={8} className="rotate-180" />
@@ -271,17 +271,17 @@ export const ExploreRightSidebar = ({ events, selectedPost, currentUser, onClose
                   <div className="flex items-center space-x-2 mb-1.5">
                     <div className="p-1.5 bg-gray-800 rounded-lg text-gray-500">
                       {event.type === 'like' && <Heart size={10} className="fill-current text-vani-accent" />}
-                      {event.type === 'comment' && <MessageSquare size={10} className="text-vani-blue" />}
-                      {event.type === 'sync' && <UserPlus size={10} className="text-green-500" />}
-                      {event.type === 'broadcast' && <Radio size={10} className="text-yellow-500" />}
+                      {(event.type === 'comment' || event.type === 'reply') && <MessageSquare size={10} className="text-vani-blue" />}
+                      {(event.type === 'sync' || event.type === 'follow' || event.type === 'sync_request') && <UserPlus size={10} className="text-green-500" />}
+                      {(event.type === 'broadcast' || event.type === 'system' || event.type === 'login' || event.type === 'mention') && <Radio size={10} className="text-yellow-500" />}
                     </div>
                     <span className="text-[10px] font-black text-white uppercase truncate">{event.user}</span>
                   </div>
                   <p className="text-[9px] text-gray-500 leading-tight mb-2 pl-1 border-l border-white/5 ml-2.5">
                     {event.type === 'like' && 'Linked to a transmission'}
-                    {event.type === 'comment' && 'Added data to a post'}
-                    {event.type === 'sync' && 'Established a new node link'}
-                    {event.type === 'broadcast' && 'Started a global broadcast'}
+                    {(event.type === 'comment' || event.type === 'reply') && 'Added data to a post'}
+                    {(event.type === 'sync' || event.type === 'follow' || event.type === 'sync_request') && 'Established a new node link'}
+                    {(event.type === 'broadcast' || event.type === 'system' || event.type === 'login' || event.type === 'mention') && 'Started a global broadcast'}
                   </p>
                   <div className="text-[7px] font-mono text-gray-700 uppercase self-end">
                     {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -84,6 +84,8 @@ export interface IUser {
 export interface IRole {
   _id: string;
   name: string;
+  key?: string | null;
+  isSystem?: boolean;
   color: string;
   permissions: string[];
   position: number;
@@ -102,6 +104,7 @@ export interface IChannel {
   members?: IUser[];
   icon?: string;
   nicknames?: Record<string, string>;
+  encryptedKeys?: Record<string, { ciphertext: string, iv: string, senderId: string }>;
 }
 
 export interface IRealm {
@@ -118,6 +121,10 @@ export interface IRealm {
   isDiscoverable?: boolean; // Added
   isSystem?: boolean;
   tier?: 'standard' | 'elite';
+  systemChannel?: string | null;
+  verificationLevel?: 'none' | 'low' | 'medium' | 'high';
+  defaultNotifications?: 'all' | 'mentions';
+  contentFilter?: 'none' | 'nsfw' | 'strict';
 }
 
 export interface IMessage {
@@ -172,6 +179,57 @@ export interface IRealmInvite {
   createdAt?: string;
   urlPath: string;
   inviter?: Pick<IUser, '_id' | 'username' | 'avatar'>;
+}
+
+// DEDUP: Compute SHA-256 hash of a file using Web Crypto API
+export async function calculateFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// DEDUP: Calculate average pixel hash of image files
+export async function calculatePerceptualHash(file: File): Promise<string | null> {
+  if (!file.type.startsWith('image/')) return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 8;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, 8, 8);
+    const imgData = ctx.getImageData(0, 0, 8, 8);
+    const data = imgData.data;
+
+    let sum = 0;
+    const grays = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) {
+      const r = data[i * 4];
+      const g = data[i * 4 + 1];
+      const b = data[i * 4 + 2];
+      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      grays[i] = gray;
+      sum += gray;
+    }
+    const avg = sum / 64;
+
+    let hashStr = '';
+    for (let i = 0; i < 64; i++) {
+      hashStr += grays[i] >= avg ? '1' : '0';
+    }
+
+    let hex = '';
+    for (let i = 0; i < 64; i += 4) {
+      const chunk = hashStr.slice(i, i + 4);
+      hex += parseInt(chunk, 2).toString(16);
+    }
+    return hex;
+  } catch (e) {
+    console.error('Failed to compute perceptual hash:', e);
+    return null;
+  }
 }
 
 export const api = {
@@ -239,6 +297,8 @@ export const api = {
   deleteRealm: async (id: string) => { const res = await axios.delete(`${API_URL}/realms/${id}`); return res.data; },
   createChannel: async (realmId: string, name: string, type: string, extras: { parentCategory?: string; position?: number; topic?: string; nsfw?: boolean } = {}) => { const res = await axios.post<IChannel>(`${API_URL}/realms/${realmId}/channels`, { name, type, ...extras }); return res.data; },
   createCategory: async (realmId: string, name: string, position = 0) => { const res = await axios.post<IChannel>(`${API_URL}/realms/${realmId}/categories`, { name, position }); return res.data; },
+  updateChannel: async (id: string, data: { name?: string; topic?: string; nsfw?: boolean; parentCategory?: string | null; position?: number }) => { const res = await axios.put<IChannel>(`${API_URL}/channels/${id}`, data); return res.data; },
+  deleteChannel: async (id: string) => { const res = await axios.delete(`${API_URL}/channels/${id}`); return res.data; },
   createRealmInvite: async (
     realmId: string,
     options: { code?: string; maxUses?: number; expiresInHours?: number; expiresAt?: string } = {}
@@ -250,17 +310,18 @@ export const api = {
   revokeRealmInvite: async (realmId: string, code: string) => { const res = await axios.delete(`${API_URL}/realms/${realmId}/invites/${encodeURIComponent(code)}`); return res.data; },
   joinRealmWithInvite: async (code: string) => { const res = await axios.post<IRealm>(`${API_URL}/realms/join/${code}`); return res.data; },
   createRole: async (realmId: string, data: any) => { const res = await axios.post(`${API_URL}/realms/${realmId}/roles`, data); return res.data; },
-  updateRole: async (realmId: string, roleId: string, data: { name?: string; color?: string; permissions?: string[] }) => { const res = await axios.patch(`${API_URL}/realms/${realmId}/roles/${roleId}`, data); return res.data; },
+  updateRole: async (realmId: string, roleId: string, data: { name?: string; color?: string; permissions?: string[]; position?: number }) => { const res = await axios.patch(`${API_URL}/realms/${realmId}/roles/${roleId}`, data); return res.data; },
   assignRole: async (realmId: string, userId: string, roleId: string) => { const res = await axios.post(`${API_URL}/realms/${realmId}/members/${userId}/role`, { roleId }); return res.data; },
   deleteRole: async (realmId: string, roleId: string) => { const res = await axios.delete(`${API_URL}/realms/${realmId}/roles/${roleId}`); return res.data; },
   getMessages: async (channelId: string) => { const res = await axios.get<IMessage[]>(`${API_URL}/channels/${channelId}/messages`); return res.data; },
   markChannelRead: async (id: string) => { const res = await axios.post(`${API_URL}/channels/${id}/read`); return res.data; },
   markChannelUnread: async (id: string) => { const res = await axios.post(`${API_URL}/channels/${id}/unread`); return res.data; },
-  scheduleMessage: async (data: { channelId: string, content: string, scheduledFor: Date, parentMessageId?: string }) => { const res = await axios.post(`${API_URL}/channels/schedule`, data); return res.data; },
+  scheduleMessage: async (data: { channelId: string, content: string, scheduledFor: Date, parentMessageId?: string, isEncrypted?: boolean, iv?: string }) => { const res = await axios.post(`${API_URL}/channels/schedule`, data); return res.data; },
   editMessage: async (id: string, content: string, isEncrypted?: boolean, iv?: string) => { const res = await axios.put<IMessage>(`${API_URL}/channels/messages/${id}`, { content, isEncrypted, iv }); return res.data; },
   deleteMessage: async (id: string) => { const res = await axios.delete(`${API_URL}/channels/messages/${id}`); return res.data; },
   getPosts: async (channelId: string) => { const res = await axios.get<IPost[]>(`${API_URL}/channels/${channelId}/posts`); return res.data; },
   getGlobalPosts: async (tag?: string) => { const res = await axios.get<IPost[]>(`${API_URL}/posts/all${tag ? `?tag=${tag}` : ''}`); return res.data; },
+  getPulseEvents: async () => { const res = await axios.get<any[]>(`${API_URL}/posts/pulse`); return res.data; },
   getUserPosts: async (userId: string) => { const res = await axios.get<IPost[]>(`${API_URL}/posts/user/${userId}`); return res.data; },
   createPost: async (channelId: string, formData: FormData) => { formData.append('channelId', channelId); const res = await axios.post<IPost>(`${API_URL}/posts`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); return res.data; },
   likePost: async (postId: string) => { const res = await axios.post<{ likes: string[] }>(`${API_URL}/posts/${postId}/like`); return res.data; },
@@ -280,7 +341,13 @@ export const api = {
   },
   globalSearch: async (query: string, filters: { type?: string, sortBy?: string, author?: string } = {}) => { 
     const params = new URLSearchParams({ q: query, ...filters });
-    const res = await axios.get<{ users: IUser[], realms: IRealm[], posts: IPost[] }>(`${API_URL}/search?${params.toString()}`); 
+    const res = await axios.get<{ 
+      users: IUser[], 
+      realms: IRealm[], 
+      posts: IPost[],
+      tags: { name: string; count: number }[],
+      counts: { users: number; realms: number; posts: number; tags: number }
+    }>(`${API_URL}/search?${params.toString()}`); 
     return res.data; 
   },
   updatePublicKey: async (publicKey: string) => { 
@@ -290,5 +357,43 @@ export const api = {
   getUserPublicKey: async (userId: string) => { 
     const res = await axios.get<{ publicKey: string | null }>(`${API_URL}/users/${userId}/publicKey`); 
     return res.data; 
+  },
+  checkMediaHash: async (hash: string, pHash?: string) => {
+    const res = await axios.get<{ exists: boolean; url?: string; mimeType?: string }>(
+      `${API_URL}/media/check-hash?hash=${hash}${pHash ? `&pHash=${pHash}` : ''}`
+    );
+    return res.data;
+  },
+  updateChannelPermissions: async (channelId: string, overwrites: any[]) => {
+    const res = await axios.put<IChannel>(`${API_URL}/channels/${channelId}/overwrites`, { overwrites });
+    return res.data;
+  },
+  kickRealmMember: async (realmId: string, userId: string, reason?: string) => {
+    const res = await axios.delete(`${API_URL}/realms/${realmId}/members/${userId}`, { data: { reason } });
+    return res.data;
+  },
+  banRealmMember: async (realmId: string, userId: string, reason?: string) => {
+    const res = await axios.post(`${API_URL}/realms/${realmId}/bans/${userId}`, { reason });
+    return res.data;
+  },
+  unbanRealmMember: async (realmId: string, userId: string, reason?: string) => {
+    const res = await axios.delete(`${API_URL}/realms/${realmId}/bans/${userId}`, { data: { reason } });
+    return res.data;
+  },
+  getRealmBans: async (realmId: string) => {
+    const res = await axios.get<any[]>(`${API_URL}/realms/${realmId}/bans`);
+    return res.data;
+  },
+  getRealmAuditLogs: async (realmId: string) => {
+    const res = await axios.get<any[]>(`${API_URL}/realms/${realmId}/audit-logs`);
+    return res.data;
+  },
+  assignRoles: async (realmId: string, userId: string, roleIds: string[]) => {
+    const res = await axios.post(`${API_URL}/realms/${realmId}/members/${userId}/role`, { roleIds });
+    return res.data;
+  },
+  updateChannelEncryptedKeys: async (channelId: string, encryptedKeys: Record<string, { ciphertext: string, iv: string }>) => {
+    const res = await axios.put<IChannel>(`${API_URL}/channels/${channelId}/encrypted-keys`, { encryptedKeys });
+    return res.data;
   }
 };

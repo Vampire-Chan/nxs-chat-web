@@ -67,7 +67,78 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
 
 .markdown-content p {
   margin-bottom: var(--vani-spacing);
 }
+
+/* Yantravani tactical HUD styles */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.scanner-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+  box-shadow: 0 0 10px #00d2ff;
+  animation: scanline 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.scanner-line-green {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4ade80, transparent);
+  box-shadow: 0 0 10px #4ade80;
+  animation: scanline 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.glow-blue {
+  box-shadow: 0 0 25px rgba(0, 210, 255, 0.08);
+}
+.glow-pink {
+  box-shadow: 0 0 25px rgba(244, 114, 182, 0.08);
+}
+.glow-green {
+  box-shadow: 0 0 25px rgba(74, 222, 128, 0.08);
+}
+.glow-purple {
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.08);
+}
+.glow-yellow {
+  box-shadow: 0 0 25px rgba(250, 204, 21, 0.08);
+}
+.glow-red {
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.08);
+}
+.glow-accent {
+  box-shadow: 0 0 25px rgba(255, 0, 85, 0.08);
+}
+

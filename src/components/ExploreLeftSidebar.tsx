@@ -47,7 +47,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                   className="group flex items-center px-2 py-2.5 rounded-xl mx-2 cursor-pointer transition-all bg-vani-blue/5 border border-vani-blue/10 hover:bg-vani-blue/10 hover:border-vani-blue/30"
                 >
                   <div className="relative mr-3 flex-shrink-0">
-                     <div className="w-10 h-10 rounded-xl overflow-hidden border border-vani-blue/20 p-0.5 ring-2 ring-vani-blue/10">
+                     <div onClick={(e) => { e.stopPropagation(); (window as any).__vani_show_mini_profile?.(e, streamer); }} className="w-10 h-10 rounded-xl overflow-hidden border border-vani-blue/20 p-0.5 ring-2 ring-vani-blue/10 cursor-pointer">
                         <img src={getIdentityAvatar(streamer)} className="w-full h-full object-cover" />
                      </div>
                      <div className="absolute -bottom-1 -right-1 bg-red-500 p-1 rounded-lg border-2 border-discord-channel shadow-lg">
@@ -55,7 +55,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                      </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                     <div className="font-black text-xs truncate uppercase tracking-tighter text-white">
+                     <div onClick={(e) => { e.stopPropagation(); (window as any).__vani_show_mini_profile?.(e, streamer); }} className="font-black text-xs truncate uppercase tracking-tighter text-white cursor-pointer hover:underline">
                         {getIdentityName(streamer)}
                      </div>
                      <div className="text-[8px] text-vani-blue truncate font-mono uppercase tracking-widest">
@@ -133,7 +133,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                   onClick={() => onSelectUser(user._id || user.id)}
                   className="group flex items-center px-2 py-2 rounded-xl mx-2 cursor-pointer transition-all text-gray-400 hover:bg-white/[0.03] hover:text-gray-200"
                 >
-                  <div className="relative mr-3 flex-shrink-0">
+                  <div onClick={(e) => { e.stopPropagation(); (window as any).__vani_show_mini_profile?.(e, user); }} className="relative mr-3 flex-shrink-0 cursor-pointer">
                      <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-700 bg-gray-800 p-[1px]">
                         <div className="w-full h-full rounded-[7px] overflow-hidden bg-discord-dark">
                            <img src={getIdentityAvatar(user)} className="w-full h-full object-cover" />
@@ -141,7 +141,7 @@ export const ExploreLeftSidebar = ({ trendingTags, popularPosts, suggestedUsers,
                      </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                     <div className="font-black text-[11px] truncate uppercase tracking-tighter group-hover:text-white">
+                     <div onClick={(e) => { e.stopPropagation(); (window as any).__vani_show_mini_profile?.(e, user); }} className="font-black text-[11px] truncate uppercase tracking-tighter group-hover:text-white cursor-pointer hover:underline">
                         {getIdentityName(user)}
                      </div>
                      <div className="text-[8px] text-gray-600 truncate font-mono tracking-tight">

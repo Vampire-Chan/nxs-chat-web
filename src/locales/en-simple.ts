@@ -12,6 +12,13 @@ export const enSimple = {
   "common.init_link": "Start Call",
   "common.awaiting": "Waiting for connection...",
   "common.navigator": "Menu",
+
+  "server.overload": "Server Busy",
+  "server.overload_desc": "The server is receiving too much traffic. We are trying to fix it. Please wait and try again.",
+  "server.cold_start": "Starting Server...",
+  "server.cold_start_desc": "The server is waking up. It will be ready in a moment.",
+  "server.rate_limit": "Sending Too Fast",
+  "server.rate_limit_desc": "You are doing actions too quickly. Please slow down and try again.",
   
   "nav.protocols": "Rules",
   "nav.knowledge": "Help",

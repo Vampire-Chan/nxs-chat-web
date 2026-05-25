@@ -2,7 +2,7 @@ import { Plus, Compass, Home, Settings, Bell, UserPlus, LogOut, CheckCircle2, Us
 import type { IRealm, IUser, INotification } from '../services/api';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ContextMenu } from './ContextMenu';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -39,7 +39,13 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
 
   const isVertical = position === 'left' || position === 'right';
 
-  const fetchMatrixStatus = useCallback(async () => {
+  const lastFetchRef = useRef<number>(0);
+
+  const fetchMatrixStatus = useCallback(async (force = false) => {
+    const now = Date.now();
+    const minInterval = force ? 1000 : 5000;
+    if (now - lastFetchRef.current < minInterval) return;
+    lastFetchRef.current = now;
     try {
       const [notifs, dms] = await Promise.all([api.getNotifications(), api.getMyDMs()]);
       setNotifications(notifs);
@@ -53,8 +59,8 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
   }, [user.id, user._id]);
 
   useEffect(() => {
-    fetchMatrixStatus();
-    const i = setInterval(fetchMatrixStatus, 15000);
+    fetchMatrixStatus(true);
+    const i = setInterval(() => fetchMatrixStatus(false), 15000);
     return () => clearInterval(i);
   }, [fetchMatrixStatus, refreshTrigger]);
 
@@ -141,15 +147,15 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
       className={`${sizeClass} bg-discord-sidebar flex items-center ${borderClass} border-gray-900 z-[100] shadow-xl`} 
       onClick={() => setShowNotifs(false)}
     >
-      <div className={`flex flex-1 ${isVertical ? 'flex-col overflow-y-auto no-scrollbar' : 'flex-row overflow-x-auto no-scrollbar'} items-center scroll-smooth relative`}>
-        <div className={`flex ${isVertical ? 'flex-col space-y-3' : 'flex-row space-x-3 items-center'}`}>
+      <div className={`flex flex-1 h-full w-full ${isVertical ? 'flex-col overflow-y-auto no-scrollbar' : 'flex-row overflow-x-auto no-scrollbar'} items-center scroll-smooth relative`}>
+        <div className={`flex ${isVertical ? 'flex-col space-y-3 px-2' : 'flex-row space-x-3 items-center'}`}>
           <motion.div 
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="relative group"
           >
-             <div onClick={onProfile} className={`w-10 h-10 rounded-[18px] overflow-hidden border-2 transition-all cursor-pointer ${selectedRealmId === 'profile' ? 'border-vani-accent scale-110 rounded-xl shadow-[0_0_15px_rgba(255,60,60,0.3)]' : 'border-transparent hover:border-vani-blue hover:rounded-xl'}`}>
-                <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+             <div onClick={onProfile} className={`w-10 h-10 rounded-[18px] overflow-hidden border-2 transition-all cursor-pointer ${selectedRealmId === 'profile' ? 'border-vani-accent scale-105 rounded-xl shadow-[0_0_10px_rgba(255,60,60,0.4)]' : 'border-transparent hover:border-vani-blue hover:rounded-xl'}`}>
+                <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover transition-all duration-150 rounded-[inherit]" />
              </div>
              {selectedRealmId === 'profile' && <motion.div layoutId="dock-indicator" className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-accent rounded-full`} />}
           </motion.div>
@@ -180,7 +186,7 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
         <div className={`${isVertical ? 'w-8 h-[1px] my-4' : 'w-[1px] h-8 mx-4'} bg-gray-800 flex-shrink-0`} />
 
         {/* SCROLLABLE REALMS LIST (Non-System Only) */}
-        <div className={`flex ${isVertical ? 'flex-col space-y-3' : 'flex-row space-x-3'} py-2`}>
+        <div className={`flex ${isVertical ? 'flex-col space-y-3 px-2' : 'flex-row space-x-3'} ${isVertical ? 'py-2' : 'py-1'}`}>
           {realms.filter(r => !(r as any).isSystem).map(realm => (
             <motion.div 
               key={realm._id} 
@@ -191,7 +197,7 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
               className="relative group cursor-pointer flex-shrink-0"
             >
               <div className={`w-10 h-10 rounded-xl transition-all duration-300 flex items-center justify-center overflow-hidden border ${selectedRealmId === realm._id ? 'bg-vani-gradient border-white/20 shadow-[0_0_15px_rgba(0,210,255,0.3)] scale-110' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`}>
-                {realm.icon ? <img src={realm.icon} alt="r" className="w-full h-full object-cover" /> : <span className="font-black text-xs text-white uppercase">{realm.name[0]}</span>}
+                {realm.icon ? <img src={realm.icon} alt="r" className="w-full h-full object-cover rounded-[inherit]" /> : <span className="font-black text-xs text-white uppercase">{realm.name[0]}</span>}
               </div>
               {selectedRealmId === realm._id && <motion.div layoutId="dock-indicator" className={`absolute ${isVertical ? '-left-1 top-1/2 -translate-y-1/2 w-1 h-4' : '-bottom-2 left-1/2 -translate-x-1/2 w-4 h-1'} bg-vani-gradient rounded-full`} />}
             </motion.div>
@@ -213,8 +219,8 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
           <div className="flex-1 hidden md:flex justify-center items-center pointer-events-none">
              <motion.div 
                key={getActiveLabel()}
-               initial={{ opacity: 0, scale: 0.9, filter: 'blur(4px)' }}
-               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+               initial={{ opacity: 0, scale: 0.9 }}
+               animate={{ opacity: 1, scale: 1 }}
                className="bg-white/5 border border-white/5 px-6 py-1.5 rounded-full shadow-inner"
              >
                 <span className="text-[10px] font-black text-vani-blue uppercase tracking-[0.4em] drop-shadow-[0_0_8px_rgba(0,210,255,0.3)]">
@@ -224,7 +230,7 @@ export const TopNavbar = ({ realms, selectedRealmId, onSelect, onCreate, user, o
           </div>
         )}
 
-        <div className={`flex items-center ${isVertical ? 'flex-col space-y-6 mt-auto' : 'flex-row space-x-6 ml-auto'}`}>
+        <div className={`flex items-center ${isVertical ? 'flex-col space-y-6 mt-auto px-2 w-full' : 'flex-row space-x-6 ml-auto'}`}>
           <div className="relative">
              <div onClick={handleNotifClick} className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all ${showNotifs ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}><Bell size={20} />{unreadAlerts > 0 && <div className="absolute -top-1 -right-1 w-5 h-5 bg-vani-accent text-white text-[10px] font-black rounded-lg flex items-center justify-center border-2 border-discord-sidebar animate-bounce">{unreadAlerts}</div>}</div>
              <AnimatePresence>

@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { IUser } from '../services/api';
-import { api } from '../services/api';
-
-import { ProfileMiniCard } from './ProfileMiniCard';
 
 interface Props {
   members: IUser[];
@@ -12,43 +9,26 @@ interface Props {
 
 export const MemberSidebar = ({ members, onMemberClick, currentUser }: Props) => {
   const [localMembers, setLocalMembers] = useState(members);
-  const [activeMiniCard, setActiveMiniCard] = useState<{ user: IUser, position: { x: number, y: number } } | null>(null);
 
   // Sync with props (via effect, not during render)
   useEffect(() => {
     setLocalMembers(members);
   }, [members]);
 
-  const handleMemberClick = (e: React.MouseEvent, member: IUser) => {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setActiveMiniCard({ 
-      user: member, 
-      position: { x: rect.left - 300, y: Math.min(rect.top, window.innerHeight - 400) } 
-    });
-  };
-
-  const handleFollow = async (targetId: string) => {
-    try {
-      await api.syncIdentity(targetId);
-      alert("Sync Request Transmitted to Yantravani.");
-    } catch (err) { console.error(err); }
-  };
-
   return (
-    <div className="w-64 bg-discord-channel hidden lg:flex flex-col p-4 space-y-6 overflow-y-auto h-full border-l border-gray-900 relative">
+    <div className="w-64 bg-discord-channel hidden lg:flex flex-col p-4 space-y-6 overflow-y-auto h-full border-l border-gray-900 relative font-mono">
       <div>
         <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 ml-2">Identities — {members.length}</h3>
         <div className="space-y-1">
           {localMembers.map(member => {
             const memberId = member._id || member.id;
             const isMe = memberId === (currentUser.id || currentUser._id);
-            const isFollowing = currentUser.following?.includes(memberId);
+            const isFollowing = currentUser.following?.some((f: any) => (f._id || f || '').toString() === memberId.toString());
 
             return (
               <div 
                 key={memberId} 
-                onClick={(e) => handleMemberClick(e, member)}
+                onClick={(e) => (window as any).__vani_show_mini_profile?.(e, member)}
                 className={`group flex items-center p-2 rounded-xl transition-all duration-200 hover:bg-white/[0.03] cursor-pointer`}
               >
                 {/* Avatar */}
@@ -77,19 +57,6 @@ export const MemberSidebar = ({ members, onMemberClick, currentUser }: Props) =>
           })}
         </div>
       </div>
-
-      {activeMiniCard && (
-        <ProfileMiniCard 
-          user={activeMiniCard.user}
-          isMe={(activeMiniCard.user._id || activeMiniCard.user.id) === (currentUser.id || currentUser._id)}
-          isFollowing={currentUser.following?.includes(activeMiniCard.user._id || activeMiniCard.user.id) || false}
-          onViewFull={() => { onMemberClick(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }}
-          onStartDM={() => { onMemberClick(activeMiniCard.user._id || activeMiniCard.user.id); setActiveMiniCard(null); }}
-          onFollow={() => handleFollow(activeMiniCard.user._id || activeMiniCard.user.id)}
-          onClose={() => setActiveMiniCard(null)}
-          position={activeMiniCard.position}
-        />
-      )}
     </div>
   );
 };

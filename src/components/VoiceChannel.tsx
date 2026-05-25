@@ -490,9 +490,9 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
                       <select 
                         value={selectedMic}
                         onChange={(e) => switchMic(e.target.value)}
-                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                        className="w-full bg-[#0a0a0c] border border-white/10 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50 cursor-pointer"
                       >
-                         {audioInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}`}</option>)}
+                         {audioInputs.map(d => <option key={d.deviceId} value={d.deviceId} className="bg-[#0a0a0c] text-white">{d.label || `Mic ${d.deviceId.slice(0, 5)}`}</option>)}
                       </select>
                    </div>
 
@@ -502,9 +502,9 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
                       <select 
                         value={selectedCamera}
                         onChange={(e) => switchCamera(e.target.value)}
-                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                        className="w-full bg-[#0a0a0c] border border-white/10 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50 cursor-pointer"
                       >
-                         {videoInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 5)}`}</option>)}
+                         {videoInputs.map(d => <option key={d.deviceId} value={d.deviceId} className="bg-[#0a0a0c] text-white">{d.label || `Camera ${d.deviceId.slice(0, 5)}`}</option>)}
                       </select>
                    </div>
 
@@ -514,10 +514,10 @@ export const VoiceChannel = ({ channelId, socket, currentUser, onLeave, initialV
                       <select 
                         value={selectedSpeaker}
                         onChange={(e) => switchSpeaker(e.target.value)}
-                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50"
+                        className="w-full bg-[#0a0a0c] border border-white/10 p-4 rounded-2xl text-white text-xs outline-none focus:border-vani-blue/50 cursor-pointer"
                       >
-                         <option value="">System Default</option>
-                         {audioOutputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Speaker ${d.deviceId.slice(0, 5)}`}</option>)}
+                         <option value="" className="bg-[#0a0a0c] text-white">System Default</option>
+                         {audioOutputs.map(d => <option key={d.deviceId} value={d.deviceId} className="bg-[#0a0a0c] text-white">{d.label || `Speaker ${d.deviceId.slice(0, 5)}`}</option>)}
                       </select>
                    </div>
                 </div>
